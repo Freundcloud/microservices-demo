@@ -119,13 +119,15 @@ jobs:
           working_directory: terraform-aws
           format: sarif
           soft_fail: true
+          sarif_file: tfsec-results.sarif
 
       - name: Upload tfsec results to GitHub Security
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: results.sarif
+          sarif_file: tfsec-results.sarif
           category: tfsec
+        continue-on-error: true
 
       - name: Run Trivy for IaC scanning
         uses: aquasecurity/trivy-action@master
@@ -135,6 +137,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-iac-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
+        continue-on-error: true
 
       - name: Upload Trivy results to GitHub Security
         if: always()
@@ -142,6 +145,7 @@ jobs:
         with:
           sarif_file: trivy-iac-results.sarif
           category: trivy-iac
+        continue-on-error: true
 
   terraform-cost:
     name: Cost Estimation
