@@ -42,10 +42,20 @@ terraform.tfvars
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
+*.tfplan
+*.tfplan.json
+*.tf.bak
 terraform-aws/.terraform/
 terraform-aws/terraform.tfstate*
 terraform-aws/.terraform.lock.hcl
+terraform-aws/tfplan
+terraform-aws/*.tfplan
+terraform-aws/*.bak
 
 # AWS CLI
 .aws/credentials
 .aws/config
+
+# Claude Code settings (may contain credentials)
+.claude/settings.local.json
+.claude/
