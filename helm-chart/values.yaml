@@ -17,8 +17,9 @@
 # Declare variables to be passed into your templates.
 
 images:
-  repository: us-central1-docker.pkg.dev/google-samples/microservices-demo
+  repository: gcr.io/google-samples/microservices-demo
   # Overrides the image tag whose default is the chart appVersion.
+  # For AWS deployment, you can use ECR or keep using the public Google samples
   tag: ""
 
 serviceAccounts:
@@ -47,10 +48,11 @@ opentelemetryCollector:
   # Specifies the project id for the otel collector. If set as "PROJECT_ID" (default value), an initContainer will automatically retrieve the project id value from the metadata server.
   projectId: "PROJECT_ID"
 
-googleCloudOperations:
+cloudOperations:
   profiler: false
   tracing: false
   metrics: false
+  # For AWS, use CloudWatch and X-Ray instead
 
 seccompProfile:
   enable: false

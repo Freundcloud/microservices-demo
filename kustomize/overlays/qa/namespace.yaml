@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: frontend
-spec:
-  hosts:
-  - "frontend.default.svc.cluster.local"
-  http:
-  - route:
-    - destination:
-        host: frontend
-        port:
-          number: 80
+  name: microservices-qa
+  labels:
+    environment: qa
+    istio-injection: enabled
+    name: microservices-qa

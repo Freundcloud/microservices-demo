@@ -1,0 +1,188 @@
+# Copyright 2024
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: microservices-qa
+
+resources:
+- ../../base
+- namespace.yaml
+- resourcequota.yaml
+
+components:
+- ../../components/service-mesh-istio
+
+commonLabels:
+  environment: qa
+  managed-by: kustomize
+
+commonAnnotations:
+  deployed-by: kustomize
+  environment: qa
+
+# Image tag suffix for qa environment
+images:
+- name: frontend
+  newName: frontend
+  newTag: qa
+- name: cartservice
+  newName: cartservice
+  newTag: qa
+- name: productcatalogservice
+  newName: productcatalogservice
+  newTag: qa
+- name: currencyservice
+  newName: currencyservice
+  newTag: qa
+- name: paymentservice
+  newName: paymentservice
+  newTag: qa
+- name: shippingservice
+  newName: shippingservice
+  newTag: qa
+- name: emailservice
+  newName: emailservice
+  newTag: qa
+- name: checkoutservice
+  newName: checkoutservice
+  newTag: qa
+- name: recommendationservice
+  newName: recommendationservice
+  newTag: qa
+- name: adservice
+  newName: adservice
+  newTag: qa
+- name: loadgenerator
+  newName: loadgenerator
+  newTag: qa
+
+# Replica patches for qa (moderate replicas)
+# Apply node affinity and tolerations to all deployments
+- path: node-affinity.yaml
+  target:
+    kind: Deployment
+
+patches:
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: frontend
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: frontend
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: cartservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: cartservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: productcatalogservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: productcatalogservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: currencyservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: currencyservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: paymentservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: paymentservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: shippingservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: shippingservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: emailservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: emailservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: checkoutservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: checkoutservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: recommendationservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: recommendationservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: adservice
+    spec:
+      replicas: 2
+  target:
+    kind: Deployment
+    name: adservice
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: loadgenerator
+    spec:
+      replicas: 1
+  target:
+    kind: Deployment
+    name: loadgenerator

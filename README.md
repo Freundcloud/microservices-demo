@@ -1,167 +1,366 @@
-<!-- <p align="center">
+# Online Boutique - AWS Deployment
+
+<p align="center">
 <img src="/src/frontend/static/icons/Hipster_HeroLogoMaroon.svg" width="300" alt="Online Boutique" />
-</p> -->
-![Continuous Integration](https://github.com/GoogleCloudPlatform/microservices-demo/workflows/Continuous%20Integration%20-%20Main/Release/badge.svg)
+</p>
 
-**Online Boutique** is a cloud-first microservices demo application.  The application is a
-web-based e-commerce app where users can browse items, add them to the cart, and purchase them.
+![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen)
+![Terraform](https://img.shields.io/badge/IaC-Terraform-purple)
+![AWS](https://img.shields.io/badge/Cloud-AWS-orange)
+![Istio](https://img.shields.io/badge/Service%20Mesh-Istio-blue)
 
-Google uses this application to demonstrate how developers can modernize enterprise applications using Google Cloud products, including: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine), [Cloud Service Mesh (CSM)](https://cloud.google.com/service-mesh), [gRPC](https://grpc.io/), [Cloud Operations](https://cloud.google.com/products/operations), [Spanner](https://cloud.google.com/spanner), [Memorystore](https://cloud.google.com/memorystore), [AlloyDB](https://cloud.google.com/alloydb), and [Gemini](https://ai.google.dev/). This application works on any Kubernetes cluster.
+**Online Boutique** is a cloud-native microservices demo application deployed on AWS. The application is a web-based e-commerce platform where users can browse items, add them to the cart, and purchase them.
 
-If you’re using this demo, please **★Star** this repository to show your interest!
+This AWS-focused version demonstrates modern cloud-native practices perfect for **GitHub + AWS + ServiceNow** collaboration workflows.
 
-**Note to Googlers:** Please fill out the form at [go/microservices-demo](http://go/microservices-demo).
+## 🚀 Quick Start
 
-## Architecture
+### For New Developers
 
-**Online Boutique** is composed of 11 microservices written in different
-languages that talk to each other over gRPC.
+```bash
+# 1. Clone repository
+git clone <repository-url>
+cd microservices-demo
 
-[![Architecture of
-microservices](/docs/img/architecture-diagram.png)](/docs/img/architecture-diagram.png)
+# 2. Run automated onboarding
+just onboard
 
-Find **Protocol Buffers Descriptions** at the [`./protos` directory](/protos).
+# 3. Configure AWS credentials
+cp .envrc.example .envrc
+# Edit .envrc with your AWS credentials
+source .envrc
 
-| Service                                              | Language      | Description                                                                                                                       |
-| ---------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [frontend](/src/frontend)                           | Go            | Exposes an HTTP server to serve the website. Does not require signup/login and generates session IDs for all users automatically. |
-| [cartservice](/src/cartservice)                     | C#            | Stores the items in the user's shopping cart in Redis and retrieves it.                                                           |
-| [productcatalogservice](/src/productcatalogservice) | Go            | Provides the list of products from a JSON file and ability to search products and get individual products.                        |
-| [currencyservice](/src/currencyservice)             | Node.js       | Converts one money amount to another currency. Uses real values fetched from European Central Bank. It's the highest QPS service. |
-| [paymentservice](/src/paymentservice)               | Node.js       | Charges the given credit card info (mock) with the given amount and returns a transaction ID.                                     |
-| [shippingservice](/src/shippingservice)             | Go            | Gives shipping cost estimates based on the shopping cart. Ships items to the given address (mock)                                 |
-| [emailservice](/src/emailservice)                   | Python        | Sends users an order confirmation email (mock).                                                                                   |
-| [checkoutservice](/src/checkoutservice)             | Go            | Retrieves user cart, prepares order and orchestrates the payment, shipping and the email notification.                            |
-| [recommendationservice](/src/recommendationservice) | Python        | Recommends other products based on what's given in the cart.                                                                      |
-| [adservice](/src/adservice)                         | Java          | Provides text ads based on given context words.                                                                                   |
-| [loadgenerator](/src/loadgenerator)                 | Python/Locust | Continuously sends requests imitating realistic user shopping flows to the frontend.                                              |
+# 4. Deploy single cluster (contains dev, qa, prod node groups)
+just tf-apply
+just k8s-config
 
-## Screenshots
+# 5. Deploy to environments
+kubectl apply -k kustomize/overlays/dev
+kubectl apply -k kustomize/overlays/qa
+kubectl apply -k kustomize/overlays/prod
 
-| Home Page                                                                                                         | Checkout Screen                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+# 6. Access application
+just k8s-url
+```
+
+**See:** [Complete Onboarding Guide](docs/ONBOARDING.md) for detailed setup instructions.
+
+### For Experienced Users
+
+```bash
+# Deploy infrastructure (single cluster with dev, qa, prod node groups)
+cd terraform-aws
+terraform apply
+
+# Configure kubectl
+aws eks update-kubeconfig --region eu-west-2 --name microservices
+
+# Deploy to each environment namespace
+kubectl apply -k ../kustomize/overlays/dev
+kubectl apply -k ../kustomize/overlays/qa
+kubectl apply -k ../kustomize/overlays/prod
+```
+
+## 📚 Documentation
+
+**Complete documentation is available in the [docs/](docs/) directory.**
+
+### Essential Guides
+
+- **[🎓 Developer Onboarding](docs/ONBOARDING.md)** - Start here! Complete setup guide for new developers
+- **[📖 Documentation Index](docs/README.md)** - Complete documentation overview
+- **[☁️  AWS Deployment Guide](docs/README-AWS.md)** - Comprehensive AWS deployment instructions
+- **[🔧 Justfile Reference](justfile)** - All available automation commands
+
+### Setup & Configuration
+
+- [AWS Setup Guide](docs/setup/AWS-SETUP.md) - AWS credentials and permissions
+- [GitHub Actions Setup](docs/setup/GITHUB-ACTIONS-SETUP.md) - CI/CD configuration
+- [Security Scanning](docs/setup/SECURITY-SCANNING.md) - Security tools and processes
+
+### Architecture & Design
+
+- [Repository Structure](docs/architecture/REPOSITORY-STRUCTURE.md) - Complete codebase guide
+- [Istio Service Mesh](docs/architecture/ISTIO-DEPLOYMENT.md) - Service mesh implementation
+- [Product Requirements](docs/architecture/product-requirements.md) - System specifications
+
+### Development
+
+- [Development Guide](docs/development/development-guide.md) - Development workflows
+- [Adding Microservices](docs/development/adding-new-microservice.md) - Service creation guide
+
+## 🏗️ Architecture
+
+**Online Boutique** consists of 12 microservices written in different languages communicating over gRPC:
+
+| Service | Language | Description |
+|---------|----------|-------------|
+| [frontend](src/frontend) | Go | Web UI server |
+| [cartservice](src/cartservice) | C# | Shopping cart with Redis |
+| [productcatalogservice](src/productcatalogservice) | Go | Product inventory |
+| [currencyservice](src/currencyservice) | Node.js | Currency conversion |
+| [paymentservice](src/paymentservice) | Node.js | Payment processing |
+| [shippingservice](src/shippingservice) | Go | Shipping calculations |
+| [emailservice](src/emailservice) | Python | Email notifications |
+| [checkoutservice](src/checkoutservice) | Go | Order orchestration |
+| [recommendationservice](src/recommendationservice) | Python | Product recommendations |
+| [adservice](src/adservice) | Java | Advertisement serving |
+| [loadgenerator](src/loadgenerator) | Python | Load testing |
+| [shoppingassistantservice](src/shoppingassistantservice) | Java | AI shopping assistant |
+
+### AWS Infrastructure
+
+- **Amazon EKS**: Single managed Kubernetes cluster with 3 dedicated node groups
+- **VPC**: Multi-AZ networking in eu-west-2 (London) across 3 availability zones
+- **ElastiCache**: Redis for session storage (shared across all environments)
+- **ECR**: Container registry with vulnerability scanning
+- **Istio**: Service mesh with mTLS, observability (shared control plane)
+- **IAM**: IRSA for secure AWS access
+- **NLB**: Network Load Balancer for ingress
+
+**Region**: eu-west-2 (London, UK)
+
+**See:** [Complete Architecture Guide](docs/architecture/REPOSITORY-STRUCTURE.md) | [Single-Cluster Migration](SINGLE-CLUSTER-MIGRATION.md)
+
+## ✨ Features
+
+### Production-Ready
+- ✅ Multi-language microservices (Go, Python, Java, Node.js, C#)
+- ✅ gRPC communication with Protocol Buffers
+- ✅ Service mesh with Istio for security and observability
+- ✅ Autoscaling with Cluster Autoscaler and HPA
+- ✅ Health checks and readiness probes
+- ✅ Resource limits configured
+- ✅ Structured logging to CloudWatch
+
+### Security
+- ✅ Container scanning with Trivy
+- ✅ SAST with CodeQL (5 languages) and Semgrep
+- ✅ Secret detection with Gitleaks
+- ✅ IaC security with Checkov and tfsec
+- ✅ mTLS enforced between all services
+- ✅ IRSA for secure AWS credentials
+- ✅ Network isolation with Security Groups
+- ✅ SBOM generation for compliance
+
+### Observability
+- ✅ Distributed tracing with Jaeger
+- ✅ Metrics with Prometheus
+- ✅ Visualization with Grafana dashboards
+- ✅ Service topology with Kiali
+- ✅ CloudWatch integration for logs
+
+### Developer Experience
+- ✅ One-command deployment with `just`
+- ✅ Infrastructure as Code with Terraform
+- ✅ Smart build detection (only rebuild changed services)
+- ✅ Multi-environment support (dev, qa, prod)
+- ✅ Comprehensive documentation
+- ✅ Automated onboarding
+
+## 🌍 Single-Cluster Multi-Environment Architecture
+
+**One EKS cluster** hosting **three environments** with four dedicated node groups:
+
+### System Node Group (Cluster Infrastructure)
+
+- **Node Group**: 2-3 × t3.small (2 vCPU, 2GB RAM)
+- **Purpose**: Hosts cluster add-ons (CoreDNS, EBS CSI driver, metrics-server, etc.)
+- **Node Labels**: `role=system`, `workload=cluster-addons`
+- **Taints**: None (allows system pods to schedule)
+- **Cost**: ~$15/month
+
+### Development Environment
+
+- **Namespace**: `microservices-dev`
+- **Node Group**: 2-4 × t3.medium (2 vCPU, 4GB RAM)
+- **Replicas**: 1 per service
+- **Features**: Basic Istio, no load generator
+- **Node Labels**: `environment=dev`, `workload=microservices-dev`
+
+### QA Environment
+
+- **Namespace**: `microservices-qa`
+- **Node Group**: 3-6 × t3.large (2 vCPU, 8GB RAM)
+- **Replicas**: 2 per service
+- **Features**: Full Istio observability stack, load generator enabled
+- **Node Labels**: `environment=qa`, `workload=microservices-qa`
+
+### Production Environment
+
+- **Namespace**: `microservices-prod`
+- **Node Group**: 5-10 × t3.xlarge (4 vCPU, 16GB RAM)
+- **Replicas**: 3 per service (High Availability)
+- **Features**: Full Istio stack, no load generator
+- **Node Labels**: `environment=prod`, `workload=microservices-prod`
+
+**Node Isolation**: Each environment has dedicated nodes via taints/tolerations - dev pods can't run on prod nodes!
+
+**Total Cost**: ~$573/month (vs ~$669/month for 3 separate clusters) - **14% savings**
+
+**Deploy the cluster:**
+
+```bash
+just tf-apply           # Creates single cluster with all 3 node groups
+just k8s-config         # Configure kubectl
+kubectl apply -k kustomize/overlays/dev    # Deploy to dev
+kubectl apply -k kustomize/overlays/qa     # Deploy to qa
+kubectl apply -k kustomize/overlays/prod   # Deploy to prod
+```
+
+**See:** [Single-Cluster Migration Guide](SINGLE-CLUSTER-MIGRATION.md) | [Kustomize Overlays](kustomize/overlays/README.md)
+
+## 🛠️ Common Tasks
+
+All tasks are available via the `justfile`. Run `just` to see all commands.
+
+### Infrastructure
+
+```bash
+just tf-plan                  # Preview infrastructure changes
+just tf-apply                 # Deploy single cluster with 3 node groups
+just tf-destroy               # Destroy cluster (WARNING: all environments!)
+just tf-validate              # Validate Terraform code
+just tf-test                  # Run Terraform tests
+```
+
+### Kubernetes
+
+```bash
+just k8s-config               # Configure kubectl for microservices cluster
+kubectl apply -k kustomize/overlays/dev   # Deploy to dev namespace
+kubectl apply -k kustomize/overlays/qa    # Deploy to qa namespace
+kubectl apply -k kustomize/overlays/prod  # Deploy to prod namespace
+just k8s-status               # Check cluster status
+just k8s-logs frontend        # View service logs
+just k8s-restart frontend     # Restart deployment
+just k8s-scale frontend 5     # Scale deployment
+just k8s-url                  # Get application URL
+```
+
+### Istio Observability
+
+```bash
+just istio-kiali              # Service mesh dashboard
+just istio-grafana            # Metrics visualization
+just istio-jaeger             # Distributed tracing
+just istio-prometheus         # Metrics database
+just istio-analyze            # Analyze configuration
+```
+
+### Development
+
+```bash
+just docker-build frontend    # Build container image
+just docker-build-all         # Build all images
+just ecr-login                # Login to AWS ECR
+just ecr-push frontend dev    # Push image to ECR
+```
+
+### Security & Validation
+
+```bash
+just validate                 # Run all validations
+just security-scan-all        # Run all security scans
+just security-scan-terraform  # Scan IaC
+just security-scan-secrets    # Detect secrets
+```
+
+## 🔐 Security
+
+Comprehensive security scanning on every commit:
+
+- **CodeQL**: Static analysis for Python, JavaScript, Go, Java, C#
+- **Trivy**: Container vulnerability scanning
+- **Gitleaks**: Secret detection
+- **Semgrep**: Pattern-based code analysis
+- **Checkov/tfsec**: Terraform security scanning
+- **OWASP Dependency Check**: Known vulnerable dependencies
+
+All results appear in GitHub Security tab.
+
+**See:** [Security Scanning Guide](docs/setup/SECURITY-SCANNING.md)
+
+## 📊 Cost Estimation
+
+Monthly AWS costs by environment (eu-west-2):
+
+| Component | Dev | QA | Prod |
+|-----------|-----|-----|------|
+| EKS Control Plane | $73 | $73 | $73 |
+| EC2 Nodes | $45 | $90 | $250 |
+| NAT Gateway | $33 | $33 | $45 |
+| Load Balancer | $18 | $18 | $18 |
+| ElastiCache Redis | $10 | $15 | $50 |
+| ECR + Logs | $6 | $6 | $6 |
+| **Total/month** | **~$185** | **~$235** | **~$442** |
+
+**Optimization tips available in:** [Cost Optimization](docs/README-AWS.md#cost-optimization)
+
+## 🚢 CI/CD Pipeline
+
+Automated workflows with GitHub Actions:
+
+- **[terraform-validate.yaml](.github/workflows/terraform-validate.yaml)** - Multi-environment validation and testing
+- **[terraform-plan.yaml](.github/workflows/terraform-plan.yaml)** - Infrastructure preview on PRs
+- **[terraform-apply.yaml](.github/workflows/terraform-apply.yaml)** - Automated deployment on merge
+- **[build-and-push-images.yaml](.github/workflows/build-and-push-images.yaml)** - Container builds with security scans
+- **[security-scan.yaml](.github/workflows/security-scan.yaml)** - Comprehensive security scanning
+- **[deploy-application.yaml](.github/workflows/deploy-application.yaml)** - Application deployment to EKS
+
+**Setup:** [GitHub Actions Configuration](docs/setup/GITHUB-ACTIONS-SETUP.md)
+
+## 📸 Screenshots
+
+| Home Page | Checkout Screen |
+|-----------|-----------------|
 | [![Screenshot of store homepage](/docs/img/online-boutique-frontend-1.png)](/docs/img/online-boutique-frontend-1.png) | [![Screenshot of checkout screen](/docs/img/online-boutique-frontend-2.png)](/docs/img/online-boutique-frontend-2.png) |
 
-## Quickstart (GKE)
+## 🤝 Contributing
 
-1. Ensure you have the following requirements:
-   - [Google Cloud project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project).
-   - Shell environment with `gcloud`, `git`, and `kubectl`.
+Contributions welcome! Please:
 
-2. Clone the latest major version.
+1. Read the [Development Guide](docs/development/development-guide.md)
+2. Follow existing code patterns
+3. Run security scans: `just security-scan-all`
+4. Update documentation as needed
+5. Submit pull request
 
-   ```sh
-   git clone --depth 1 --branch v0 https://github.com/GoogleCloudPlatform/microservices-demo.git
-   cd microservices-demo/
-   ```
+## 📝 License
 
-   The `--depth 1` argument skips downloading git history.
+This project is licensed under the Apache License 2.0 - see individual files for details.
 
-3. Set the Google Cloud project and region and ensure the Google Kubernetes Engine API is enabled.
+Original Google Cloud version: [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo)
 
-   ```sh
-   export PROJECT_ID=<PROJECT_ID>
-   export REGION=us-central1
-   gcloud services enable container.googleapis.com \
-     --project=${PROJECT_ID}
-   ```
+## 🆘 Support
 
-   Substitute `<PROJECT_ID>` with the ID of your Google Cloud project.
+### Getting Help
 
-4. Create a GKE cluster and get the credentials for it.
+1. Check the [Troubleshooting Guide](docs/README-AWS.md#troubleshooting)
+2. Review [Documentation Index](docs/README.md)
+3. Search existing GitHub issues
+4. Open new issue with:
+   - Problem description
+   - Steps to reproduce
+   - Logs and error messages
+   - Environment details
 
-   ```sh
-   gcloud container clusters create-auto online-boutique \
-     --project=${PROJECT_ID} --region=${REGION}
-   ```
+### Additional Resources
 
-   Creating the cluster may take a few minutes.
+- [Amazon EKS Documentation](https://docs.aws.amazon.com/eks/)
+- [Istio Documentation](https://istio.io/latest/docs/)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+- [EKS Best Practices](https://aws.github.io/aws-eks-best-practices/)
 
-5. Deploy Online Boutique to the cluster.
+---
 
-   ```sh
-   kubectl apply -f ./release/kubernetes-manifests.yaml
-   ```
+**⭐ Star this repository if you find it useful!**
 
-6. Wait for the pods to be ready.
-
-   ```sh
-   kubectl get pods
-   ```
-
-   After a few minutes, you should see the Pods in a `Running` state:
-
-   ```
-   NAME                                     READY   STATUS    RESTARTS   AGE
-   adservice-76bdd69666-ckc5j               1/1     Running   0          2m58s
-   cartservice-66d497c6b7-dp5jr             1/1     Running   0          2m59s
-   checkoutservice-666c784bd6-4jd22         1/1     Running   0          3m1s
-   currencyservice-5d5d496984-4jmd7         1/1     Running   0          2m59s
-   emailservice-667457d9d6-75jcq            1/1     Running   0          3m2s
-   frontend-6b8d69b9fb-wjqdg                1/1     Running   0          3m1s
-   loadgenerator-665b5cd444-gwqdq           1/1     Running   0          3m
-   paymentservice-68596d6dd6-bf6bv          1/1     Running   0          3m
-   productcatalogservice-557d474574-888kr   1/1     Running   0          3m
-   recommendationservice-69c56b74d4-7z8r5   1/1     Running   0          3m1s
-   redis-cart-5f59546cdd-5jnqf              1/1     Running   0          2m58s
-   shippingservice-6ccc89f8fd-v686r         1/1     Running   0          2m58s
-   ```
-
-7. Access the web frontend in a browser using the frontend's external IP.
-
-   ```sh
-   kubectl get service frontend-external | awk '{print $4}'
-   ```
-
-   Visit `http://EXTERNAL_IP` in a web browser to access your instance of Online Boutique.
-
-8. Congrats! You've deployed the default Online Boutique. To deploy a different variation of Online Boutique (e.g., with Google Cloud Operations tracing, Istio, etc.), see [Deploy Online Boutique variations with Kustomize](#deploy-online-boutique-variations-with-kustomize).
-
-9. Once you are done with it, delete the GKE cluster.
-
-   ```sh
-   gcloud container clusters delete online-boutique \
-     --project=${PROJECT_ID} --region=${REGION}
-   ```
-
-   Deleting the cluster may take a few minutes.
-
-## Additional deployment options
-
-- **Terraform**: [See these instructions](/terraform) to learn how to deploy Online Boutique using [Terraform](https://www.terraform.io/intro).
-- **Istio / Cloud Service Mesh**: [See these instructions](/kustomize/components/service-mesh-istio/README.md) to deploy Online Boutique alongside an Istio-backed service mesh.
-- **Non-GKE clusters (Minikube, Kind, etc)**: See the [Development guide](/docs/development-guide.md) to learn how you can deploy Online Boutique on non-GKE clusters.
-- **AI assistant using Gemini**: [See these instructions](/kustomize/components/shopping-assistant/README.md) to deploy a Gemini-powered AI assistant that suggests products to purchase based on an image.
-- **And more**: The [`/kustomize` directory](/kustomize) contains instructions for customizing the deployment of Online Boutique with other variations.
-
-## Documentation
-
-- [Development](/docs/development-guide.md) to learn how to run and develop this app locally.
-
-## Demos featuring Online Boutique
-
-- [Platform Engineering in action: Deploy the Online Boutique sample apps with Score and Humanitec](https://medium.com/p/d99101001e69)
-- [The new Kubernetes Gateway API with Istio and Anthos Service Mesh (ASM)](https://medium.com/p/9d64c7009cd)
-- [Use Azure Redis Cache with the Online Boutique sample on AKS](https://medium.com/p/981bd98b53f8)
-- [Sail Sharp, 8 tips to optimize and secure your .NET containers for Kubernetes](https://medium.com/p/c68ba253844a)
-- [Deploy multi-region application with Anthos and Google cloud Spanner](https://medium.com/google-cloud/a2ea3493ed0)
-- [Use Google Cloud Memorystore (Redis) with the Online Boutique sample on GKE](https://medium.com/p/82f7879a900d)
-- [Use Helm to simplify the deployment of Online Boutique, with a Service Mesh, GitOps, and more!](https://medium.com/p/246119e46d53)
-- [How to reduce microservices complexity with Apigee and Anthos Service Mesh](https://cloud.google.com/blog/products/application-modernization/api-management-and-service-mesh-go-together)
-- [gRPC health probes with Kubernetes 1.24+](https://medium.com/p/b5bd26253a4c)
-- [Use Google Cloud Spanner with the Online Boutique sample](https://medium.com/p/f7248e077339)
-- [Seamlessly encrypt traffic from any apps in your Mesh to Memorystore (redis)](https://medium.com/google-cloud/64b71969318d)
-- [Strengthen your app's security with Cloud Service Mesh and Anthos Config Management](https://cloud.google.com/service-mesh/docs/strengthen-app-security)
-- [From edge to mesh: Exposing service mesh applications through GKE Ingress](https://cloud.google.com/architecture/exposing-service-mesh-apps-through-gke-ingress)
-- [Take the first step toward SRE with Cloud Operations Sandbox](https://cloud.google.com/blog/products/operations/on-the-road-to-sre-with-cloud-operations-sandbox)
-- [Deploying the Online Boutique sample application on Cloud Service Mesh](https://cloud.google.com/service-mesh/docs/onlineboutique-install-kpt)
-- [Anthos Service Mesh Workshop: Lab Guide](https://codelabs.developers.google.com/codelabs/anthos-service-mesh-workshop)
-- [KubeCon EU 2019 - Reinventing Networking: A Deep Dive into Istio's Multicluster Gateways - Steve Dake, Independent](https://youtu.be/-t2BfT59zJA?t=982)
-- Google Cloud Next'18 SF
-  - [Day 1 Keynote](https://youtu.be/vJ9OaAqfxo4?t=2416) showing GKE On-Prem
-  - [Day 3 Keynote](https://youtu.be/JQPOPV_VH5w?t=815) showing Stackdriver
-    APM (Tracing, Code Search, Profiler, Google Cloud Build)
-  - [Introduction to Service Management with Istio](https://www.youtube.com/watch?v=wCJrdKdD6UM&feature=youtu.be&t=586)
-- [Google Cloud Next'18 London – Keynote](https://youtu.be/nIq2pkNcfEI?t=3071)
-  showing Stackdriver Incident Response Management
-- [Microservices demo showcasing Go Micro](https://github.com/go-micro/demo)
+**Perfect for demonstrating:**
+- Microservices architecture on AWS EKS
+- Istio service mesh with mTLS
+- GitOps workflows with GitHub Actions
+- Multi-language gRPC applications
+- Comprehensive security scanning
+- Infrastructure as Code with Terraform
+- Cloud-native observability

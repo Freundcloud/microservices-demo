@@ -1,0 +1,147 @@
+name: "Terraform Apply - AWS Infrastructure"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform-aws/**'
+      - '.github/workflows/terraform-apply.yaml'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  TF_VERSION: 1.5.0
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    environment: production
+
+    defaults:
+      run:
+        working-directory: terraform-aws
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out=tfplan -input=false
+
+      - name: Terraform Apply
+        if: github.event.inputs.action != 'destroy'
+        id: apply
+        run: terraform apply -auto-approve -input=false tfplan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        id: destroy
+        run: terraform destroy -auto-approve -input=false
+
+      - name: Get EKS Cluster Info
+        if: steps.apply.outcome == 'success'
+        id: eks-info
+        run: |
+          echo "cluster_name=$(terraform output -raw cluster_name)" >> $GITHUB_OUTPUT
+          echo "cluster_endpoint=$(terraform output -raw cluster_endpoint)" >> $GITHUB_OUTPUT
+          echo "region=$(terraform output -raw region)" >> $GITHUB_OUTPUT
+
+      - name: Update kubeconfig
+        if: steps.apply.outcome == 'success'
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ steps.eks-info.outputs.region }} \
+            --name ${{ steps.eks-info.outputs.cluster_name }}
+
+      - name: Verify EKS Access
+        if: steps.apply.outcome == 'success'
+        run: kubectl get nodes
+
+      - name: Create Summary
+        if: always()
+        run: |
+          echo "## Terraform Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format Check**: ${{ steps.fmt.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Init**: ${{ steps.init.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validate**: ${{ steps.validate.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Plan**: ${{ steps.plan.outcome }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.action }}" != "destroy" ]; then
+            echo "- **Apply**: ${{ steps.apply.outcome }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Destroy**: ${{ steps.destroy.outcome }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.apply.outcome }}" == "success" ]; then
+            echo "### Cluster Information" >> $GITHUB_STEP_SUMMARY
+            echo "- **Cluster Name**: ${{ steps.eks-info.outputs.cluster_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Region**: ${{ steps.eks-info.outputs.region }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Endpoint**: ${{ steps.eks-info.outputs.cluster_endpoint }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "aws eks update-kubeconfig --region ${{ steps.eks-info.outputs.region }} --name ${{ steps.eks-info.outputs.cluster_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "kubectl apply -f release/kubernetes-manifests.yaml" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Optional: Trigger application deployment after infrastructure is ready
+  trigger-app-deployment:
+    name: Trigger Application Deployment
+    needs: terraform-apply
+    if: github.event.inputs.action != 'destroy' && success()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger App Deploy Workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-application.yaml',
+              ref: 'main'
+            })
