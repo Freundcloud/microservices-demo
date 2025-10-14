@@ -42,12 +42,6 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "availability_zones" {
-  description = "List of availability zones to use"
-  type        = list(string)
-  default     = ["eu-west-2a", "eu-west-2b", "eu-west-2c"]
-}
-
 variable "private_subnet_cidrs" {
   description = "CIDR blocks for private subnets"
   type        = list(string)
@@ -112,18 +106,6 @@ variable "enable_metrics_server" {
   description = "Enable Kubernetes Metrics Server"
   type        = bool
   default     = true
-}
-
-variable "namespace" {
-  description = "Kubernetes namespace for Online Boutique deployment"
-  type        = string
-  default     = "default"
-}
-
-variable "deploy_app" {
-  description = "Deploy the Online Boutique application after infrastructure setup"
-  type        = bool
-  default     = false
 }
 
 variable "tags" {
