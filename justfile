@@ -458,3 +458,326 @@ backend-destroy:
     @echo "Press Ctrl+C to cancel, or Enter to continue..."
     @read
     cd terraform-aws/backend && terraform destroy
+
+# ==============================================================================
+# Cluster Management & Monitoring
+# ==============================================================================
+
+# Show complete cluster status overview
+cluster-status:
+    @echo "📊 Cluster Status Overview"
+    @echo "=========================="
+    @echo ""
+    @echo "🏗️  Node Groups:"
+    @kubectl get nodes -L workload -L environment --sort-by=.metadata.labels.workload
+    @echo ""
+    @echo "📦 Pods by Namespace:"
+    @kubectl get pods --all-namespaces | grep -E "NAMESPACE|istio-system|microservices|kube-system" | grep -v "Completed"
+    @echo ""
+    @echo "🔧 Cluster Add-ons:"
+    @kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller,app.kubernetes.io/name=cluster-autoscaler
+    @echo ""
+    @echo "📈 Resource Usage:"
+    @kubectl top nodes 2>/dev/null || echo "⚠️  Metrics not available (metrics-server may still be starting)"
+
+# Show detailed node information
+nodes-info:
+    @echo "🖥️  Node Details"
+    @echo "==============="
+    @echo ""
+    @for node in $(kubectl get nodes -o name); do \
+        echo "Node: $$node"; \
+        kubectl describe $$node | grep -E "Name:|Role:|Instance:|Capacity:|Allocatable:|Allocated"; \
+        echo ""; \
+    done
+
+# Show node resource utilization
+nodes-usage:
+    @echo "📊 Node Resource Usage"
+    @echo "====================="
+    @kubectl top nodes --sort-by=memory 2>/dev/null || echo "⚠️  Metrics not available"
+
+# Show pod resource utilization
+pods-usage NAMESPACE="":
+    #!/usr/bin/env bash
+    if [ -z "{{NAMESPACE}}" ]; then
+        echo "📊 Pod Resource Usage (All Namespaces)"
+        echo "======================================"
+        kubectl top pods --all-namespaces --sort-by=memory 2>/dev/null || echo "⚠️  Metrics not available"
+    else
+        echo "📊 Pod Resource Usage ({{NAMESPACE}})"
+        echo "======================================"
+        kubectl top pods -n {{NAMESPACE}} --sort-by=memory 2>/dev/null || echo "⚠️  Metrics not available"
+    fi
+
+# Monitor cluster events in real-time
+events-watch NAMESPACE="default":
+    @echo "👀 Watching cluster events in {{NAMESPACE}}..."
+    @kubectl get events -n {{NAMESPACE}} --watch
+
+# Show all events with timestamps
+events-recent NAMESPACE="":
+    #!/usr/bin/env bash
+    if [ -z "{{NAMESPACE}}" ]; then
+        echo "📋 Recent Cluster Events (All Namespaces)"
+        echo "========================================="
+        kubectl get events --all-namespaces --sort-by=.metadata.creationTimestamp | tail -50
+    else
+        echo "📋 Recent Events in {{NAMESPACE}}"
+        echo "=================================="
+        kubectl get events -n {{NAMESPACE}} --sort-by=.metadata.creationTimestamp | tail -30
+    fi
+
+# Check cluster health status
+health-check:
+    @echo "🏥 Cluster Health Check"
+    @echo "======================="
+    @echo ""
+    @echo "✅ Checking API Server..."
+    @kubectl cluster-info | head -1
+    @echo ""
+    @echo "✅ Checking Node Status..."
+    @kubectl get nodes --no-headers | awk '{print "  " $1 ": " $2}'
+    @echo ""
+    @echo "✅ Checking System Pods..."
+    @kubectl get pods -n kube-system --no-headers | grep -v Running | grep -v Completed || echo "  All system pods running"
+    @echo ""
+    @echo "✅ Checking Istio..."
+    @kubectl get pods -n istio-system --no-headers | grep -v Running | grep -v Completed || echo "  All Istio pods running"
+    @echo ""
+    @echo "✅ Checking Add-ons..."
+    @kubectl get deploy -n kube-system aws-load-balancer-controller metrics-server cluster-autoscaler 2>/dev/null | tail -n +2 || echo "  ⚠️  Some add-ons not found"
+
+# Show resource quotas and limits
+quotas-info NAMESPACE="":
+    #!/usr/bin/env bash
+    if [ -z "{{NAMESPACE}}" ]; then
+        echo "📏 Resource Quotas (All Namespaces)"
+        echo "==================================="
+        kubectl get resourcequota --all-namespaces
+        echo ""
+        echo "📏 Limit Ranges (All Namespaces)"
+        echo "================================"
+        kubectl get limitrange --all-namespaces
+    else
+        echo "📏 Resource Quotas in {{NAMESPACE}}"
+        echo "===================================="
+        kubectl describe resourcequota -n {{NAMESPACE}}
+        echo ""
+        echo "📏 Limit Ranges in {{NAMESPACE}}"
+        echo "================================"
+        kubectl describe limitrange -n {{NAMESPACE}}
+    fi
+
+# Monitor Istio service mesh health
+istio-health:
+    @echo "🕸️  Istio Service Mesh Health"
+    @echo "============================"
+    @echo ""
+    @echo "Control Plane:"
+    @kubectl get pods -n istio-system -l app=istiod
+    @echo ""
+    @echo "Ingress Gateway:"
+    @kubectl get pods -n istio-system -l app=istio-ingressgateway
+    @echo ""
+    @echo "Proxy Status:"
+    @istioctl proxy-status 2>/dev/null || echo "⚠️  istioctl not installed"
+    @echo ""
+    @echo "Configuration Analysis:"
+    @istioctl analyze --all-namespaces 2>/dev/null || echo "⚠️  istioctl not installed"
+
+# Show Istio ingress gateway URL and status
+istio-ingress-info:
+    @echo "🌐 Istio Ingress Gateway Information"
+    @echo "===================================="
+    @echo ""
+    @echo "Gateway Service:"
+    @kubectl get svc -n istio-system istio-ingressgateway
+    @echo ""
+    @echo "External URL:"
+    @echo "  http://$(kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+    @echo ""
+    @echo "Gateway Configuration:"
+    @kubectl get gateway -n default
+
+# Tail logs from all pods in a deployment
+logs-tail DEPLOYMENT NAMESPACE="default":
+    @echo "📜 Tailing logs for {{DEPLOYMENT}} in {{NAMESPACE}}..."
+    @kubectl logs -f -n {{NAMESPACE}} -l app={{DEPLOYMENT}} --all-containers=true --tail=50
+
+# Show logs from Istio sidecar proxy
+logs-proxy POD NAMESPACE="default":
+    @echo "📜 Istio proxy logs for {{POD}} in {{NAMESPACE}}..."
+    @kubectl logs -n {{NAMESPACE}} {{POD}} -c istio-proxy --tail=100
+
+# Describe a pod with full details
+pod-describe POD NAMESPACE="default":
+    @kubectl describe pod -n {{NAMESPACE}} {{POD}}
+
+# Get shell access to a pod
+pod-exec POD NAMESPACE="default" CONTAINER="":
+    #!/usr/bin/env bash
+    if [ -z "{{CONTAINER}}" ]; then
+        kubectl exec -it -n {{NAMESPACE}} {{POD}} -- /bin/sh
+    else
+        kubectl exec -it -n {{NAMESPACE}} {{POD}} -c {{CONTAINER}} -- /bin/sh
+    fi
+
+# Port forward to a service
+port-forward SERVICE PORT NAMESPACE="default":
+    @echo "🔌 Port forwarding {{SERVICE}}:{{PORT}} in {{NAMESPACE}}..."
+    @kubectl port-forward -n {{NAMESPACE}} svc/{{SERVICE}} {{PORT}}:{{PORT}}
+
+# Show all services and their endpoints
+services-list NAMESPACE="":
+    #!/usr/bin/env bash
+    if [ -z "{{NAMESPACE}}" ]; then
+        echo "🌐 Services (All Namespaces)"
+        echo "============================"
+        kubectl get svc --all-namespaces -o wide
+    else
+        echo "🌐 Services in {{NAMESPACE}}"
+        echo "==========================="
+        kubectl get svc -n {{NAMESPACE}} -o wide
+        echo ""
+        echo "Endpoints:"
+        kubectl get endpoints -n {{NAMESPACE}}
+    fi
+
+# Show network policies
+network-policies NAMESPACE="":
+    #!/usr/bin/env bash
+    if [ -z "{{NAMESPACE}}" ]; then
+        echo "🔒 Network Policies (All Namespaces)"
+        echo "===================================="
+        kubectl get networkpolicies --all-namespaces
+    else
+        echo "🔒 Network Policies in {{NAMESPACE}}"
+        echo "===================================="
+        kubectl describe networkpolicies -n {{NAMESPACE}}
+    fi
+
+# Cordon a node (mark as unschedulable)
+node-cordon NODE:
+    @echo "🚫 Cordoning node {{NODE}}..."
+    @kubectl cordon {{NODE}}
+    @echo "✅ Node {{NODE}} is now unschedulable"
+
+# Uncordon a node (mark as schedulable)
+node-uncordon NODE:
+    @echo "✅ Uncordoning node {{NODE}}..."
+    @kubectl uncordon {{NODE}}
+    @echo "✅ Node {{NODE}} is now schedulable"
+
+# Drain a node (safely evict all pods)
+node-drain NODE:
+    @echo "💧 Draining node {{NODE}}..."
+    @kubectl drain {{NODE}} --ignore-daemonsets --delete-emptydir-data
+    @echo "✅ Node {{NODE}} has been drained"
+
+# Show persistent volumes and claims
+storage-info NAMESPACE="":
+    #!/usr/bin/env bash
+    echo "💾 Persistent Volumes"
+    echo "====================="
+    kubectl get pv
+    echo ""
+    if [ -z "{{NAMESPACE}}" ]; then
+        echo "📦 Persistent Volume Claims (All Namespaces)"
+        echo "============================================"
+        kubectl get pvc --all-namespaces
+    else
+        echo "📦 Persistent Volume Claims in {{NAMESPACE}}"
+        echo "============================================="
+        kubectl get pvc -n {{NAMESPACE}}
+    fi
+
+# Show all ConfigMaps and Secrets
+config-info NAMESPACE="default":
+    @echo "⚙️  ConfigMaps in {{NAMESPACE}}"
+    @echo "=============================="
+    @kubectl get configmaps -n {{NAMESPACE}}
+    @echo ""
+    @echo "🔐 Secrets in {{NAMESPACE}}"
+    @echo "=========================="
+    @kubectl get secrets -n {{NAMESPACE}}
+
+# Backup all Kubernetes manifests
+backup-manifests OUTPUT_DIR="./backup":
+    #!/usr/bin/env bash
+    echo "💾 Backing up Kubernetes manifests to {{OUTPUT_DIR}}..."
+    mkdir -p {{OUTPUT_DIR}}
+    kubectl get all --all-namespaces -o yaml > {{OUTPUT_DIR}}/all-resources.yaml
+    kubectl get configmaps --all-namespaces -o yaml > {{OUTPUT_DIR}}/configmaps.yaml
+    kubectl get secrets --all-namespaces -o yaml > {{OUTPUT_DIR}}/secrets.yaml
+    kubectl get pv,pvc --all-namespaces -o yaml > {{OUTPUT_DIR}}/storage.yaml
+    echo "✅ Backup complete: {{OUTPUT_DIR}}"
+
+# Generate diagnostic bundle for troubleshooting
+diagnostics OUTPUT_DIR="./diagnostics":
+    #!/usr/bin/env bash
+    echo "🔍 Generating diagnostic bundle..."
+    mkdir -p {{OUTPUT_DIR}}
+    
+    echo "Collecting cluster info..."
+    kubectl cluster-info dump > {{OUTPUT_DIR}}/cluster-info.txt 2>&1
+    
+    echo "Collecting node info..."
+    kubectl get nodes -o wide > {{OUTPUT_DIR}}/nodes.txt
+    kubectl describe nodes > {{OUTPUT_DIR}}/nodes-detailed.txt
+    
+    echo "Collecting pod info..."
+    kubectl get pods --all-namespaces -o wide > {{OUTPUT_DIR}}/pods.txt
+    kubectl get events --all-namespaces --sort-by=.metadata.creationTimestamp > {{OUTPUT_DIR}}/events.txt
+    
+    echo "Collecting Istio info..."
+    kubectl get all -n istio-system > {{OUTPUT_DIR}}/istio-resources.txt 2>&1
+    istioctl proxy-status > {{OUTPUT_DIR}}/istio-proxy-status.txt 2>&1 || true
+    
+    echo "Collecting logs..."
+    mkdir -p {{OUTPUT_DIR}}/logs
+    for ns in kube-system istio-system default; do
+        for pod in $(kubectl get pods -n $ns -o name); do
+            podname=$(echo $pod | cut -d'/' -f2)
+            kubectl logs -n $ns $pod --all-containers=true > {{OUTPUT_DIR}}/logs/${ns}-${podname}.log 2>&1 || true
+        done
+    done
+    
+    echo "✅ Diagnostic bundle created: {{OUTPUT_DIR}}"
+    echo "📦 Archive with: tar czf diagnostics.tar.gz {{OUTPUT_DIR}}"
+
+# Quick help for cluster management commands
+cluster-help:
+    @echo "🎯 Cluster Management Commands"
+    @echo "=============================="
+    @echo ""
+    @echo "📊 Status & Monitoring:"
+    @echo "  just cluster-status          - Complete cluster overview"
+    @echo "  just health-check            - Quick health status"
+    @echo "  just nodes-info              - Detailed node information"
+    @echo "  just nodes-usage             - Node resource usage"
+    @echo "  just pods-usage [NAMESPACE]  - Pod resource usage"
+    @echo ""
+    @echo "🕸️  Istio Service Mesh:"
+    @echo "  just istio-health            - Istio control plane status"
+    @echo "  just istio-ingress-info      - Gateway URL and status"
+    @echo "  just istio-kiali             - Open Kiali dashboard"
+    @echo "  just istio-grafana           - Open Grafana dashboard"
+    @echo ""
+    @echo "📜 Logs & Events:"
+    @echo "  just logs-tail DEPLOYMENT [NS]  - Stream deployment logs"
+    @echo "  just events-watch [NAMESPACE]   - Watch events live"
+    @echo "  just events-recent [NAMESPACE]  - Recent events"
+    @echo ""
+    @echo "🔧 Node Management:"
+    @echo "  just node-cordon NODE        - Mark node unschedulable"
+    @echo "  just node-drain NODE         - Safely evict pods"
+    @echo "  just node-uncordon NODE      - Mark node schedulable"
+    @echo ""
+    @echo "🔍 Troubleshooting:"
+    @echo "  just diagnostics [DIR]       - Generate diagnostic bundle"
+    @echo "  just pod-describe POD [NS]   - Pod details"
+    @echo "  just logs-proxy POD [NS]     - Istio sidecar logs"
+    @echo ""
+    @echo "Run 'just' to see all commands"
+

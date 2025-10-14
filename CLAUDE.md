@@ -58,6 +58,42 @@ just k8s-scale frontend 5     # Scale to 5 replicas
 just k8s-url                  # Get application URL
 ```
 
+### Cluster Management & Monitoring
+```bash
+# Status & Health
+just cluster-status          # Complete cluster overview
+just health-check            # Quick health check
+just nodes-info              # Detailed node information
+just nodes-usage             # Node resource utilization
+just pods-usage [NAMESPACE]  # Pod resource usage
+
+# Istio Service Mesh
+just istio-health            # Istio control plane status
+just istio-ingress-info      # Gateway URL and configuration
+just istio-kiali             # Open Kiali dashboard (port 20001)
+just istio-grafana           # Open Grafana dashboard (port 3000)
+
+# Logs & Events
+just logs-tail DEPLOYMENT [NS]    # Stream deployment logs
+just logs-proxy POD [NS]          # Istio sidecar logs
+just events-watch [NAMESPACE]     # Watch events in real-time
+just events-recent [NAMESPACE]    # Show recent events
+
+# Node Management
+just node-cordon NODE        # Mark node unschedulable
+just node-drain NODE         # Safely evict all pods
+just node-uncordon NODE      # Mark node schedulable
+
+# Troubleshooting
+just diagnostics [DIR]       # Generate diagnostic bundle
+just pod-describe POD [NS]   # Full pod details
+just pod-exec POD [NS]       # Shell access to pod
+just port-forward SVC PORT   # Port forward to service
+
+# Help
+just cluster-help            # Show all cluster commands
+```
+
 ### Kustomize Multi-Environment Deployment
 ```bash
 # Preview changes before applying
@@ -133,20 +169,27 @@ just clean-all                # Clean Docker and Terraform artifacts
 - **Availability Zones**: eu-west-2a, eu-west-2b, eu-west-2c
 
 ### Node Groups
-1. **Dev Node Group**
-   - Instance: t3.medium (2 vCPU, 4 GB RAM)
+1. **System Node Group**
+   - Instance: t3.xlarge (4 vCPU, 16 GB RAM)
+   - Min/Max/Desired: 2/3/2
+   - Labels: `role=system`, `workload=cluster-addons`
+   - Taints: None (allows system pods to schedule)
+   - Purpose: Cluster infrastructure (CoreDNS, Istio, EBS CSI, ALB Controller)
+
+2. **Dev Node Group**
+   - Instance: t3.xlarge (4 vCPU, 16 GB RAM)
    - Min/Max/Desired: 2/4/2
    - Labels: `environment=dev`, `workload=microservices-dev`
    - Taints: `environment=dev:NoSchedule`
 
-2. **QA Node Group**
-   - Instance: t3.large (2 vCPU, 8 GB RAM)
+3. **QA Node Group**
+   - Instance: t3.2xlarge (8 vCPU, 32 GB RAM)
    - Min/Max/Desired: 3/6/3
    - Labels: `environment=qa`, `workload=microservices-qa`
    - Taints: `environment=qa:NoSchedule`
 
-3. **Prod Node Group**
-   - Instance: t3.xlarge (4 vCPU, 16 GB RAM)
+4. **Prod Node Group**
+   - Instance: m5.4xlarge (16 vCPU, 64 GB RAM)
    - Min/Max/Desired: 5/10/5
    - Labels: `environment=prod`, `workload=microservices-prod`
    - Taints: `environment=prod:NoSchedule`
