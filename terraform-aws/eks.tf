@@ -143,7 +143,7 @@ module "eks" {
       max_size     = 4
       desired_size = 2
 
-      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM
+      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -172,11 +172,11 @@ module "eks" {
     qa = {
       name = "${var.cluster_name}-qa-ng"
 
-      min_size     = 3
-      max_size     = 6
-      desired_size = 3
+      min_size     = 4
+      max_size     = 8
+      desired_size = 4
 
-      instance_types = ["t3.2xlarge"] # 8 vCPU, 32 GB RAM
+      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -205,11 +205,11 @@ module "eks" {
     prod = {
       name = "${var.cluster_name}-prod-ng"
 
-      min_size     = 5
-      max_size     = 10
-      desired_size = 5
+      min_size     = 4
+      max_size     = 8
+      desired_size = 4
 
-      instance_types = ["m5.4xlarge"] # 16 vCPU, 64 GB RAM
+      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM
       capacity_type  = "ON_DEMAND"
 
       labels = {
