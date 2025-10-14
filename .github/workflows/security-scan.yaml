@@ -207,10 +207,17 @@ jobs:
           docker run --rm -v $(pwd):/project kubesec/kubesec:v2 scan /project/kubernetes-manifests/*.yaml > kubesec-results.json
         continue-on-error: true
 
-      - name: Run Polaris
-        uses: fairwindsops/polaris-action@v1
-        with:
-          path: kubernetes-manifests/
+      - name: Install Polaris CLI
+        run: |
+          wget -O polaris https://github.com/FairwindsOps/polaris/releases/latest/download/polaris_linux_amd64
+          chmod +x polaris
+          sudo mv polaris /usr/local/bin/
+        continue-on-error: true
+
+      - name: Run Polaris Audit
+        run: |
+          polaris audit --audit-path kubernetes-manifests/ --format json > polaris-results.json || true
+        continue-on-error: true
 
       - name: Upload Polaris Results
         uses: actions/upload-artifact@v4
