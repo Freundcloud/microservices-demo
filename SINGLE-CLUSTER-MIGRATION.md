@@ -11,7 +11,7 @@ The project has been migrated from a **3-cluster architecture** to a **single-cl
 - `microservices-qa` cluster (dedicated VPC, dedicated nodes)
 - `microservices-prod` cluster (dedicated VPC, dedicated nodes)
 
-**Cost:** ~$219/month for control planes alone ($73 × 3) + 3× node costs
+**Cost:** ~£180/month for control planes alone (£60 × 3) + 3× node costs
 
 ## Architecture Now
 
@@ -49,7 +49,7 @@ The project has been migrated from a **3-cluster architecture** to a **single-cl
 - `microservices-qa` (2 replicas per service)
 - `microservices-prod` (3 replicas per service)
 
-**Cost:** ~$73/month for control plane + shared infrastructure = **~$146/month savings**
+**Cost:** ~£60/month for control plane + shared infrastructure = **~£120/month savings**
 
 ## Region Configuration
 
@@ -70,7 +70,7 @@ When all node groups have taints (dev, qa, prod), Kubernetes system components l
 - Istio control plane components to deploy
 - System monitoring and observability tools to function
 
-The system node group is small (t3.small) and cost-effective (~$15/month for 2 nodes) while ensuring cluster stability.
+The system node group is small (t3.small) and cost-effective (~£12/month for 2 nodes) while ensuring cluster stability.
 
 ## Node Affinity & Isolation
 
@@ -175,20 +175,21 @@ kubectl get pods -n microservices-prod -o wide
 ## Cost Breakdown
 
 ### Old Architecture (3 Clusters)
-- EKS Control Planes: 3 × $73 = $219/month
-- Dev nodes: 2 × t3.medium = ~$60/month
-- QA nodes: 3 × t3.medium = ~$90/month
-- Prod nodes: 5 × t3.large = ~$300/month
-- **Total: ~$669/month**
+- EKS Control Planes: 3 × £60 = £180/month
+- Dev nodes: 2 × t3.medium = ~£49/month
+- QA nodes: 3 × t3.medium = ~£74/month
+- Prod nodes: 5 × t3.large = ~£246/month
+- **Total: ~£549/month**
 
 ### New Architecture (1 Cluster)
-- EKS Control Plane: 1 × $73 = $73/month
-- Dev nodes: 2 × t3.medium = ~$60/month
-- QA nodes: 3 × t3.large = ~$100/month
-- Prod nodes: 5 × t3.xlarge = ~$340/month
-- **Total: ~$573/month**
+- EKS Control Plane: 1 × £60 = £60/month
+- System nodes: 2 × t3.small = ~£12/month
+- Dev nodes: 2 × t3.medium = ~£49/month
+- QA nodes: 3 × t3.large = ~£82/month
+- Prod nodes: 5 × t3.xlarge = ~£279/month
+- **Total: ~£482/month**
 
-**Savings: ~$96/month (~14% reduction)**
+**Savings: ~£67/month (~12% reduction)**
 
 Plus additional savings from:
 - Shared VPC infrastructure
@@ -217,7 +218,7 @@ Each namespace has resource quotas to prevent overconsumption:
 
 ## Benefits
 
-✅ **Cost Savings**: ~$96/month base savings
+✅ **Cost Savings**: ~£67/month base savings
 ✅ **Simplified Management**: One cluster to maintain
 ✅ **Resource Efficiency**: Shared infrastructure components
 ✅ **Proper Isolation**: Node-level separation via taints/tolerations

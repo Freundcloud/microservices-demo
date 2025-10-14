@@ -168,7 +168,7 @@ kubectl apply -k ../kustomize/overlays/prod
 - **Purpose**: Hosts cluster add-ons (CoreDNS, EBS CSI driver, metrics-server, etc.)
 - **Node Labels**: `role=system`, `workload=cluster-addons`
 - **Taints**: None (allows system pods to schedule)
-- **Cost**: ~$15/month
+- **Cost**: ~£12/month
 
 ### Development Environment
 
@@ -196,7 +196,7 @@ kubectl apply -k ../kustomize/overlays/prod
 
 **Node Isolation**: Each environment has dedicated nodes via taints/tolerations - dev pods can't run on prod nodes!
 
-**Total Cost**: ~$573/month (vs ~$669/month for 3 separate clusters) - **14% savings**
+**Total Cost**: ~£470/month (vs ~£549/month for 3 separate clusters) - **14% savings**
 
 **Deploy the cluster:**
 
@@ -287,13 +287,13 @@ Monthly AWS costs by environment (eu-west-2):
 
 | Component | Dev | QA | Prod |
 |-----------|-----|-----|------|
-| EKS Control Plane | $73 | $73 | $73 |
-| EC2 Nodes | $45 | $90 | $250 |
-| NAT Gateway | $33 | $33 | $45 |
-| Load Balancer | $18 | $18 | $18 |
-| ElastiCache Redis | $10 | $15 | $50 |
-| ECR + Logs | $6 | $6 | $6 |
-| **Total/month** | **~$185** | **~$235** | **~$442** |
+| EKS Control Plane | £60 | £60 | £60 |
+| EC2 Nodes | £37 | £74 | £205 |
+| NAT Gateway | £27 | £27 | £37 |
+| Load Balancer | £15 | £15 | £15 |
+| ElastiCache Redis | £8 | £12 | £41 |
+| ECR + Logs | £5 | £5 | £5 |
+| **Total/month** | **~£152** | **~£193** | **~£363** |
 
 **Optimization tips available in:** [Cost Optimization](docs/README-AWS.md#cost-optimization)
 
