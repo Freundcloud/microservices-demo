@@ -33,6 +33,13 @@ Essential guides for getting started:
   - GitHub Security integration
   - Viewing and handling security alerts
 
+- **[ServiceNow Integration](SERVICENOW-INTEGRATION.md)**
+  - ServiceNow DevOps security scan integration
+  - Centralized security dashboard
+  - Compliance tracking and reporting
+  - Security gate policy enforcement
+  - Interactive setup script
+
 ### 🏗️ Architecture Documentation
 
 Understanding the system design:
