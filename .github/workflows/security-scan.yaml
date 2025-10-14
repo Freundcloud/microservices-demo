@@ -283,3 +283,94 @@ jobs:
           echo "**Note**: Gitleaks secret scanning disabled (requires paid license)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
+
+  # ServiceNow Security Results Integration
+  servicenow-codeql-results:
+    name: ServiceNow CodeQL Results
+    needs: codeql-analysis
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ServiceNow DevOps Security Results - CodeQL
+        uses: ServiceNow/servicenow-devops-security-result@v3.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow CodeQL Results'
+          security-result-attributes: '{"scanner": "CodeQL", "securityToolId": "${{ secrets.SN_CODEQL_TOOL_ID }}"}'
+
+  servicenow-semgrep-results:
+    name: ServiceNow Semgrep Results
+    needs: semgrep-scan
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ServiceNow DevOps Security Results - Semgrep
+        uses: ServiceNow/servicenow-devops-security-result@v3.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow Semgrep Results'
+          security-result-attributes: '{"scanner": "Semgrep", "securityToolId": "${{ secrets.SN_SEMGREP_TOOL_ID }}"}'
+
+  servicenow-trivy-results:
+    name: ServiceNow Trivy Results
+    needs: trivy-fs-scan
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ServiceNow DevOps Security Results - Trivy
+        uses: ServiceNow/servicenow-devops-security-result@v3.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow Trivy Results'
+          security-result-attributes: '{"scanner": "Trivy", "securityToolId": "${{ secrets.SN_TRIVY_TOOL_ID }}"}'
+
+  servicenow-iac-results:
+    name: ServiceNow IaC Scan Results
+    needs: iac-scan
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ServiceNow DevOps Security Results - Checkov
+        uses: ServiceNow/servicenow-devops-security-result@v3.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow Checkov Results'
+          security-result-attributes: '{"scanner": "Checkov", "securityToolId": "${{ secrets.SN_CHECKOV_TOOL_ID }}"}'
+
+  servicenow-owasp-results:
+    name: ServiceNow OWASP Results
+    needs: owasp-dependency-check
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ServiceNow DevOps Security Results - OWASP
+        uses: ServiceNow/servicenow-devops-security-result@v3.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow OWASP Dependency Check Results'
+          security-result-attributes: '{"scanner": "OWASP Dependency Check", "securityToolId": "${{ secrets.SN_OWASP_TOOL_ID }}"}'
