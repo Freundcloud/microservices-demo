@@ -63,22 +63,22 @@ jobs:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0
 
-  # Secret scanning with Gitleaks
-  secret-scanning:
-    name: Secret Scanning
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+  # Secret scanning with Gitleaks - DISABLED (requires paid license)
+  # secret-scanning:
+  #   name: Secret Scanning
+  #   runs-on: ubuntu-latest
+  #
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #
+  #     - name: Run Gitleaks
+  #       uses: gitleaks/gitleaks-action@v2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   # SAST with Semgrep
   semgrep-scan:
@@ -246,7 +246,7 @@ jobs:
   # Security summary
   security-summary:
     name: Security Summary
-    needs: [codeql-analysis, secret-scanning, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan]
+    needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan]
     if: always()
     runs-on: ubuntu-latest
 
@@ -260,7 +260,6 @@ jobs:
           echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Secret Scanning | ${{ needs.secret-scanning.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Semgrep SAST | ${{ needs.semgrep-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Trivy Filesystem | ${{ needs.trivy-fs-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| IaC Scanning | ${{ needs.iac-scan.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -268,11 +267,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Security Tools Used" >> $GITHUB_STEP_SUMMARY
           echo "- 🔍 **CodeQL**: Multi-language semantic code analysis" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔐 **Gitleaks**: Secret scanning in code and history" >> $GITHUB_STEP_SUMMARY
           echo "- 🛡️ **Semgrep**: Static application security testing" >> $GITHUB_STEP_SUMMARY
           echo "- 📦 **Trivy**: Vulnerability and misconfig scanner" >> $GITHUB_STEP_SUMMARY
           echo "- 🏗️ **Checkov & tfsec**: Infrastructure as Code scanning" >> $GITHUB_STEP_SUMMARY
           echo "- ☸️ **Kubesec & Polaris**: Kubernetes security analysis" >> $GITHUB_STEP_SUMMARY
           echo "- 📚 **OWASP Dependency Check**: Dependency vulnerability scanning" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: Gitleaks secret scanning disabled (requires paid license)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
