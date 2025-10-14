@@ -54,7 +54,10 @@ Before configuring GitHub Actions, you need:
    - **Name**: GitHub Actions
    - **Type**: GitHub
    - **URL**: `https://github.com/Freundcloud/microservices-demo`
-4. Note the **sys_id** (Tool ID) for GitHub Secrets
+4. **Save** the record
+5. Note the **sys_id** (Tool ID) for GitHub Secrets
+
+**💡 How to find sys_id values**: See [SERVICENOW-FIND-SYSID.md](SERVICENOW-FIND-SYSID.md) for step-by-step instructions with screenshots and examples.
 
 #### Onboard Security Scanners
 
