@@ -280,104 +280,26 @@ resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
-# Install AWS Load Balancer Controller
-resource "helm_release" "aws_load_balancer_controller" {
-  count = var.enable_alb_controller ? 1 : 0
+# NOTE: Helm releases moved to helm-installs.tf using null_resource + local-exec
+# This approach properly inherits AWS credentials from environment variables
 
-  name       = "aws-load-balancer-controller"
-  repository = "https://aws.github.io/eks-charts"
-  chart      = "aws-load-balancer-controller"
-  namespace  = "kube-system"
-  version    = "1.6.2"
+# # Install AWS Load Balancer Controller
+# resource "helm_release" "aws_load_balancer_controller" {
+#   count = var.enable_alb_controller ? 1 : 0
+#   # ... (commented out, see helm-installs.tf)
+# }
 
-  set {
-    name  = "clusterName"
-    value = module.eks.cluster_name
-  }
+# # Install Kubernetes Metrics Server
+# resource "helm_release" "metrics_server" {
+#   count = var.enable_metrics_server ? 1 : 0
+#   # ... (commented out, see helm-installs.tf)
+# }
 
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "aws-load-balancer-controller"
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.aws_load_balancer_controller[0].arn
-  }
-
-  set {
-    name  = "region"
-    value = var.aws_region
-  }
-
-  set {
-    name  = "vpcId"
-    value = module.vpc.vpc_id
-  }
-
-  depends_on = [module.eks]
-}
-
-# Install Kubernetes Metrics Server
-resource "helm_release" "metrics_server" {
-  count = var.enable_metrics_server ? 1 : 0
-
-  name       = "metrics-server"
-  repository = "https://kubernetes-sigs.github.io/metrics-server/"
-  chart      = "metrics-server"
-  namespace  = "kube-system"
-  version    = "3.11.0"
-
-  set {
-    name  = "args[0]"
-    value = "--kubelet-preferred-address-types=InternalIP"
-  }
-
-  depends_on = [module.eks]
-}
-
-# Install Cluster Autoscaler
-resource "helm_release" "cluster_autoscaler" {
-  count = var.enable_cluster_autoscaler ? 1 : 0
-
-  name       = "cluster-autoscaler"
-  repository = "https://kubernetes.github.io/autoscaler"
-  chart      = "cluster-autoscaler"
-  namespace  = "kube-system"
-  version    = "9.29.3"
-
-  set {
-    name  = "autoDiscovery.clusterName"
-    value = module.eks.cluster_name
-  }
-
-  set {
-    name  = "awsRegion"
-    value = var.aws_region
-  }
-
-  set {
-    name  = "rbac.serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "rbac.serviceAccount.name"
-    value = "cluster-autoscaler"
-  }
-
-  set {
-    name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.cluster_autoscaler[0].arn
-  }
-
-  depends_on = [module.eks]
-}
+# # Install Cluster Autoscaler
+# resource "helm_release" "cluster_autoscaler" {
+#   count = var.enable_cluster_autoscaler ? 1 : 0
+#   # ... (commented out, see helm-installs.tf)
+# }
 
 # Update kubeconfig for local access
 resource "null_resource" "update_kubeconfig" {

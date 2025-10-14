@@ -116,42 +116,15 @@ resource "aws_elasticache_parameter_group" "redis" {
   )
 }
 
-# Kubernetes Secret for Redis connection
-resource "kubernetes_secret" "redis_connection" {
-  count = var.enable_redis ? 1 : 0
+# NOTE: Kubernetes resources moved to helm-installs.tf using null_resource + local-exec
+# This approach properly inherits AWS credentials from environment variables
 
-  metadata {
-    name      = "redis-connection"
-    namespace = var.namespace
-  }
+# # Kubernetes Secret for Redis connection
+# resource "kubernetes_secret" "redis_connection" {
+#   # ... (commented out, see helm-installs.tf)
+# }
 
-  data = {
-    redis-address = "${aws_elasticache_cluster.redis[0].cache_nodes[0].address}:${aws_elasticache_cluster.redis[0].port}"
-  }
-
-  type = "Opaque"
-
-  depends_on = [
-    module.eks,
-    aws_elasticache_cluster.redis
-  ]
-}
-
-# Kubernetes ConfigMap with Redis configuration
-resource "kubernetes_config_map" "redis_config" {
-  count = var.enable_redis ? 1 : 0
-
-  metadata {
-    name      = "redis-config"
-    namespace = var.namespace
-  }
-
-  data = {
-    "REDIS_ADDR" = "${aws_elasticache_cluster.redis[0].cache_nodes[0].address}:${aws_elasticache_cluster.redis[0].port}"
-  }
-
-  depends_on = [
-    module.eks,
-    aws_elasticache_cluster.redis
-  ]
-}
+# # Kubernetes ConfigMap with Redis configuration
+# resource "kubernetes_config_map" "redis_config" {
+#   # ... (commented out, see helm-installs.tf)
+# }
