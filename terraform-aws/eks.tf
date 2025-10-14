@@ -15,7 +15,7 @@
 # EKS Cluster Module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"  # Upgraded to fix deprecated inline_policy warning
+  version = "~> 20.0" # Upgraded to fix deprecated inline_policy warning
 
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
@@ -116,7 +116,7 @@ module "eks" {
       max_size     = 3
       desired_size = 2
 
-      instance_types = ["t3.small"]  # 2 vCPU, 2 GB RAM - sufficient for system pods
+      instance_types = ["t3.small"] # 2 vCPU, 2 GB RAM - sufficient for system pods
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -143,7 +143,7 @@ module "eks" {
       max_size     = 4
       desired_size = 2
 
-      instance_types = ["t3.medium"]  # 2 vCPU, 4 GB RAM
+      instance_types = ["t3.medium"] # 2 vCPU, 4 GB RAM
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -176,7 +176,7 @@ module "eks" {
       max_size     = 6
       desired_size = 3
 
-      instance_types = ["t3.large"]  # 2 vCPU, 8 GB RAM
+      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -209,7 +209,7 @@ module "eks" {
       max_size     = 10
       desired_size = 5
 
-      instance_types = ["t3.xlarge"]  # 4 vCPU, 16 GB RAM
+      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM
       capacity_type  = "ON_DEMAND"
 
       labels = {

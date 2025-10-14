@@ -126,7 +126,7 @@ resource "aws_dynamodb_table" "terraform_locks" {
 # Output the backend configuration
 output "backend_config" {
   description = "Backend configuration for main Terraform code"
-  value = <<-EOT
+  value       = <<-EOT
     Add this to your terraform-aws/versions.tf:
 
     terraform {

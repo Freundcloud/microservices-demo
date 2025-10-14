@@ -36,11 +36,11 @@ run "eks_node_group_configuration_test" {
   command = plan
 
   variables {
-    cluster_name   = "test-cluster"
-    aws_region     = "eu-west-2"
-    environment    = "test"
-    enable_istio   = false
-    enable_redis   = false
+    cluster_name = "test-cluster"
+    aws_region   = "eu-west-2"
+    environment  = "test"
+    enable_istio = false
+    enable_redis = false
   }
 
   # Verify all four node groups exist

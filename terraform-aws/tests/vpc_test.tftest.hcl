@@ -19,13 +19,13 @@ run "vpc_configuration_test" {
   command = plan
 
   variables {
-    cluster_name         = "test-cluster"
-    aws_region           = "eu-west-2"
-    environment          = "test"
-    vpc_cidr             = "10.0.0.0/16"
-    availability_zones   = ["eu-west-2a", "eu-west-2b", "eu-west-2c"]
-    enable_istio         = false
-    enable_redis         = false
+    cluster_name       = "test-cluster"
+    aws_region         = "eu-west-2"
+    environment        = "test"
+    vpc_cidr           = "10.0.0.0/16"
+    availability_zones = ["eu-west-2a", "eu-west-2b", "eu-west-2c"]
+    enable_istio       = false
+    enable_redis       = false
   }
 
   # Verify VPC CIDR
