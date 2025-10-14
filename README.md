@@ -32,9 +32,12 @@ source .envrc
 
 # 4. Deploy single cluster (contains dev, qa, prod node groups)
 just tf-apply
-just k8s-config
 
-# 5. Deploy to environments
+# 5. Install Helm charts and Istio components
+./post-install.sh
+
+# 6. Configure kubectl and deploy to environments
+just k8s-config
 kubectl apply -k kustomize/overlays/dev
 kubectl apply -k kustomize/overlays/qa
 kubectl apply -k kustomize/overlays/prod
@@ -50,7 +53,12 @@ just k8s-url
 ```bash
 # Deploy infrastructure (single cluster with dev, qa, prod node groups)
 cd terraform-aws
+source ../.envrc  # Load AWS credentials
 terraform apply
+cd ..
+
+# Install Helm charts and Istio service mesh
+./post-install.sh
 
 # Configure kubectl
 aws eks update-kubeconfig --region eu-west-2 --name microservices
