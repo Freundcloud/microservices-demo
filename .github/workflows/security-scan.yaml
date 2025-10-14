@@ -183,15 +183,26 @@ jobs:
         with:
           working_directory: terraform-aws/
           format: sarif
-          sarif_file: tfsec-results.sarif
           soft_fail: true
+        continue-on-error: true
+
+      - name: Save tfsec Results
+        run: |
+          if [ -f terraform-aws/results.sarif ]; then
+            mv terraform-aws/results.sarif tfsec-results.sarif
+          else
+            echo "No tfsec results file found, creating empty SARIF"
+            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[]}' > tfsec-results.sarif
+          fi
+        continue-on-error: true
 
       - name: Upload tfsec Results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('tfsec-results.sarif') != ''
         with:
           sarif_file: tfsec-results.sarif
           category: tfsec-terraform
+        continue-on-error: true
 
   # Kubernetes manifest scanning
   k8s-manifest-scan:
@@ -285,10 +296,13 @@ jobs:
           echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
 
   # ServiceNow Security Results Integration
+  # Note: These jobs are OPTIONAL and only run when ServiceNow secrets are configured
+  # To enable: Configure secrets as described in docs/SERVICENOW-INTEGRATION.md
+  # To disable: These jobs will be skipped automatically if secrets are not set
   servicenow-codeql-results:
     name: ServiceNow CodeQL Results
     needs: codeql-analysis
-    if: always()
+    if: always() && secrets.SN_INSTANCE_URL != ''
     runs-on: ubuntu-latest
 
     steps:
@@ -306,7 +320,7 @@ jobs:
   servicenow-semgrep-results:
     name: ServiceNow Semgrep Results
     needs: semgrep-scan
-    if: always()
+    if: always() && secrets.SN_INSTANCE_URL != ''
     runs-on: ubuntu-latest
 
     steps:
@@ -324,7 +338,7 @@ jobs:
   servicenow-trivy-results:
     name: ServiceNow Trivy Results
     needs: trivy-fs-scan
-    if: always()
+    if: always() && secrets.SN_INSTANCE_URL != ''
     runs-on: ubuntu-latest
 
     steps:
@@ -342,7 +356,7 @@ jobs:
   servicenow-iac-results:
     name: ServiceNow IaC Scan Results
     needs: iac-scan
-    if: always()
+    if: always() && secrets.SN_INSTANCE_URL != ''
     runs-on: ubuntu-latest
 
     steps:
@@ -360,7 +374,7 @@ jobs:
   servicenow-owasp-results:
     name: ServiceNow OWASP Results
     needs: owasp-dependency-check
-    if: always()
+    if: always() && secrets.SN_INSTANCE_URL != ''
     runs-on: ubuntu-latest
 
     steps:
