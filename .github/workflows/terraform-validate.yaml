@@ -166,13 +166,10 @@ jobs:
         working-directory: terraform-aws
         run: terraform init
 
-      - name: Generate Terraform Plan for Dev
+      - name: Generate Terraform Plan
         working-directory: terraform-aws
         run: |
-          terraform plan \
-            -var="environment=dev" \
-            -var="cluster_name=microservices-dev" \
-            -out=dev-plan.tfplan
+          terraform plan -out=plan.tfplan
 
       - name: Setup Infracost
         uses: infracost/actions/setup@v3
@@ -183,15 +180,15 @@ jobs:
         working-directory: terraform-aws
         run: |
           infracost breakdown \
-            --path=dev-plan.tfplan \
+            --path=plan.tfplan \
             --format=json \
-            --out-file=infracost-dev.json || echo "Infracost analysis failed (optional)"
+            --out-file=infracost.json || echo "Infracost analysis failed (optional)"
 
       - name: Post Infracost comment
         if: github.event_name == 'pull_request'
         uses: infracost/actions/comment@v1
         with:
-          path: terraform-aws/infracost-dev.json
+          path: terraform-aws/infracost.json
           behavior: update
 
   terraform-docs:
@@ -254,109 +251,6 @@ jobs:
           else
             echo "ℹ️ No Terraform tests found (tests/ directory doesn't exist)"
           fi
-
-  terraform-plan-matrix:
-    name: Terraform Plan (Multi-Environment)
-    runs-on: ubuntu-latest
-    needs: [terraform-fmt, terraform-validate, terraform-lint]
-    strategy:
-      matrix:
-        environment: [dev, qa, prod]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Set environment-specific variables
-        id: env-vars
-        run: |
-          if [ "${{ matrix.environment }}" == "dev" ]; then
-            echo "cluster_name=microservices-dev" >> $GITHUB_OUTPUT
-            echo "desired_size=2" >> $GITHUB_OUTPUT
-            echo "min_size=1" >> $GITHUB_OUTPUT
-            echo "max_size=3" >> $GITHUB_OUTPUT
-            echo "instance_types=[\"t3.medium\"]" >> $GITHUB_OUTPUT
-          elif [ "${{ matrix.environment }}" == "qa" ]; then
-            echo "cluster_name=microservices-qa" >> $GITHUB_OUTPUT
-            echo "desired_size=3" >> $GITHUB_OUTPUT
-            echo "min_size=2" >> $GITHUB_OUTPUT
-            echo "max_size=5" >> $GITHUB_OUTPUT
-            echo "instance_types=[\"t3.medium\"]" >> $GITHUB_OUTPUT
-          else
-            echo "cluster_name=microservices-prod" >> $GITHUB_OUTPUT
-            echo "desired_size=5" >> $GITHUB_OUTPUT
-            echo "min_size=3" >> $GITHUB_OUTPUT
-            echo "max_size=10" >> $GITHUB_OUTPUT
-            echo "instance_types=[\"t3.large\",\"t3.xlarge\"]" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Terraform Init
-        working-directory: terraform-aws
-        run: terraform init
-
-      - name: Terraform Plan for ${{ matrix.environment }}
-        working-directory: terraform-aws
-        run: |
-          terraform plan \
-            -var="environment=${{ matrix.environment }}" \
-            -var="cluster_name=${{ steps.env-vars.outputs.cluster_name }}" \
-            -var="desired_size=${{ steps.env-vars.outputs.desired_size }}" \
-            -var="min_size=${{ steps.env-vars.outputs.min_size }}" \
-            -var="max_size=${{ steps.env-vars.outputs.max_size }}" \
-            -var='instance_types=${{ steps.env-vars.outputs.instance_types }}' \
-            -out=${{ matrix.environment }}-plan.tfplan
-
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.environment }}-plan
-          path: terraform-aws/${{ matrix.environment }}-plan.tfplan
-          retention-days: 5
-
-      - name: Generate human-readable plan
-        working-directory: terraform-aws
-        run: |
-          terraform show -no-color ${{ matrix.environment }}-plan.tfplan > ${{ matrix.environment }}-plan.txt
-
-      - name: Comment PR with plan
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const plan = fs.readFileSync('terraform-aws/${{ matrix.environment }}-plan.txt', 'utf8');
-            const output = `#### Terraform Plan: ${{ matrix.environment }} 🏗️
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`hcl
-            ${plan.length > 65000 ? plan.substring(0, 65000) + '\n...(truncated)' : plan}
-            \`\`\`
-
-            </details>
-
-            *Environment: ${{ matrix.environment }}*
-            *Cluster: ${{ steps.env-vars.outputs.cluster_name }}*
-            *Nodes: ${{ steps.env-vars.outputs.min_size }}-${{ steps.env-vars.outputs.max_size }}*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            });
 
   summary:
     name: Validation Summary
