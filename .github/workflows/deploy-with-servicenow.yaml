@@ -70,20 +70,13 @@ jobs:
           job-name: 'Deploy to ${{ github.event.inputs.environment }}'
           change-request: |
             {
-              "setCloseCode": "${{ steps.change-settings.outputs.auto_close }}",
               "autoCloseChange": ${{ steps.change-settings.outputs.auto_close }},
               "attributes": {
                 "short_description": "Deploy microservices-demo to ${{ github.event.inputs.environment }}",
-                "description": "Automated deployment of microservices application to ${{ github.event.inputs.environment }} environment via GitHub Actions. Commit: ${{ github.sha }}. Repository: ${{ github.repository }}",
-                "assignment_group": "${{ steps.change-settings.outputs.assignment_group }}",
-                "implementation_plan": "1. Run security scans\n2. Create Kubernetes manifests\n3. Apply manifests to EKS cluster\n4. Verify deployment health\n5. Update ServiceNow CMDB",
-                "backout_plan": "Rollback to previous stable version using: kubectl rollout undo deployment -n microservices-${{ github.event.inputs.environment }}",
-                "test_plan": "Verify all pods are running, check service endpoints, validate with load testing",
-                "risk": "${{ steps.change-settings.outputs.risk }}",
-                "priority": "${{ steps.change-settings.outputs.priority }}",
-                "category": "Software",
-                "type": "Standard",
-                "cmdb_ci": "AWS EKS - microservices"
+                "description": "Automated deployment via GitHub Actions.\n\nEnvironment: ${{ github.event.inputs.environment }}\nCommit: ${{ github.sha }}\nRepository: ${{ github.repository }}\nTriggered by: ${{ github.actor }}",
+                "implementation_plan": "1. Run security scans\n2. Build and validate Kubernetes manifests\n3. Deploy to EKS cluster namespace: microservices-${{ github.event.inputs.environment }}\n4. Verify all pods running\n5. Update ServiceNow CMDB",
+                "backout_plan": "kubectl rollout undo deployment -n microservices-${{ github.event.inputs.environment }}\nOR\nkubectl delete -k kustomize/overlays/${{ github.event.inputs.environment }}",
+                "test_plan": "1. Check all pods status: kubectl get pods -n microservices-${{ github.event.inputs.environment }}\n2. Verify service endpoints\n3. Run health checks\n4. Monitor Istio metrics"
               }
             }
 
