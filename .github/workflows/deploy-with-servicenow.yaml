@@ -22,6 +22,7 @@ env:
   SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
   SN_DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
   SN_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+  SN_OAUTH_TOKEN: ${{ secrets.SN_OAUTH_TOKEN }}
 
 jobs:
   # Job 1: Create ServiceNow Change Request
@@ -349,7 +350,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Update CMDB with deployment info
-        if: secrets.SN_OAUTH_TOKEN != ''
+        if: ${{ secrets.SN_OAUTH_TOKEN != '' }}
         run: |
           ENV="${{ github.event.inputs.environment }}"
           NAMESPACE="microservices-$ENV"
