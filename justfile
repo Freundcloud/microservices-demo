@@ -460,6 +460,135 @@ backend-destroy:
     cd terraform-aws/backend && terraform destroy
 
 # ==============================================================================
+# ServiceNow Integration
+# ==============================================================================
+
+# Run security scan and send results to ServiceNow
+sn-security-scan:
+    @echo "🔐 Running security scan with ServiceNow integration..."
+    gh workflow run security-scan-servicenow.yaml
+    @echo "✅ Security scan workflow triggered"
+    @echo "📊 View results: gh run watch"
+    @echo "🔗 ServiceNow: Check DevOps > Security > Security Results"
+
+# Deploy to dev environment (auto-approved via ServiceNow)
+sn-deploy-dev:
+    @echo "🚀 Deploying to dev environment via ServiceNow..."
+    gh workflow run deploy-with-servicenow.yaml -f environment=dev
+    @echo "✅ Deployment workflow triggered (auto-approved for dev)"
+    @echo "📊 Watch progress: gh run watch"
+    @echo "🔗 ServiceNow: Change Management > My Changes"
+
+# Deploy to qa environment (requires QA Lead approval)
+sn-deploy-qa:
+    @echo "🚀 Deploying to qa environment via ServiceNow..."
+    @echo "⚠️  This requires QA Lead approval in ServiceNow"
+    gh workflow run deploy-with-servicenow.yaml -f environment=qa
+    @echo "✅ Deployment workflow triggered"
+    @echo "⏳ Waiting for QA Lead approval in ServiceNow..."
+    @echo "📊 Watch progress: gh run watch"
+    @echo "🔗 ServiceNow: Change Management > My Changes"
+
+# Deploy to prod environment (requires CAB approval)
+sn-deploy-prod:
+    @echo "🚀 Deploying to prod environment via ServiceNow..."
+    @echo "⚠️  This requires Change Advisory Board (CAB) approval"
+    @echo "     Approvers: Change Manager, App Owner, Security Team"
+    gh workflow run deploy-with-servicenow.yaml -f environment=prod
+    @echo "✅ Deployment workflow triggered"
+    @echo "⏳ Waiting for CAB approval in ServiceNow..."
+    @echo "📊 Watch progress: gh run watch"
+    @echo "🔗 ServiceNow: Change Management > My Changes"
+
+# Run EKS discovery to update ServiceNow CMDB
+sn-discover:
+    @echo "🔍 Running EKS discovery to update ServiceNow CMDB..."
+    gh workflow run eks-discovery.yaml
+    @echo "✅ Discovery workflow triggered"
+    @echo "📊 Watch progress: gh run watch"
+    @echo "🔗 ServiceNow: Configuration > CMDB > EKS Clusters"
+
+# View ServiceNow workflow status
+sn-status:
+    @echo "📊 ServiceNow Integration Status"
+    @echo "================================"
+    @echo ""
+    @echo "Recent workflow runs:"
+    @gh run list --limit 5
+    @echo ""
+    @echo "🔗 View in GitHub: https://github.com/$(git config --get remote.origin.url | sed 's/.*://;s/.git$//')/actions"
+    @echo "🔗 ServiceNow URL: Check your SN_INSTANCE_URL secret"
+
+# Watch current workflow run
+sn-watch:
+    @echo "👀 Watching current workflow run..."
+    @gh run watch
+
+# List all ServiceNow-related workflow runs
+sn-history:
+    @echo "📜 ServiceNow Workflow History"
+    @echo "=============================="
+    @echo ""
+    @echo "Security Scans:"
+    @gh run list --workflow=security-scan-servicenow.yaml --limit 10
+    @echo ""
+    @echo "Deployments:"
+    @gh run list --workflow=deploy-with-servicenow.yaml --limit 10
+    @echo ""
+    @echo "Discoveries:"
+    @gh run list --workflow=eks-discovery.yaml --limit 10
+
+# View ServiceNow integration documentation
+sn-docs:
+    @echo "📚 ServiceNow Integration Documentation"
+    @echo "======================================="
+    @echo ""
+    @echo "Quick Start:"
+    @echo "  docs/SERVICENOW-QUICKSTART.md"
+    @echo ""
+    @echo "Essential Setup (30 min):"
+    @echo "  docs/SERVICENOW-ESSENTIAL-SETUP.md"
+    @echo ""
+    @echo "Complete Guide:"
+    @echo "  docs/SERVICENOW-INTEGRATION-PLAN.md"
+    @echo ""
+    @echo "Workflow Documentation:"
+    @echo "  .github/workflows/SERVICENOW-WORKFLOWS-README.md"
+    @echo ""
+    @echo "🔗 View online: https://github.com/Freundcloud/microservices-demo/tree/main/docs"
+
+# Show ServiceNow integration help
+sn-help:
+    @echo "🎯 ServiceNow Integration Commands"
+    @echo "==================================="
+    @echo ""
+    @echo "🚀 Deployments:"
+    @echo "  just sn-deploy-dev       - Deploy to dev (auto-approved)"
+    @echo "  just sn-deploy-qa        - Deploy to qa (QA Lead approval)"
+    @echo "  just sn-deploy-prod      - Deploy to prod (CAB approval)"
+    @echo ""
+    @echo "🔐 Security:"
+    @echo "  just sn-security-scan    - Run security scans"
+    @echo ""
+    @echo "🔍 Discovery:"
+    @echo "  just sn-discover         - Update CMDB with cluster info"
+    @echo ""
+    @echo "📊 Monitoring:"
+    @echo "  just sn-status           - Show workflow status"
+    @echo "  just sn-watch            - Watch current workflow"
+    @echo "  just sn-history          - Show workflow history"
+    @echo ""
+    @echo "📚 Documentation:"
+    @echo "  just sn-docs             - View documentation links"
+    @echo ""
+    @echo "Prerequisites:"
+    @echo "  - ServiceNow DevOps plugin installed"
+    @echo "  - GitHub Secrets configured (SN_DEVOPS_INTEGRATION_TOKEN, etc.)"
+    @echo "  - GitHub CLI installed (gh)"
+    @echo ""
+    @echo "Setup Guide: docs/SERVICENOW-ESSENTIAL-SETUP.md"
+
+# ==============================================================================
 # Cluster Management & Monitoring
 # ==============================================================================
 
