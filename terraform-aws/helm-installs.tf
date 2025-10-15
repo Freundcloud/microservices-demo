@@ -207,22 +207,15 @@ resource "null_resource" "install_istio_ingressgateway" {
       # Update kubeconfig
       aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}
 
-      # Install or upgrade istio ingress gateway
+      # Install or upgrade istio ingress gateway using values file
+      # IMPORTANT: Using version 1.20.8 due to schema validation bugs in 1.22+ versions
+      # Versions 1.22-1.27 have broken values.schema.json files that reject valid configurations
+      # See: https://github.com/istio/istio/issues/57354
+      # Version 1.20.8 is compatible with istiod 1.23.0 and validates correctly
       helm upgrade --install istio-ingressgateway istio/gateway \
         --namespace istio-system \
-        --version ${var.istio_version} \
-        --set service.type=LoadBalancer \
-        --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
-        --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"=internet-facing \
-        --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-cross-zone-load-balancing-enabled"=true \
-        --set resources.requests.cpu=100m \
-        --set resources.requests.memory=128Mi \
-        --set resources.limits.cpu=2000m \
-        --set resources.limits.memory=1024Mi \
-        --set autoscaling.enabled=true \
-        --set autoscaling.minReplicas=2 \
-        --set autoscaling.maxReplicas=5 \
-        --set autoscaling.targetCPUUtilizationPercentage=80 \
+        --version 1.20.8 \
+        --values ${path.module}/istio-gateway-values.yaml \
         --wait
     EOT
   }
