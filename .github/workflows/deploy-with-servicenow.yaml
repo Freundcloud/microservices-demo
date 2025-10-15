@@ -350,7 +350,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Update CMDB with deployment info
-        if: ${{ secrets.SN_OAUTH_TOKEN != '' }}
+        if: ${{ env.SN_OAUTH_TOKEN != '' }}
         run: |
           ENV="${{ github.event.inputs.environment }}"
           NAMESPACE="microservices-$ENV"

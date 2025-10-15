@@ -139,7 +139,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload cluster info to ServiceNow CMDB
-        if: ${{ secrets.SN_OAUTH_TOKEN != '' }}
+        if: ${{ env.SN_OAUTH_TOKEN != '' }}
         run: |
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -198,7 +198,7 @@ jobs:
           fi
 
       - name: Upload microservices to ServiceNow CMDB
-        if: ${{ secrets.SN_OAUTH_TOKEN != '' && env.CLUSTER_SYS_ID != '' }}
+        if: ${{ env.SN_OAUTH_TOKEN != '' && env.CLUSTER_SYS_ID != '' }}
         run: |
           echo "Uploading microservices to ServiceNow CMDB..."
 
@@ -264,7 +264,7 @@ jobs:
           echo "✅ All microservices uploaded to CMDB" >> $GITHUB_STEP_SUMMARY
 
       - name: ServiceNow CMDB not configured
-        if: ${{ secrets.SN_OAUTH_TOKEN == '' }}
+        if: ${{ env.SN_OAUTH_TOKEN == '' }}
         run: |
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
