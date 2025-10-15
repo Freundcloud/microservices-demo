@@ -137,7 +137,7 @@ module "eks" {
 
     # Development Node Group - Small instances for dev workloads (1 replica per service)
     dev = {
-      name = "${var.cluster_name}-dev-ng"
+      name = "${var.cluster_name}-dev"
 
       min_size     = 2
       max_size     = 4
@@ -162,7 +162,7 @@ module "eks" {
       tags = merge(
         var.tags,
         {
-          Name        = "${var.cluster_name}-dev-ng"
+          Name        = "${var.cluster_name}-dev"
           Environment = "dev"
         }
       )
@@ -170,13 +170,13 @@ module "eks" {
 
     # QA Node Group - Medium instances for qa workloads (2 replicas per service)
     qa = {
-      name = "${var.cluster_name}-qa-ng"
+      name = "${var.cluster_name}-qa"
 
-      min_size     = 4
-      max_size     = 8
-      desired_size = 4
+      min_size     = 2
+      max_size     = 4
+      desired_size = 2
 
-      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM
+      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - same as dev
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -195,21 +195,21 @@ module "eks" {
       tags = merge(
         var.tags,
         {
-          Name        = "${var.cluster_name}-qa-ng"
+          Name        = "${var.cluster_name}-qa"
           Environment = "qa"
         }
       )
     }
 
-    # Production Node Group - Large instances for prod workloads (3 replicas per service)
+    # Production Node Group - Same as dev/qa for cost savings in demo
     prod = {
-      name = "${var.cluster_name}-prod-ng"
+      name = "${var.cluster_name}-prod"
 
-      min_size     = 4
-      max_size     = 8
-      desired_size = 4
+      min_size     = 2
+      max_size     = 4
+      desired_size = 2
 
-      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM
+      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - same as dev/qa
       capacity_type  = "ON_DEMAND"
 
       labels = {
@@ -228,7 +228,7 @@ module "eks" {
       tags = merge(
         var.tags,
         {
-          Name        = "${var.cluster_name}-prod-ng"
+          Name        = "${var.cluster_name}-prod"
           Environment = "prod"
         }
       )

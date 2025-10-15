@@ -1,0 +1,36 @@
+# QA Environment Istio Gateway and VirtualService
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: qa-gateway
+  namespace: microservices-qa
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: frontend-qa
+  namespace: microservices-qa
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - qa-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: frontend.microservices-qa.svc.cluster.local
+        port:
+          number: 80

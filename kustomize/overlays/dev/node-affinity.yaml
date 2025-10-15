@@ -32,7 +32,7 @@ spec:
       - key: "environment"
         operator: "Equal"
         value: "dev"
-        effect: "NO_SCHEDULE"
+        effect: "NoSchedule"
 
       # Node affinity - preferred scheduling rules
       affinity:

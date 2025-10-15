@@ -34,8 +34,8 @@ spec:
       cpu: "8"
       memory: 8Gi
     min:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 50m
+      memory: 64Mi
     default:
       cpu: "2"
       memory: 2Gi

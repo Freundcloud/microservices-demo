@@ -21,6 +21,7 @@ resources:
 - ../../base
 - namespace.yaml
 - resourcequota.yaml
+- gateway.yaml
 
 components:
 - ../../components/service-mesh-istio
@@ -33,49 +34,48 @@ commonAnnotations:
   deployed-by: kustomize
   environment: qa
 
-# Image tag suffix for qa environment
+# Image configuration for qa environment - using ECR
 images:
-- name: frontend
-  newName: frontend
-  newTag: qa
-- name: cartservice
-  newName: cartservice
-  newTag: qa
-- name: productcatalogservice
-  newName: productcatalogservice
-  newTag: qa
-- name: currencyservice
-  newName: currencyservice
-  newTag: qa
-- name: paymentservice
-  newName: paymentservice
-  newTag: qa
-- name: shippingservice
-  newName: shippingservice
-  newTag: qa
-- name: emailservice
-  newName: emailservice
-  newTag: qa
-- name: checkoutservice
-  newName: checkoutservice
-  newTag: qa
-- name: recommendationservice
-  newName: recommendationservice
-  newTag: qa
-- name: adservice
-  newName: adservice
-  newTag: qa
-- name: loadgenerator
-  newName: loadgenerator
-  newTag: qa
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/frontend
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/cartservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/productcatalogservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/productcatalogservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/currencyservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/paymentservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/shippingservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/shippingservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/emailservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/checkoutservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/recommendationservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/adservice
+  newTag: latest
+- name: us-central1-docker.pkg.dev/google-samples/microservices-demo/loadgenerator
+  newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/loadgenerator
+  newTag: latest
 
 # Replica patches for qa (moderate replicas)
+patches:
 # Apply node affinity and tolerations to all deployments
 - path: node-affinity.yaml
   target:
     kind: Deployment
-
-patches:
 - patch: |-
     apiVersion: apps/v1
     kind: Deployment

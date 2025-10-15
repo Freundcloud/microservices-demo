@@ -33,12 +33,20 @@ Essential guides for getting started:
   - GitHub Security integration
   - Viewing and handling security alerts
 
-- **[ServiceNow Integration](SERVICENOW-INTEGRATION.md)**
-  - ServiceNow DevOps security scan integration
-  - Centralized security dashboard
-  - Compliance tracking and reporting
-  - Security gate policy enforcement
-  - Interactive setup script
+- **[ServiceNow Integration Summary](SERVICENOW-INTEGRATION-SUMMARY.md)**
+  - Quick overview of ServiceNow integration
+  - Key changes required
+  - Deployment workflow changes
+  - Quick start guide
+  - 4-week implementation timeline
+
+- **[ServiceNow Integration Complete Plan](SERVICENOW-INTEGRATION-PLAN.md)**
+  - Detailed project plan
+  - Change management automation
+  - Security scan integration (5 tools)
+  - AWS EKS CMDB discovery
+  - Complete workflow configurations
+  - Troubleshooting guide
 
 ### 🏗️ Architecture Documentation
 

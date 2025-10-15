@@ -34,8 +34,8 @@ spec:
       cpu: "4"
       memory: 4Gi
     min:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 50m
+      memory: 64Mi
     default:
       cpu: "1"
       memory: 1Gi
