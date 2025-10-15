@@ -349,7 +349,19 @@ Configuration > CMDB > Dashboards
 
 ## Troubleshooting
 
-### Common Issues
+For comprehensive troubleshooting information, see **[SERVICENOW-TROUBLESHOOTING.md](/docs/SERVICENOW-TROUBLESHOOTING.md)**.
+
+The troubleshooting guide covers:
+- Internal Server Error (500) diagnosis and solutions
+- Authentication error fixes
+- Change request creation failures
+- CMDB update issues
+- Security scan upload problems
+- Debugging tips and techniques
+- Common error messages reference
+- Quick verification checklist
+
+### Quick Troubleshooting
 
 #### 1. ServiceNow Integration Token Invalid
 
@@ -364,9 +376,21 @@ Configuration > CMDB > Dashboards
 3. Update GitHub Secret: SN_DEVOPS_INTEGRATION_TOKEN
 ```
 
-#### 2. Change Request Not Created
+#### 2. Change Request Not Created (Internal Server Error)
 
-**Symptom**: Deploy workflow fails at change request step
+**Symptom**: Deploy workflow fails with "Internal server error"
+
+**Common Causes**:
+- ServiceNow DevOps plugin not installed
+- GitHub tool not configured in ServiceNow
+- Invalid assignment group or other field values
+- Missing mandatory fields
+
+**Quick Fix**: See [SERVICENOW-TROUBLESHOOTING.md](/docs/SERVICENOW-TROUBLESHOOTING.md#internal-server-error-500)
+
+#### 3. CMDB Updates Failing
+
+**Symptom**: Discovery workflow completes but CMDB not updated
 
 **Check**:
 - ServiceNow instance URL correct in secrets
