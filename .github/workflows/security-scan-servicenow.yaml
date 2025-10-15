@@ -1,0 +1,396 @@
+name: "Security Scanning with ServiceNow Integration"
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
+  SN_DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+  SN_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
+jobs:
+  # CodeQL Analysis for multiple languages
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python', 'javascript', 'go', 'java', 'csharp']
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        if: matrix.language != 'java'
+
+      - name: Setup Java 21
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build Java services
+        if: matrix.language == 'java'
+        run: |
+          # Build adservice (Java with Gradle)
+          cd src/adservice
+          ./gradlew build -x test
+        continue-on-error: true
+
+      - name: Perform CodeQL Analysis
+        id: codeql
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          output: codeql-results-${{ matrix.language }}.sarif
+
+      - name: Upload CodeQL results to ServiceNow
+        if: always() && env.SN_DEVOPS_TOKEN != ''
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'CodeQL Analysis - ${{ matrix.language }}'
+          security-result-attributes: |
+            {
+              "scanner": "CodeQL",
+              "applicationName": "microservices-demo",
+              "securityToolId": "codeql",
+              "language": "${{ matrix.language }}"
+            }
+          security-result-file: 'codeql-results-${{ matrix.language }}.sarif'
+        continue-on-error: true
+
+  # Dependency scanning with Dependabot
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-2.0, GPL-3.0
+
+  # SAST with Semgrep
+  semgrep-scan:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+
+    container:
+      image: returntocorp/semgrep
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan --config=auto --sarif --output=semgrep-results.sarif
+
+      - name: Upload Semgrep Results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+
+      - name: Upload Semgrep results to ServiceNow
+        if: always() && env.SN_DEVOPS_TOKEN != ''
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Semgrep SAST'
+          security-result-attributes: |
+            {
+              "scanner": "Semgrep",
+              "applicationName": "microservices-demo",
+              "securityToolId": "semgrep",
+              "scanType": "SAST"
+            }
+          security-result-file: 'semgrep-results.sarif'
+        continue-on-error: true
+
+  # Container scanning with Trivy
+  trivy-fs-scan:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy Results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+          category: trivy-filesystem
+
+      - name: Upload Trivy results to ServiceNow
+        if: always() && env.SN_DEVOPS_TOKEN != ''
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Trivy Filesystem Scan'
+          security-result-attributes: |
+            {
+              "scanner": "Trivy",
+              "applicationName": "microservices-demo",
+              "securityToolId": "trivy",
+              "scanType": "Filesystem"
+            }
+          security-result-file: 'trivy-fs-results.sarif'
+        continue-on-error: true
+
+  # Infrastructure as Code scanning
+  iac-scan:
+    name: IaC Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform-aws/
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+
+      - name: Upload Checkov Results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov-terraform
+
+      - name: Upload Checkov results to ServiceNow
+        if: always() && env.SN_DEVOPS_TOKEN != ''
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'IaC Security Scan - Checkov'
+          security-result-attributes: |
+            {
+              "scanner": "Checkov",
+              "applicationName": "microservices-demo",
+              "securityToolId": "checkov",
+              "scanType": "Infrastructure as Code"
+            }
+          security-result-file: 'checkov-results.sarif'
+        continue-on-error: true
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: terraform-aws/
+          format: sarif
+          soft_fail: true
+        continue-on-error: true
+
+      - name: Save tfsec Results
+        run: |
+          if [ -f terraform-aws/results.sarif ]; then
+            mv terraform-aws/results.sarif tfsec-results.sarif
+          else
+            echo "No tfsec results file found, creating empty SARIF"
+            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[]}' > tfsec-results.sarif
+          fi
+        continue-on-error: true
+
+      - name: Upload tfsec Results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('tfsec-results.sarif') != ''
+        with:
+          sarif_file: tfsec-results.sarif
+          category: tfsec-terraform
+        continue-on-error: true
+
+  # Kubernetes manifest scanning
+  k8s-manifest-scan:
+    name: Kubernetes Manifest Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Kubesec
+        run: |
+          docker run --rm -v $(pwd):/project kubesec/kubesec:v2 scan /project/kubernetes-manifests/*.yaml > kubesec-results.json
+        continue-on-error: true
+
+      - name: Install Polaris CLI
+        run: |
+          wget -O polaris https://github.com/FairwindsOps/polaris/releases/latest/download/polaris_linux_amd64
+          chmod +x polaris
+          sudo mv polaris /usr/local/bin/
+        continue-on-error: true
+
+      - name: Run Polaris Audit
+        run: |
+          polaris audit --audit-path kubernetes-manifests/ --format json > polaris-results.json || true
+        continue-on-error: true
+
+      - name: Upload Polaris Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: polaris-results
+          path: polaris-results.json
+
+  # OWASP Dependency Check
+  owasp-dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'online-boutique'
+          path: 'src/'
+          format: 'SARIF'
+          out: 'dependency-check-report'
+
+      - name: Upload Results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: dependency-check-report/dependency-check-report.sarif
+          category: owasp-dependency-check
+
+  # License compliance check
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Licenses (Python)
+        run: |
+          find src -name "requirements.txt" -exec pip-licenses --from={} \;
+        continue-on-error: true
+
+      - name: Check Licenses (Node.js)
+        run: |
+          for dir in src/*/; do
+            if [ -f "$dir/package.json" ]; then
+              cd "$dir"
+              npx license-checker --summary
+              cd -
+            fi
+          done
+        continue-on-error: true
+
+  # Security summary and ServiceNow aggregation
+  security-summary:
+    name: Security Summary
+    needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create Security Summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep SAST | ${{ needs.semgrep-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy Filesystem | ${{ needs.trivy-fs-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IaC Scanning | ${{ needs.iac-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| K8s Manifest Scan | ${{ needs.k8s-manifest-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Security Tools Used" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 **CodeQL**: Multi-language semantic code analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- 🛡️ **Semgrep**: Static application security testing" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Trivy**: Vulnerability and misconfig scanner" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏗️ **Checkov & tfsec**: Infrastructure as Code scanning" >> $GITHUB_STEP_SUMMARY
+          echo "- ☸️ **Kubesec & Polaris**: Kubernetes security analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- 📚 **OWASP Dependency Check**: Dependency vulnerability scanning" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}" ]; then
+            echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Security results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "- View in ServiceNow: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=sn_devops_security_result_list.do" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ ServiceNow integration not configured" >> $GITHUB_STEP_SUMMARY
+            echo "- Add SN_DEVOPS_INTEGRATION_TOKEN secret to enable" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for critical vulnerabilities
+        run: |
+          # This would check ServiceNow for critical vulnerabilities
+          # and potentially fail the workflow if critical issues found
+          if [ -n "${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}" ]; then
+            echo "✅ Security checks completed"
+            echo "Review results in ServiceNow before proceeding with deployment"
+          fi

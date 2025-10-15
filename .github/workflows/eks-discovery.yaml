@@ -1,0 +1,334 @@
+name: EKS Cluster Discovery to ServiceNow
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:  # Manual trigger
+  push:
+    paths:
+      - 'kustomize/overlays/**'
+      - 'kubernetes-manifests/**'
+      - '.github/workflows/deploy-with-servicenow.yaml'
+
+env:
+  AWS_REGION: eu-west-2
+  CLUSTER_NAME: microservices
+  SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
+  SN_OAUTH_TOKEN: ${{ secrets.SN_OAUTH_TOKEN }}
+
+jobs:
+  discover-eks-cluster:
+    name: Discover EKS Cluster
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Discover EKS cluster information
+        id: cluster-info
+        run: |
+          echo "## EKS Cluster Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster**: ${{ env.CLUSTER_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Region**: ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Discovery Time**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get cluster details
+          aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} > cluster.json
+
+          # Extract key information
+          CLUSTER_ARN=$(jq -r '.cluster.arn' cluster.json)
+          CLUSTER_VERSION=$(jq -r '.cluster.version' cluster.json)
+          CLUSTER_ENDPOINT=$(jq -r '.cluster.endpoint' cluster.json)
+          CLUSTER_STATUS=$(jq -r '.cluster.status' cluster.json)
+          VPC_ID=$(jq -r '.cluster.resourcesVpcConfig.vpcId' cluster.json)
+          CREATED_AT=$(jq -r '.cluster.createdAt' cluster.json)
+
+          echo "cluster_arn=$CLUSTER_ARN" >> $GITHUB_OUTPUT
+          echo "cluster_version=$CLUSTER_VERSION" >> $GITHUB_OUTPUT
+          echo "cluster_endpoint=$CLUSTER_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "cluster_status=$CLUSTER_STATUS" >> $GITHUB_OUTPUT
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+
+          echo "### Cluster Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **ARN**: \`$CLUSTER_ARN\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: Kubernetes $CLUSTER_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: $CLUSTER_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- **VPC**: $VPC_ID" >> $GITHUB_STEP_SUMMARY
+          echo "- **Created**: $CREATED_AT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get node groups
+          echo "### Node Groups" >> $GITHUB_STEP_SUMMARY
+          aws eks list-nodegroups --cluster-name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} > nodegroups.json
+          jq -r '.nodegroups[]' nodegroups.json | while read -r ng; do
+            NG_INFO=$(aws eks describe-nodegroup --cluster-name ${{ env.CLUSTER_NAME }} --nodegroup-name "$ng" --region ${{ env.AWS_REGION }})
+            INSTANCE_TYPE=$(echo $NG_INFO | jq -r '.nodegroup.instanceTypes[0]')
+            DESIRED=$(echo $NG_INFO | jq -r '.nodegroup.scalingConfig.desiredSize')
+            echo "- **$ng**: $INSTANCE_TYPE (Desired: $DESIRED)" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Discover microservices in all environments
+        id: discover-services
+        run: |
+          echo "### Microservices Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          NAMESPACES=("microservices-dev" "microservices-qa" "microservices-prod")
+
+          # Create JSON array for all services
+          echo '{"services": []}' > all-services.json
+
+          for NAMESPACE in "${NAMESPACES[@]}"; do
+            if kubectl get namespace $NAMESPACE &> /dev/null; then
+              echo "#### Environment: ${NAMESPACE##*-}" >> $GITHUB_STEP_SUMMARY
+
+              # Get all deployments
+              kubectl get deployments -n $NAMESPACE -o json | \
+                jq --arg ns "$NAMESPACE" --arg env "${NAMESPACE##*-}" '
+                  .items[] | {
+                    name: .metadata.name,
+                    namespace: $ns,
+                    environment: $env,
+                    replicas: .spec.replicas,
+                    ready_replicas: (.status.readyReplicas // 0),
+                    image: .spec.template.spec.containers[0].image,
+                    image_tag: (.spec.template.spec.containers[0].image | split(":")[1]),
+                    created: .metadata.creationTimestamp,
+                    labels: .metadata.labels,
+                    status: (if .status.readyReplicas == .spec.replicas then "Running" else "Degraded" end)
+                  }
+                ' > services-$NAMESPACE.json
+
+              # Display services
+              jq -r '.name as $name | .ready_replicas as $ready | .replicas as $total | .status as $status |
+                     "- **\($name)**: \($ready)/\($total) replicas - \($status)"' services-$NAMESPACE.json >> $GITHUB_STEP_SUMMARY || true
+
+              # Append to all services
+              jq --slurpfile new services-$NAMESPACE.json '.services += $new' all-services.json > tmp.json
+              mv tmp.json all-services.json
+
+              echo "" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ Namespace $NAMESPACE not found" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          TOTAL_SERVICES=$(jq '.services | length' all-services.json)
+          echo "**Total services discovered**: $TOTAL_SERVICES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload cluster info to ServiceNow CMDB
+        if: secrets.SN_OAUTH_TOKEN != ''
+        run: |
+          echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Prepare cluster payload
+          CLUSTER_PAYLOAD=$(cat <<EOF
+          {
+            "u_name": "${{ env.CLUSTER_NAME }}",
+            "u_arn": "${{ steps.cluster-info.outputs.cluster_arn }}",
+            "u_version": "${{ steps.cluster-info.outputs.cluster_version }}",
+            "u_endpoint": "${{ steps.cluster-info.outputs.cluster_endpoint }}",
+            "u_status": "${{ steps.cluster-info.outputs.cluster_status }}",
+            "u_region": "${{ env.AWS_REGION }}",
+            "u_vpc_id": "${{ steps.cluster-info.outputs.vpc_id }}",
+            "u_provider": "AWS EKS",
+            "u_last_discovered": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "u_discovered_by": "GitHub Actions"
+          }
+          EOF
+          )
+
+          # Check if cluster exists in CMDB
+          EXISTING_CLUSTER=$(curl -s -X GET \
+            "${{ env.SN_INSTANCE_URL }}/api/now/table/u_eks_cluster?sysparm_query=u_name=${{ env.CLUSTER_NAME }}&sysparm_limit=1" \
+            -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+            -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+          CLUSTER_SYS_ID=$(echo $EXISTING_CLUSTER | jq -r '.result[0].sys_id // empty')
+
+          if [ -n "$CLUSTER_SYS_ID" ]; then
+            echo "Updating existing cluster record: $CLUSTER_SYS_ID"
+            RESPONSE=$(curl -s -X PUT \
+              "${{ env.SN_INSTANCE_URL }}/api/now/table/u_eks_cluster/$CLUSTER_SYS_ID" \
+              -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{}')
+
+            echo "✅ Updated existing cluster CI in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Creating new cluster record"
+            CLUSTER_RESPONSE=$(curl -s -X POST \
+              "${{ env.SN_INSTANCE_URL }}/api/now/table/u_eks_cluster" \
+              -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
+
+            CLUSTER_SYS_ID=$(echo $CLUSTER_RESPONSE | jq -r '.result.sys_id // empty')
+            echo "✅ Created new cluster CI in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "$CLUSTER_SYS_ID" ]; then
+            echo "CLUSTER_SYS_ID=$CLUSTER_SYS_ID" >> $GITHUB_ENV
+            echo "- **Cluster CI sys_id**: \`$CLUSTER_SYS_ID\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Failed to create/update cluster CI" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload microservices to ServiceNow CMDB
+        if: secrets.SN_OAUTH_TOKEN != '' && env.CLUSTER_SYS_ID != ''
+        run: |
+          echo "Uploading microservices to ServiceNow CMDB..."
+
+          # Read all services
+          SERVICES=$(jq -c '.services[]' all-services.json)
+          SERVICE_COUNT=0
+
+          while IFS= read -r service; do
+            NAME=$(echo $service | jq -r '.name')
+            NAMESPACE=$(echo $service | jq -r '.namespace')
+            ENV=$(echo $service | jq -r '.environment')
+            REPLICAS=$(echo $service | jq -r '.replicas')
+            READY_REPLICAS=$(echo $service | jq -r '.ready_replicas')
+            IMAGE=$(echo $service | jq -r '.image')
+            IMAGE_TAG=$(echo $service | jq -r '.image_tag')
+            STATUS=$(echo $service | jq -r '.status')
+
+            # Prepare service payload
+            SERVICE_PAYLOAD=$(cat <<EOF
+          {
+            "u_name": "$NAME",
+            "u_namespace": "$NAMESPACE",
+            "u_environment": "$ENV",
+            "u_replicas": "$REPLICAS",
+            "u_ready_replicas": "$READY_REPLICAS",
+            "u_image": "$IMAGE",
+            "u_image_tag": "$IMAGE_TAG",
+            "u_status": "$STATUS",
+            "u_cluster": "$CLUSTER_SYS_ID",
+            "u_last_discovered": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "u_discovered_by": "GitHub Actions"
+          }
+          EOF
+          )
+
+            # Check if service exists
+            EXISTING_SERVICE=$(curl -s -X GET \
+              "${{ env.SN_INSTANCE_URL }}/api/now/table/u_microservice?sysparm_query=u_name=$NAME^u_namespace=$NAMESPACE&sysparm_limit=1" \
+              -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+              -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+            SERVICE_SYS_ID=$(echo $EXISTING_SERVICE | jq -r '.result[0].sys_id // empty')
+
+            if [ -n "$SERVICE_SYS_ID" ]; then
+              curl -s -X PUT \
+                "${{ env.SN_INSTANCE_URL }}/api/now/table/u_microservice/$SERVICE_SYS_ID" \
+                -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                -d "$SERVICE_PAYLOAD" > /dev/null 2>&1
+            else
+              curl -s -X POST \
+                "${{ env.SN_INSTANCE_URL }}/api/now/table/u_microservice" \
+                -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                -d "$SERVICE_PAYLOAD" > /dev/null 2>&1
+            fi
+
+            SERVICE_COUNT=$((SERVICE_COUNT + 1))
+          done <<< "$SERVICES"
+
+          echo "- **Microservices updated**: $SERVICE_COUNT services" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All microservices uploaded to CMDB" >> $GITHUB_STEP_SUMMARY
+
+      - name: ServiceNow CMDB not configured
+        if: secrets.SN_OAUTH_TOKEN == ''
+        run: |
+          echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ ServiceNow CMDB integration not configured" >> $GITHUB_STEP_SUMMARY
+          echo "Add \`SN_OAUTH_TOKEN\` secret to enable CMDB updates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create discovery summary
+        run: |
+          cat << 'EOF' > discovery-summary.md
+          # EKS Discovery Summary
+
+          **Discovery Date**: $(date)
+          **Cluster**: ${{ env.CLUSTER_NAME }}
+          **Region**: ${{ env.AWS_REGION }}
+
+          ## Cluster Information
+          - **ARN**: ${{ steps.cluster-info.outputs.cluster_arn }}
+          - **Version**: Kubernetes ${{ steps.cluster-info.outputs.cluster_version }}
+          - **Status**: ${{ steps.cluster-info.outputs.cluster_status }}
+          - **VPC**: ${{ steps.cluster-info.outputs.vpc_id }}
+
+          ## Microservices Discovered
+          EOF
+
+          jq -r '.services[] | "- \(.name) [\(.environment)]: \(.ready_replicas)/\(.replicas) replicas - \(.status)"' all-services.json >> discovery-summary.md
+
+          echo "" >> discovery-summary.md
+          echo "## ServiceNow Integration" >> discovery-summary.md
+
+          if [ -n "${{ secrets.SN_OAUTH_TOKEN }}" ]; then
+            echo "✅ Data uploaded to ServiceNow CMDB" >> discovery-summary.md
+            echo "- **Cluster Record**: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_eks_cluster_list.do" >> discovery-summary.md
+            echo "- **Services**: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
+          else
+            echo "⚠️ ServiceNow CMDB integration not configured" >> discovery-summary.md
+          fi
+
+          echo "" >> discovery-summary.md
+          echo "---" >> discovery-summary.md
+          echo "Discovery completed successfully ✅" >> discovery-summary.md
+
+          cat discovery-summary.md
+
+      - name: Upload summary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-summary-${{ github.run_number }}
+          path: |
+            discovery-summary.md
+            all-services.json
+            cluster.json
+          retention-days: 30
+
+      - name: Final summary
+        run: |
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View ServiceNow CMDB**:" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ secrets.SN_OAUTH_TOKEN }}" ]; then
+            echo "- [EKS Clusters](${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_eks_cluster_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Microservices](${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_microservice_list.do)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Configure \`SN_OAUTH_TOKEN\` secret to enable CMDB integration" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Discovery**: Scheduled in 6 hours or run manually" >> $GITHUB_STEP_SUMMARY

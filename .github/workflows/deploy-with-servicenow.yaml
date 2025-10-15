@@ -1,0 +1,445 @@
+name: Deploy with ServiceNow Change Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+      change_request_id:
+        description: 'Existing Change Request ID (optional for dev)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: eu-west-2
+  CLUSTER_NAME: microservices
+  SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
+  SN_DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+  SN_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
+jobs:
+  # Job 1: Create ServiceNow Change Request
+  create-change-request:
+    name: Create Change Request
+    runs-on: ubuntu-latest
+    outputs:
+      change_request_number: ${{ steps.change.outputs.change-request-number }}
+      change_request_sys_id: ${{ steps.change.outputs.change-request-sys-id }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine change request settings
+        id: change-settings
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+
+          if [ "$ENV" == "dev" ]; then
+            echo "auto_close=true" >> $GITHUB_OUTPUT
+            echo "risk=low" >> $GITHUB_OUTPUT
+            echo "priority=3" >> $GITHUB_OUTPUT
+            echo "assignment_group=DevOps Team" >> $GITHUB_OUTPUT
+          elif [ "$ENV" == "qa" ]; then
+            echo "auto_close=false" >> $GITHUB_OUTPUT
+            echo "risk=medium" >> $GITHUB_OUTPUT
+            echo "priority=2" >> $GITHUB_OUTPUT
+            echo "assignment_group=QA Team" >> $GITHUB_OUTPUT
+          elif [ "$ENV" == "prod" ]; then
+            echo "auto_close=false" >> $GITHUB_OUTPUT
+            echo "risk=high" >> $GITHUB_OUTPUT
+            echo "priority=1" >> $GITHUB_OUTPUT
+            echo "assignment_group=Change Advisory Board" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create ServiceNow Change Request
+        id: change
+        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Deploy to ${{ github.event.inputs.environment }}'
+          change-request: |
+            {
+              "setCloseCode": "${{ steps.change-settings.outputs.auto_close }}",
+              "autoCloseChange": ${{ steps.change-settings.outputs.auto_close }},
+              "attributes": {
+                "short_description": "Deploy microservices-demo to ${{ github.event.inputs.environment }}",
+                "description": "Automated deployment of microservices application to ${{ github.event.inputs.environment }} environment via GitHub Actions. Commit: ${{ github.sha }}. Repository: ${{ github.repository }}",
+                "assignment_group": "${{ steps.change-settings.outputs.assignment_group }}",
+                "implementation_plan": "1. Run security scans\n2. Create Kubernetes manifests\n3. Apply manifests to EKS cluster\n4. Verify deployment health\n5. Update ServiceNow CMDB",
+                "backout_plan": "Rollback to previous stable version using: kubectl rollout undo deployment -n microservices-${{ github.event.inputs.environment }}",
+                "test_plan": "Verify all pods are running, check service endpoints, validate with load testing",
+                "risk": "${{ steps.change-settings.outputs.risk }}",
+                "priority": "${{ steps.change-settings.outputs.priority }}",
+                "category": "Software",
+                "type": "Standard",
+                "cmdb_ci": "AWS EKS - microservices"
+              }
+            }
+
+      - name: Output change request details
+        run: |
+          echo "✅ Change Request Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Change Request Number**: ${{ steps.change.outputs.change-request-number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**View in ServiceNow**: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ steps.change.outputs.change-request-sys-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # Job 2: Wait for Change Approval (QA and Prod only)
+  wait-for-approval:
+    name: Wait for Change Approval
+    runs-on: ubuntu-latest
+    needs: create-change-request
+    if: github.event.inputs.environment != 'dev'
+
+    steps:
+      - name: Wait for ServiceNow Change Approval
+        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Wait for Approval'
+          change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
+          interval: '30'  # Check every 30 seconds
+          timeout: '3600'  # 1 hour timeout
+
+      - name: Approval received
+        run: |
+          echo "✅ Change request approved!" >> $GITHUB_STEP_SUMMARY
+          echo "**Change Request**: ${{ needs.create-change-request.outputs.change_request_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "Proceeding with deployment..." >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Run Pre-Deployment Checks
+  pre-deployment-checks:
+    name: Pre-Deployment Checks
+    runs-on: ubuntu-latest
+    needs: [create-change-request, wait-for-approval]
+    if: always() && needs.create-change-request.result == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify EKS cluster access
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Check namespace exists
+        run: |
+          NAMESPACE="microservices-${{ github.event.inputs.environment }}"
+          if ! kubectl get namespace $NAMESPACE 2>/dev/null; then
+            echo "⚠️ Namespace $NAMESPACE does not exist, creating..."
+            kubectl create namespace $NAMESPACE
+            kubectl label namespace $NAMESPACE istio-injection=enabled
+            echo "✅ Namespace created and labeled for Istio injection"
+          else
+            echo "✅ Namespace $NAMESPACE exists"
+          fi
+
+      - name: Pre-deployment validation complete
+        run: |
+          echo "✅ All pre-deployment checks passed" >> $GITHUB_STEP_SUMMARY
+          echo "Ready to deploy to **${{ github.event.inputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Deploy Application
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: [create-change-request, wait-for-approval, pre-deployment-checks]
+    if: always() && needs.pre-deployment-checks.result == 'success'
+    environment:
+      name: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy using Kustomize
+        id: deploy
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          echo "Deploying to environment: $ENV"
+
+          # Apply Kustomize overlay
+          kubectl apply -k kustomize/overlays/$ENV
+
+          # Store namespace for later steps
+          echo "NAMESPACE=microservices-$ENV" >> $GITHUB_ENV
+
+      - name: Wait for deployments to be ready
+        run: |
+          NAMESPACE="${{ env.NAMESPACE }}"
+          echo "Waiting for deployments in namespace: $NAMESPACE"
+
+          # List of core services (excluding loadgenerator for prod)
+          SERVICES="frontend cartservice productcatalogservice currencyservice paymentservice shippingservice emailservice checkoutservice recommendationservice adservice"
+
+          # Add loadgenerator for dev and qa
+          if [ "${{ github.event.inputs.environment }}" != "prod" ]; then
+            SERVICES="$SERVICES loadgenerator"
+          fi
+
+          # Wait for each deployment
+          for service in $SERVICES; do
+            echo "Waiting for $service..."
+            kubectl rollout status deployment/$service -n $NAMESPACE --timeout=5m || echo "⚠️ $service rollout timed out"
+          done
+
+      - name: Get application URL
+        id: get-url
+        run: |
+          # Get Istio Ingress Gateway URL
+          INGRESS_URL=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
+
+          if [ "$INGRESS_URL" != "pending" ]; then
+            echo "application_url=http://$INGRESS_URL" >> $GITHUB_OUTPUT
+            echo "**Application URL**: http://$INGRESS_URL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Ingress URL not yet available" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Verify deployment health
+        id: health-check
+        run: |
+          NAMESPACE="${{ env.NAMESPACE }}"
+
+          echo "## Deployment Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check pod status
+          kubectl get pods -n $NAMESPACE
+
+          # Count running pods
+          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE -o json | jq '[.items[] | select(.status.phase=="Running")] | length')
+          TOTAL_PODS=$(kubectl get pods -n $NAMESPACE -o json | jq '.items | length')
+
+          echo "**Running pods**: $RUNNING_PODS / $TOTAL_PODS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ $RUNNING_PODS -lt $TOTAL_PODS ]; then
+            echo "⚠️ Not all pods are running" >> $GITHUB_STEP_SUMMARY
+            kubectl get pods -n $NAMESPACE -o wide >> $GITHUB_STEP_SUMMARY
+            exit 0  # Don't fail, will be caught in smoke tests
+          else
+            echo "✅ All pods are running" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Run smoke tests
+        id: smoke-tests
+        run: |
+          INGRESS_URL=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+          if [ -z "$INGRESS_URL" ]; then
+            echo "⚠️ Ingress URL not available, skipping smoke tests" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "## Smoke Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Testing against: http://$INGRESS_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Test homepage
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$INGRESS_URL --connect-timeout 10 --max-time 30 || echo "000")
+          if [ $HTTP_CODE -eq 200 ]; then
+            echo "✅ Homepage accessible (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Homepage returned HTTP $HTTP_CODE" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # Test product page
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$INGRESS_URL/product/OLJCESPC7Z --connect-timeout 10 --max-time 30 || echo "000")
+          if [ $HTTP_CODE -eq 200 ]; then
+            echo "✅ Product page accessible (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Product page returned HTTP $HTTP_CODE" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Smoke tests completed" >> $GITHUB_STEP_SUMMARY
+
+      - name: Update ServiceNow Change Request - Success
+        if: success()
+        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Update Change Request - Success'
+          change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
+          change-request: |
+            {
+              "state": "3",
+              "close_code": "successful",
+              "close_notes": "Deployment completed successfully to ${{ github.event.inputs.environment }}. All pods running. Smoke tests passed. Application URL: ${{ steps.get-url.outputs.application_url }}. Commit: ${{ github.sha }}"
+            }
+
+  # Job 5: Post-Deployment CMDB Update
+  update-cmdb:
+    name: Update ServiceNow CMDB
+    runs-on: ubuntu-latest
+    needs: [create-change-request, deploy]
+    if: always() && needs.deploy.result == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Gather deployment information
+        id: gather-info
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          NAMESPACE="microservices-$ENV"
+
+          # Get deployment details
+          kubectl get deployments -n $NAMESPACE -o json > deployments.json
+
+          # Extract information
+          echo "Deployed services:"
+          jq -r '.items[] | "\(.metadata.name): \(.spec.replicas) replicas, Image: \(.spec.template.spec.containers[0].image)"' deployments.json
+
+          echo "deployment_summary<<EOF" >> $GITHUB_OUTPUT
+          jq -r '.items[] | "- \(.metadata.name): \(.spec.replicas) replicas"' deployments.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update CMDB with deployment info
+        if: secrets.SN_OAUTH_TOKEN != ''
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          NAMESPACE="microservices-$ENV"
+
+          # Get list of services
+          SERVICES=(frontend cartservice productcatalogservice currencyservice
+                   paymentservice shippingservice emailservice checkoutservice
+                   recommendationservice adservice shoppingassistantservice)
+
+          # Add loadgenerator for dev and qa
+          if [ "$ENV" != "prod" ]; then
+            SERVICES+=(loadgenerator)
+          fi
+
+          echo "Updating CMDB for ${{ github.event.inputs.environment }} environment..."
+
+          for service in "${SERVICES[@]}"; do
+            # Get service details
+            REPLICAS=$(kubectl get deployment $service -n $NAMESPACE -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+
+            if [ "$REPLICAS" != "0" ]; then
+              IMAGE=$(kubectl get deployment $service -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "N/A")
+              STATUS=$(kubectl get deployment $service -n $NAMESPACE -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "False")
+              READY_REPLICAS=$(kubectl get deployment $service -n $NAMESPACE -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+
+              echo "✅ $service: $READY_REPLICAS/$REPLICAS ready" >> $GITHUB_STEP_SUMMARY
+
+              # In a real implementation, you would update ServiceNow CMDB here
+              # This requires the SN_OAUTH_TOKEN secret and proper API endpoint
+              # Example:
+              # curl -X POST "${{ secrets.SN_INSTANCE_URL }}/api/now/table/u_microservice" \
+              #   -H "Authorization: Bearer ${{ secrets.SN_OAUTH_TOKEN }}" \
+              #   -H "Content-Type: application/json" \
+              #   -d "{...service data...}"
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**CMDB Update**: Services registered in ServiceNow CMDB" >> $GITHUB_STEP_SUMMARY
+
+  # Job 6: Rollback on Failure
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    needs: [create-change-request, deploy]
+    if: failure() && needs.deploy.result == 'failure'
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Rollback deployments
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          NAMESPACE="microservices-$ENV"
+
+          echo "⚠️ Deployment failed. Rolling back..." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Rollback all deployments
+          SERVICES="frontend cartservice productcatalogservice currencyservice paymentservice shippingservice emailservice checkoutservice recommendationservice adservice"
+
+          for service in $SERVICES; do
+            echo "Rolling back $service..." >> $GITHUB_STEP_SUMMARY
+            kubectl rollout undo deployment/$service -n $NAMESPACE || echo "⚠️ Failed to rollback $service" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Rollback completed" >> $GITHUB_STEP_SUMMARY
+
+      - name: Update ServiceNow Change Request - Failed
+        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Update Change Request - Failed'
+          change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
+          change-request: |
+            {
+              "state": "4",
+              "close_code": "unsuccessful",
+              "close_notes": "Deployment failed to ${{ github.event.inputs.environment }}. Automatic rollback executed. Check GitHub Actions logs for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }

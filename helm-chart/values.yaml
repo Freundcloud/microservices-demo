@@ -54,6 +54,12 @@ cloudOperations:
   metrics: false
   # For AWS, use CloudWatch and X-Ray instead
 
+# Alias for compatibility with templates
+googleCloudOperations:
+  profiler: false
+  tracing: false
+  metrics: false
+
 seccompProfile:
   enable: false
   type: RuntimeDefault
