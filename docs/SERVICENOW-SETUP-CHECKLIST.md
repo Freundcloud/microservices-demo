@@ -73,25 +73,33 @@ Version: [version number]
 
 ---
 
-#### Task 1.2: Install AWS Service Management Connector
+#### Task 1.2: Install AWS Service Management Connector (OPTIONAL)
 
-**Steps:**
+**⚠️ NOTE**: This is **OPTIONAL** for the GitHub Actions integration. The AWS Service Management Connector is only needed if you want ServiceNow to directly discover AWS resources. Our GitHub Actions workflows handle discovery automatically.
+
+**You can skip this step if**:
+- You don't have access to this plugin
+- You prefer GitHub Actions to handle discovery (recommended)
+- You don't need native AWS integration in ServiceNow
+
+**If you want to install it** (Optional):
 1. Navigate to: **System Applications > All Available Applications > All**
-2. Search for: `AWS Service Management`
-3. Find: **AWS Service Management Connector**
-4. Click **Install**
-5. Accept license terms
-6. Wait for installation (10-15 minutes)
-7. Verify installation:
-   - Navigate to: **All > AWS Service Management**
-   - You should see AWS Service Management menu
+2. Search for: `AWS Service Management` or `AWS Service Management Connector`
+3. If found: Click **Install**
+4. If not found: This plugin requires a separate license or may not be available in your ServiceNow instance
 
-**Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
+**Alternative (Recommended)**: Use the GitHub Actions `eks-discovery.yaml` workflow we created, which:
+- Doesn't require any additional ServiceNow plugins
+- Runs automatically every 6 hours
+- Updates CMDB via ServiceNow REST API
+- Works with standard ServiceNow licenses
+
+**Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed | ⏭️ Skipped (Using GitHub Actions)
 
 **Installation Details:**
 - Plugin Name: `com.snc.aws_service_management_connector`
 - Installation Time: ~10-15 minutes
-- Requires: Admin privileges
+- Requires: Admin privileges + Additional license may be required
 
 ---
 
