@@ -156,7 +156,18 @@ Complete ServiceNow CMDB integration with automated discovery and security scann
   - Troubleshooting issues
 
 **Change Management & Approvals:**
-- **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)** ⭐ **COMPREHENSIVE GUIDE**
+- **[DevOps Change Velocity vs. Standard Change](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)** ⭐ **READ THIS FIRST**
+  - Why DevOps Change workspace isn't available
+  - Standard Change Management (current approach)
+  - DevOps Change Velocity (premium plugin)
+  - Comparison and recommendations
+  - What we've implemented without the plugin
+- **[Navigation URLs](SERVICENOW-NAVIGATION-URLS.md)** ⭐ **BOOKMARK THIS**
+  - Correct URLs for all ServiceNow features
+  - Change Request list (not DevOps workspace)
+  - Custom views and filters
+  - Quick reference guide
+- **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)**
   - Multi-level approval configuration
   - Dev/QA/Prod approval policies
   - Approval groups setup
