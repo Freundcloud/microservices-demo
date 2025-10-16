@@ -140,31 +140,41 @@ jobs:
 
       - name: Upload cluster info to ServiceNow CMDB
         if: ${{ env.SN_OAUTH_TOKEN != '' }}
+        env:
+          CLUSTER_ARN: ${{ steps.cluster-info.outputs.cluster_arn }}
+          CLUSTER_VERSION: ${{ steps.cluster-info.outputs.cluster_version }}
+          CLUSTER_ENDPOINT: ${{ steps.cluster-info.outputs.cluster_endpoint }}
+          CLUSTER_STATUS: ${{ steps.cluster-info.outputs.cluster_status }}
+          VPC_ID: ${{ steps.cluster-info.outputs.vpc_id }}
         run: |
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Prepare cluster payload using jq with proper escaping
+          # Prepare cluster payload using jq with all values from environment variables
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-          # Write cluster data to JSON file to avoid shell escaping issues
-          cat > cluster-payload.json << 'CLUSTER_EOF'
-          {
-            "u_name": "${{ env.CLUSTER_NAME }}",
-            "u_arn": "${{ steps.cluster-info.outputs.cluster_arn }}",
-            "u_version": "${{ steps.cluster-info.outputs.cluster_version }}",
-            "u_endpoint": "${{ steps.cluster-info.outputs.cluster_endpoint }}",
-            "u_status": "${{ steps.cluster-info.outputs.cluster_status }}",
-            "u_region": "${{ env.AWS_REGION }}",
-            "u_vpc_id": "${{ steps.cluster-info.outputs.vpc_id }}",
-            "u_provider": "AWS EKS",
-            "u_last_discovered": "TIMESTAMP_PLACEHOLDER",
-            "u_discovered_by": "GitHub Actions"
-          }
-          CLUSTER_EOF
-
-          # Replace timestamp placeholder with actual timestamp
-          CLUSTER_PAYLOAD=$(jq --arg ts "$TIMESTAMP" '.u_last_discovered = $ts' cluster-payload.json)
+          # Create payload using jq with --arg to safely handle all values
+          CLUSTER_PAYLOAD=$(jq -n \
+            --arg name "${CLUSTER_NAME}" \
+            --arg arn "${CLUSTER_ARN}" \
+            --arg version "${CLUSTER_VERSION}" \
+            --arg endpoint "${CLUSTER_ENDPOINT}" \
+            --arg status "${CLUSTER_STATUS}" \
+            --arg region "${AWS_REGION}" \
+            --arg vpc "${VPC_ID}" \
+            --arg timestamp "${TIMESTAMP}" \
+            '{
+              u_name: $name,
+              u_arn: $arn,
+              u_version: $version,
+              u_endpoint: $endpoint,
+              u_status: $status,
+              u_region: $region,
+              u_vpc_id: $vpc,
+              u_provider: "AWS EKS",
+              u_last_discovered: $timestamp,
+              u_discovered_by: "GitHub Actions"
+            }')
 
           # Check if cluster exists in CMDB
           EXISTING_CLUSTER=$(curl -s -X GET \
