@@ -112,6 +112,65 @@ For developers working on the codebase:
   - OWASP Dependency Check
   - GitHub Security integration
 
+### 🏢 ServiceNow Integration
+
+Complete ServiceNow CMDB integration with automated discovery and security scanning:
+
+- **[Implementation Status](SERVICENOW-IMPLEMENTATION-STATUS.md)** ⭐ **START HERE**
+  - Overall implementation progress
+  - Component status tracking
+  - Testing checklist
+  - Next steps guide
+
+- **[Quick Start Guide](SERVICENOW-QUICK-START.md)**
+  - Prerequisites and setup
+  - Table creation
+  - Workflow configuration
+  - First deployment
+
+- **[Setup Checklist](SERVICENOW-SETUP-CHECKLIST.md)**
+  - Step-by-step setup validation
+  - Configuration verification
+  - Access testing
+  - Troubleshooting common issues
+
+**EKS Discovery & CMDB Population:**
+- **[Node Discovery](SERVICENOW-NODE-DISCOVERY.md)**
+  - EKS cluster discovery
+  - Node metadata collection
+  - Relationship mapping
+- **[Viewing Nodes in ServiceNow](SERVICENOW-VIEWING-NODES.md)**
+  - ServiceNow UI navigation
+  - Filtering and searching
+  - Custom views
+
+**Security Scanning Integration:**
+- **[Security Scanning Design](SERVICENOW-SECURITY-SCANNING.md)**
+  - Architecture overview
+  - 8 security tools integrated
+  - SARIF aggregation
+  - Finding deduplication
+  - Table schema design
+- **[Security Verification Guide](SERVICENOW-SECURITY-VERIFICATION.md)**
+  - Step-by-step testing
+  - Table creation instructions
+  - Results validation
+  - Troubleshooting
+
+**Additional Documentation:**
+- **[Workflow Testing](SERVICENOW-WORKFLOW-TESTING.md)**
+  - Workflow execution testing
+  - API validation
+  - Data verification
+- **[Migration Summary](SERVICENOW-MIGRATION-SUMMARY.md)**
+  - Implementation history
+  - Key decisions
+  - Lessons learned
+- **[Zurich Compatibility](SERVICENOW-ZURICH-COMPATIBILITY.md)**
+  - Version-specific notes
+  - Compatibility issues
+  - Workarounds
+
 ### 🔧 Workflow Troubleshooting
 
 - **[OWASP Dependency-Check Troubleshooting](workflows/TROUBLESHOOTING-DEPENDENCY-CHECK.md)**
