@@ -153,7 +153,7 @@ Total relationships: 33
 
 ### View DevOps Change Workspace:
 1. Navigate to: **DevOps Change** → **Change Requests**
-2. Or direct link: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/devops_change_v2_list.do
+2. Or direct link: https://calitiiltddemo3.service-now.com/change_request_list.do?sysparm_query=business_service.name=Online%20Boutique
 3. **Important**: You won't see any change requests yet until you trigger a deployment (next step)
 
 ---

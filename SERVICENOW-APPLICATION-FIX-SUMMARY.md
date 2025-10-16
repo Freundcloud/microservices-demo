@@ -137,7 +137,7 @@ gh workflow run deploy-with-servicenow-basic.yaml --field environment=dev -R Fre
 
 ### Step 3: Verify in ServiceNow DevOps Change Workspace
 1. Navigate to: **DevOps Change** → **Change Requests**
-2. Direct link: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/devops_change_v2_list.do
+2. Direct link: https://calitiiltddemo3.service-now.com/change_request_list.do?sysparm_query=business_service.name=Online%20Boutique
 3. Verify change request shows:
    - ✅ Application: Online Boutique
    - ✅ Environment: dev
