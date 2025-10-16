@@ -18,9 +18,9 @@ metadata:
   name: dev-resource-quota
 spec:
   hard:
-    requests.cpu: "10"
+    requests.cpu: "15"
     requests.memory: 20Gi
-    limits.cpu: "20"
+    limits.cpu: "30"
     limits.memory: 40Gi
     pods: "50"
 ---
