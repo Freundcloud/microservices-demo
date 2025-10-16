@@ -178,8 +178,8 @@ jobs:
 
           # Check if cluster exists in CMDB
           EXISTING_CLUSTER=$(curl -s -X GET \
-            "${{ env.SN_INSTANCE_URL }}/api/now/table/u_eks_cluster?sysparm_query=u_name=${{ env.CLUSTER_NAME }}&sysparm_limit=1" \
-            -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+            "${SN_INSTANCE_URL}/api/now/table/u_eks_cluster?sysparm_query=u_name=${CLUSTER_NAME}&sysparm_limit=1" \
+            -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
             -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
           CLUSTER_SYS_ID=$(echo "$EXISTING_CLUSTER" | jq -r '.result[0].sys_id // empty')
@@ -187,8 +187,8 @@ jobs:
           if [ -n "$CLUSTER_SYS_ID" ]; then
             echo "Updating existing cluster record: $CLUSTER_SYS_ID"
             RESPONSE=$(curl -s -X PUT \
-              "${{ env.SN_INSTANCE_URL }}/api/now/table/u_eks_cluster/$CLUSTER_SYS_ID" \
-              -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+              "${SN_INSTANCE_URL}/api/now/table/u_eks_cluster/$CLUSTER_SYS_ID" \
+              -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
               -H "Content-Type: application/json" \
               -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{}')
 
@@ -196,8 +196,8 @@ jobs:
           else
             echo "Creating new cluster record"
             CLUSTER_RESPONSE=$(curl -s -X POST \
-              "${{ env.SN_INSTANCE_URL }}/api/now/table/u_eks_cluster" \
-              -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+              "${SN_INSTANCE_URL}/api/now/table/u_eks_cluster" \
+              -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
               -H "Content-Type: application/json" \
               -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
 
@@ -252,22 +252,22 @@ jobs:
 
             # Check if service exists
             EXISTING_SERVICE=$(curl -s -X GET \
-              "${{ env.SN_INSTANCE_URL }}/api/now/table/u_microservice?sysparm_query=u_name=$NAME^u_namespace=$NAMESPACE&sysparm_limit=1" \
-              -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+              "${SN_INSTANCE_URL}/api/now/table/u_microservice?sysparm_query=u_name=$NAME^u_namespace=$NAMESPACE&sysparm_limit=1" \
+              -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
               -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
             SERVICE_SYS_ID=$(echo "$EXISTING_SERVICE" | jq -r '.result[0].sys_id // empty')
 
             if [ -n "$SERVICE_SYS_ID" ]; then
               curl -s -X PUT \
-                "${{ env.SN_INSTANCE_URL }}/api/now/table/u_microservice/$SERVICE_SYS_ID" \
-                -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+                "${SN_INSTANCE_URL}/api/now/table/u_microservice/$SERVICE_SYS_ID" \
+                -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
                 -H "Content-Type: application/json" \
                 -d "$SERVICE_PAYLOAD" > /dev/null 2>&1
             else
               curl -s -X POST \
-                "${{ env.SN_INSTANCE_URL }}/api/now/table/u_microservice" \
-                -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
+                "${SN_INSTANCE_URL}/api/now/table/u_microservice" \
+                -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
                 -H "Content-Type: application/json" \
                 -d "$SERVICE_PAYLOAD" > /dev/null 2>&1
             fi
