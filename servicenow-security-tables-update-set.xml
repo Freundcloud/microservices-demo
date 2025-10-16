@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2025-10-16 19:00:00">
+  <sys_remote_update_set action="INSERT_OR_UPDATE">
+    <application display_value="Global">global</application>
+    <application_name>Global</application_name>
+    <application_scope>global</application_scope>
+    <application_version/>
+    <collisions/>
+    <commit_date/>
+    <deleted/>
+    <description>Security Scanning Integration Tables - Creates u_security_scan_result and u_security_scan_summary tables with all required fields</description>
+    <inserted/>
+    <name>Security Scanning Tables</name>
+    <origin_sys_id/>
+    <parent display_value=""/>
+    <release_date/>
+    <remote_base_update_set display_value=""/>
+    <remote_sys_id>security_scanning_tables_v1</remote_sys_id>
+    <state>loaded</state>
+    <summary/>
+    <sys_class_name>sys_remote_update_set</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>security_scanning_tables_v1</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-10-16 19:00:00</sys_updated_on>
+    <update_set display_value=""/>
+    <update_source display_value=""/>
+    <updated/>
+  </sys_remote_update_set>
+
+  <!-- Table 1: u_security_scan_result -->
+  <sys_db_object action="INSERT_OR_UPDATE">
+    <access/>
+    <actions_access>true</actions_access>
+    <alter_access>true</alter_access>
+    <caller_access/>
+    <client_scripts_access>true</client_scripts_access>
+    <configuration_access>false</configuration_access>
+    <create_access>true</create_access>
+    <create_access_controls>false</create_access_controls>
+    <delete_access>false</delete_access>
+    <is_extendable>false</is_extendable>
+    <label>Security Scan Result</label>
+    <live_feed_enabled>false</live_feed_enabled>
+    <name>u_security_scan_result</name>
+    <number_ref/>
+    <provider_class/>
+    <read_access>true</read_access>
+    <scriptable_table>false</scriptable_table>
+    <super_class/>
+    <sys_class_name>sys_db_object</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_security_scan_result</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_name>Security Scan Result</sys_name>
+    <sys_package display_value="Global" source="global">global</sys_package>
+    <sys_policy/>
+    <sys_scope display_value="Global">global</sys_scope>
+    <sys_update_name>sys_db_object_u_security_scan_result</sys_update_name>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-10-16 19:00:00</sys_updated_on>
+    <update_access>true</update_access>
+    <user_role/>
+    <ws_access>true</ws_access>
+  </sys_db_object>
+
+  <!-- Fields for u_security_scan_result -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <array>false</array>
+    <element>u_scan_id</element>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_security_scan_result</name>
+    <primary>false</primary>
+    <reference/>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_scan_id_field</sys_id>
+    <sys_name>Scan ID</sys_name>
+    <table_reference>false</table_reference>
+    <text_index>false</text_index>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_scan_type</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_scan_type_field</sys_id>
+    <sys_name>Scan Type</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_scan_date</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_scan_date_field</sys_id>
+    <sys_name>Scan Date</sys_name>
+    <type>glide_date_time</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_finding_id</element>
+    <mandatory>true</mandatory>
+    <max_length>255</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_finding_id_field</sys_id>
+    <sys_name>Finding ID</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_severity</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_severity_field</sys_id>
+    <sys_name>Severity</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_title</element>
+    <mandatory>true</mandatory>
+    <max_length>255</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_title_field</sys_id>
+    <sys_name>Title</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_description</element>
+    <max_length>4000</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_description_field</sys_id>
+    <sys_name>Description</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_file_path</element>
+    <max_length>512</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_file_path_field</sys_id>
+    <sys_name>File Path</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_line_number</element>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_line_number_field</sys_id>
+    <sys_name>Line Number</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_rule_id</element>
+    <max_length>255</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_rule_id_field</sys_id>
+    <sys_name>Rule ID</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cve_id</element>
+    <max_length>100</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_cve_id_field</sys_id>
+    <sys_name>CVE ID</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cvss_score</element>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_cvss_score_field</sys_id>
+    <sys_name>CVSS Score</sys_name>
+    <type>decimal</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_status</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_status_field</sys_id>
+    <sys_name>Status</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_repository</element>
+    <mandatory>true</mandatory>
+    <max_length>255</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_repository_field</sys_id>
+    <sys_name>Repository</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_branch</element>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_branch_field</sys_id>
+    <sys_name>Branch</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_commit_sha</element>
+    <mandatory>true</mandatory>
+    <max_length>40</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_commit_sha_field</sys_id>
+    <sys_name>Commit SHA</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_github_url</element>
+    <max_length>1024</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_github_url_field</sys_id>
+    <sys_name>GitHub URL</sys_name>
+    <type>url</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_sarif_data</element>
+    <max_length>65000</max_length>
+    <name>u_security_scan_result</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_sarif_data_field</sys_id>
+    <sys_name>SARIF Data</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <!-- Table 2: u_security_scan_summary -->
+  <sys_db_object action="INSERT_OR_UPDATE">
+    <access/>
+    <actions_access>true</actions_access>
+    <alter_access>true</alter_access>
+    <caller_access/>
+    <client_scripts_access>true</client_scripts_access>
+    <configuration_access>false</configuration_access>
+    <create_access>true</create_access>
+    <create_access_controls>false</create_access_controls>
+    <delete_access>false</delete_access>
+    <is_extendable>false</is_extendable>
+    <label>Security Scan Summary</label>
+    <live_feed_enabled>false</live_feed_enabled>
+    <name>u_security_scan_summary</name>
+    <number_ref/>
+    <provider_class/>
+    <read_access>true</read_access>
+    <scriptable_table>false</scriptable_table>
+    <super_class/>
+    <sys_class_name>sys_db_object</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_security_scan_summary</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_name>Security Scan Summary</sys_name>
+    <sys_package display_value="Global" source="global">global</sys_package>
+    <sys_policy/>
+    <sys_scope display_value="Global">global</sys_scope>
+    <sys_update_name>sys_db_object_u_security_scan_summary</sys_update_name>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-10-16 19:00:00</sys_updated_on>
+    <update_access>true</update_access>
+    <user_role/>
+    <ws_access>true</ws_access>
+  </sys_db_object>
+
+  <!-- Fields for u_security_scan_summary -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_scan_id</element>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_scan_id_field</sys_id>
+    <sys_name>Scan ID</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_workflow_run_id</element>
+    <max_length>100</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_workflow_run_id_field</sys_id>
+    <sys_name>Workflow Run ID</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_repository</element>
+    <mandatory>true</mandatory>
+    <max_length>255</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_repository_field</sys_id>
+    <sys_name>Repository</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_branch</element>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_branch_field</sys_id>
+    <sys_name>Branch</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_commit_sha</element>
+    <mandatory>true</mandatory>
+    <max_length>40</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_commit_sha_field</sys_id>
+    <sys_name>Commit SHA</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_scan_date</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_scan_date_field</sys_id>
+    <sys_name>Scan Date</sys_name>
+    <type>glide_date_time</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_total_findings</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_total_findings_field</sys_id>
+    <sys_name>Total Findings</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_critical_count</element>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_critical_count_field</sys_id>
+    <sys_name>Critical Count</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_high_count</element>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_high_count_field</sys_id>
+    <sys_name>High Count</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_medium_count</element>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_medium_count_field</sys_id>
+    <sys_name>Medium Count</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_low_count</element>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_low_count_field</sys_id>
+    <sys_name>Low Count</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_info_count</element>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_info_count_field</sys_id>
+    <sys_name>Info Count</sys_name>
+    <type>integer</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_tools_run</element>
+    <max_length>512</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_tools_run_field</sys_id>
+    <sys_name>Tools Run</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_status</element>
+    <mandatory>true</mandatory>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_status_field</sys_id>
+    <sys_name>Status</sys_name>
+    <type>string</type>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_github_url</element>
+    <max_length>1024</max_length>
+    <name>u_security_scan_summary</name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-16 19:00:00</sys_created_on>
+    <sys_id>u_summary_github_url_field</sys_id>
+    <sys_name>GitHub URL</sys_name>
+    <type>url</type>
+  </sys_dictionary>
+
+</unload>
