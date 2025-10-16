@@ -7,8 +7,33 @@
 ## Prerequisites
 
 - ServiceNow instance: https://calitiiltddemo3.service-now.com
-- Business Application "Online Boutique" already created (you mentioned this is done)
 - GitHub repository access to configure secrets
+
+---
+
+## Step 0: Create Business Application (if not already done)
+
+**If you haven't created the "Online Boutique" application yet**, you need to create it first with the required **Application Category** field.
+
+### Quick Creation via Script (Recommended)
+```bash
+export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
+export SERVICENOW_USERNAME="github_integration"
+export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+bash scripts/create-servicenow-application.sh
+```
+
+### Manual Creation via ServiceNow UI
+1. Navigate to: **Configuration** → **CMDB** → **Applications** → **Business Applications**
+2. Click: **New**
+3. Fill in:
+   - **Name**: `Online Boutique`
+   - **Operational Status**: `Operational`
+   - **Application Category**: `Service Delivery` ⭐ **REQUIRED**
+   - **Short Description**: `Cloud-native microservices demo application on AWS EKS`
+4. Click: **Submit**
+
+**Important**: The Application Category field is **required** by a ServiceNow Business Rule. If you get an error about "Application Category is empty", see [SERVICENOW-APPLICATION-CREATION-FIX.md](SERVICENOW-APPLICATION-CREATION-FIX.md) for details.
 
 ---
 
@@ -193,6 +218,26 @@ gh workflow run deploy-with-servicenow-basic.yaml --field environment=dev
 ---
 
 ## Troubleshooting
+
+### Problem: "Application Category is empty" error
+**Symptom**:
+```
+Error in CI insert:
+• Insertion failed with error: Operation against file 'cmdb_ci_business_app'
+  was aborted by Business Rule 'Check if Application Category is empty'
+```
+
+**Solution**: The Application Category field is **required**. Use the automated script which includes this field:
+```bash
+export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
+export SERVICENOW_USERNAME="github_integration"
+export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+bash scripts/create-servicenow-application.sh
+```
+
+Or manually set "Application Category" to "Service Delivery" when creating via UI.
+
+**Details**: See [SERVICENOW-APPLICATION-CREATION-FIX.md](SERVICENOW-APPLICATION-CREATION-FIX.md) for complete fix documentation.
 
 ### Problem: Services not found in CMDB
 **Symptom**: `map-service-dependencies.sh` reports services missing
