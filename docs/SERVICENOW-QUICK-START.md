@@ -62,31 +62,329 @@ gh secret set SERVICENOW_PASSWORD --body "your-password"
 gh secret set SERVICENOW_ORCHESTRATION_TOOL_ID --body "your-sys-id"
 ```
 
-### Step 5: Create u_microservice Table (5 minutes)
+### Step 5: Create u_microservice Table (10 minutes) ✅ COMPLETED
 
-**Required for CMDB features**
+**Required for CMDB features** - This table stores microservice deployment information from your EKS cluster.
+
+**Status**: ✅ Table created and verified working (2025-10-16)
+
+#### Part A: Create the Table (3 minutes)
+
+**IMPORTANT**: There are two ways to create a CI table in ServiceNow. Use **Method 1** (simpler):
+
+---
+
+##### **Method 1: Direct Table Creation (RECOMMENDED)**
+
+This is the simplest method that avoids complex CI dependency configuration.
+
+**Step-by-Step Instructions**:
+
+1. **Open Table Definition List**
+   ```
+   - Click in the Filter Navigator (search box at top left)
+   - Type: sys_db_object.list
+   - Press Enter
+   ```
+   This opens the "Tables" list showing all database tables in ServiceNow.
+
+2. **Create New Table**
+   ```
+   - Click the "New" button (top right)
+   ```
+   You'll see a form to define a new table.
+
+3. **Fill in Table Details**
+   ```
+   Label: Microservice
+     ↳ This is the human-readable name users will see
+
+   Name: u_microservice
+     ↳ This is the actual database table name
+     ↳ ServiceNow automatically adds "u_" prefix for custom tables
+     ↳ Use lowercase, no spaces
+
+   Extends table: Configuration Item [cmdb_ci]
+     ↳ Click the search icon (magnifying glass)
+     ↳ Search for: "cmdb_ci"
+     ↳ Select: "Configuration Item [cmdb_ci]"
+     ↳ This inherits CMDB fields like name, sys_id, sys_created_on, etc.
+
+   Application: Global (leave as default)
+
+   Create access controls: ✓ (checked)
+     ↳ This automatically creates security rules
+
+   Add module to menu: ✓ (checked)
+     ↳ This adds it to the left navigation menu
+
+   Extensible: ✓ (checked)
+     ↳ Allows extending this table in the future
+   ```
+
+4. **Save the Table**
+   ```
+   - Click "Submit" button (NOT "Submit and Make Dependent")
+   ```
+   ServiceNow will create the table. This takes 5-10 seconds.
+
+5. **Verify Table Created**
+   ```
+   - You should see a success message
+   - The table now appears in the Tables list
+   ```
+
+---
+
+##### **Method 2: CI Class Manager (If You See Dependency Screen)**
+
+If you're seeing a screen asking for "Select class for the new CI" with fields like:
+- Class (Required)
+- Application (Required)
+- Dependent-upon class
+- Identifier entries
+
+You're in the **CI Class Manager** workflow. Here's what to do:
+
+**Step 1: Select Class**
+```
+Class: Configuration Item [cmdb_ci]
+  ↳ Use the lookup icon to search for "cmdb_ci"
+  ↳ Select: Configuration Item [cmdb_ci]
+
+Application: Global
+  ↳ Leave as Global unless working in a scoped app
+```
+
+**Step 2: Handle Dependency Configuration (if prompted)**
+```
+Dependent-upon class: (Leave blank or skip)
+  ↳ Microservices don't have a "depends on" relationship in ServiceNow
+  ↳ If required, you can select Configuration Item [cmdb_ci] again
+```
+
+**Step 3: Identifier Entries (if prompted)**
+
+Identifier entries define how ServiceNow uniquely identifies each microservice CI.
 
 ```
-1. Filter Navigator: sys_db_object.list
-2. Click: New
-3. Configure:
-   - Label: Microservice
-   - Name: u_microservice
-   - Extends: Configuration Item (cmdb_ci)
-4. Save
-5. Add columns (via Columns tab → New):
+Criterion attributes: Select these attributes:
+  ✓ Name (u_name)
+  ✓ Namespace (u_namespace)
+  ✓ Cluster Name (u_cluster_name)
+
+  ↳ A microservice is unique by: name + namespace + cluster
+  ↳ Example: "frontend" in "default" namespace on "microservices" cluster
 ```
 
-| Column Name | Type | Length | Mandatory |
-|-------------|------|--------|-----------|
-| u_name | String | 100 | Yes |
-| u_namespace | String | 100 | Yes |
-| u_cluster_name | String | 100 | No |
-| u_image | String | 500 | No |
-| u_replicas | Integer | - | No |
-| u_ready_replicas | Integer | - | No |
-| u_status | String | 50 | No |
-| u_language | String | 50 | No |
+**Note**: If this seems too complex, **cancel and use Method 1 instead** (sys_db_object.list).
+
+---
+
+**Why Method 1 is Recommended**:
+- ✅ Simpler - fewer screens and configuration
+- ✅ Faster - direct table creation
+- ✅ Same result - you get the same u_microservice table
+- ✅ Can add CI identification rules later if needed
+
+**Continue with Part B below after table is created with either method.**
+
+#### Part B: Add Custom Fields (7 minutes)
+
+Now add columns to store microservice-specific data:
+
+**Step-by-Step for Each Field**:
+
+1. **Open Your New Table**
+   ```
+   - In the Tables list, find "Microservice [u_microservice]"
+   - Click on it to open
+   ```
+
+2. **Go to Columns Section**
+   ```
+   - Scroll down to the "Columns" related list
+   - Click "New" button in the Columns section
+   ```
+
+3. **Add Field #1: Service Name**
+   ```
+   Type: String
+   Column label: Name
+   Column name: u_name
+   Max length: 100
+   Mandatory: ✓ (checked)
+
+   Click: Submit
+   ```
+   **Purpose**: Stores the Kubernetes service name (e.g., "frontend", "cartservice")
+
+4. **Add Field #2: Namespace**
+   ```
+   Click "New" again in Columns section
+
+   Type: String
+   Column label: Namespace
+   Column name: u_namespace
+   Max length: 100
+   Mandatory: ✓ (checked)
+
+   Click: Submit
+   ```
+   **Purpose**: Stores the Kubernetes namespace (e.g., "default", "microservices-dev")
+
+5. **Add Field #3: Cluster Name**
+   ```
+   Click "New" in Columns section
+
+   Type: String
+   Column label: Cluster Name
+   Column name: u_cluster_name
+   Max length: 100
+   Mandatory: ☐ (unchecked)
+
+   Click: Submit
+   ```
+   **Purpose**: Links to which EKS cluster this service runs on (e.g., "microservices")
+
+6. **Add Field #4: Container Image**
+   ```
+   Click "New" in Columns section
+
+   Type: String
+   Column label: Image
+   Column name: u_image
+   Max length: 500
+   Mandatory: ☐ (unchecked)
+
+   Click: Submit
+   ```
+   **Purpose**: Stores the Docker image (e.g., "123456.dkr.ecr.eu-west-2.amazonaws.com/frontend:latest")
+
+7. **Add Field #5: Desired Replicas**
+   ```
+   Click "New" in Columns section
+
+   Type: Integer
+   Column label: Replicas
+   Column name: u_replicas
+   Mandatory: ☐ (unchecked)
+
+   Click: Submit
+   ```
+   **Purpose**: How many pods should be running (e.g., 3)
+
+8. **Add Field #6: Ready Replicas**
+   ```
+   Click "New" in Columns section
+
+   Type: Integer
+   Column label: Ready Replicas
+   Column name: u_ready_replicas
+   Mandatory: ☐ (unchecked)
+
+   Click: Submit
+   ```
+   **Purpose**: How many pods are actually running and healthy (e.g., 3/3)
+
+9. **Add Field #7: Status**
+   ```
+   Click "New" in Columns section
+
+   Type: String
+   Column label: Status
+   Column name: u_status
+   Max length: 50
+   Mandatory: ☐ (unchecked)
+
+   Click: Submit
+   ```
+   **Purpose**: Deployment status (e.g., "Running", "Pending", "Failed")
+
+10. **Add Field #8: Programming Language**
+    ```
+    Click "New" in Columns section
+
+    Type: String
+    Column label: Language
+    Column name: u_language
+    Max length: 50
+    Mandatory: ☐ (unchecked)
+
+    Click: Submit
+    ```
+    **Purpose**: What language the service is written in (e.g., "Go", "Python", "Java")
+
+#### Part C: Verify Table is Ready (1 minute)
+
+1. **Test Table Access**
+   ```bash
+   # Replace with your details
+   PASSWORD='your-password'
+   curl -u "github_integration:${PASSWORD}" \
+     "https://your-instance.service-now.com/api/now/table/u_microservice?sysparm_limit=1"
+   ```
+
+2. **Expected Result**:
+   ```json
+   {"result":[]}
+   ```
+   ✅ Empty array means table exists and is accessible (just no records yet)
+
+3. **If you get an error**:
+   ```json
+   {"error":{"message":"Invalid table u_microservice",...}}
+   ```
+   ❌ Table wasn't created correctly - retry the steps above
+
+#### Part D: Access Your New Table in ServiceNow
+
+After creation, you can view the table:
+
+**Method 1: Direct Access**
+```
+Filter Navigator: u_microservice.list
+```
+
+**Method 2: Via Menu**
+```
+Left Navigation → Configuration → Microservices
+(If you checked "Add module to menu")
+```
+
+**Method 3: Via REST API**
+```bash
+curl -u "github_integration:password" \
+  "https://instance.service-now.com/api/now/table/u_microservice"
+```
+
+#### What This Table Does
+
+Once created, the `eks-discovery.yaml` workflow will automatically populate this table with data like:
+
+| Name | Namespace | Cluster | Replicas | Status | Language |
+|------|-----------|---------|----------|--------|----------|
+| frontend | default | microservices | 1/1 | Running | Go |
+| cartservice | default | microservices | 1/1 | Running | C# |
+| productcatalogservice | default | microservices | 1/1 | Running | Go |
+| ... | ... | ... | ... | ... | ... |
+
+This gives you complete visibility of all microservices in your EKS cluster(s) within ServiceNow CMDB.
+
+#### Complete Field Summary
+
+| # | Field Name | Type | Length | Required | Example Value |
+|---|------------|------|--------|----------|---------------|
+| 1 | u_name | String | 100 | Yes | "frontend" |
+| 2 | u_namespace | String | 100 | Yes | "default" |
+| 3 | u_cluster_name | String | 100 | No | "microservices" |
+| 4 | u_image | String | 500 | No | "123456.dkr.ecr.eu-west-2.amazonaws.com/frontend:v1.0" |
+| 5 | u_replicas | Integer | - | No | 3 |
+| 6 | u_ready_replicas | Integer | - | No | 3 |
+| 7 | u_status | String | 50 | No | "Running" |
+| 8 | u_language | String | 50 | No | "Go" |
+
+Plus inherited CMDB fields: sys_id, sys_created_on, sys_updated_on, sys_created_by, etc.
 
 ## Test Your Setup
 

@@ -501,40 +501,49 @@ If GitHub tool doesn't exist:
 
 ---
 
-#### Task 1.9: Create Microservice CI Class
+#### Task 1.9: Create Microservice CI Class ✅ COMPLETED
 
 **Steps:**
-1. Navigate to: **Configuration > CI Class Manager**
+1. Navigate to: **System Definition > Tables** (`sys_db_object.list`)
 2. Click **New**
-3. Create new class:
-   - **Name**: `Microservice`
-   - **Parent Class**: `cmdb_ci_service` (Service)
-   - **Table Name**: `u_microservice`
-4. Click **Create**
+3. Create new table:
+   - **Label**: `Microservice`
+   - **Name**: `u_microservice`
+   - **Extends table**: `Configuration Item [cmdb_ci]`
+   - **Application**: `Global`
+   - **Create access controls**: ✅ Yes
+   - **Add module to menu**: ✅ Yes
+   - **Extensible**: ✅ Yes
+4. Click **Submit**
 
 **Add Attributes:**
-5. Add the following fields:
+5. Add the following fields via "Insert a new row..." in Table Columns section:
 
-| Field Name | Type | Max Length | Mandatory |
-|------------|------|------------|-----------|
-| u_service_name | String | 255 | Yes |
-| u_namespace | String | 100 | Yes |
-| u_environment | String | 50 | Yes |
-| u_replicas | Integer | - | No |
-| u_ready_replicas | Integer | - | No |
-| u_image | String | 512 | No |
-| u_image_tag | String | 100 | No |
-| u_status | String | 50 | No |
-| u_cluster | Reference (u_eks_cluster) | - | No |
-| u_language | String | 50 | No |
-| u_last_discovered | Date/Time | - | No |
-| u_discovered_by | String | 100 | No |
+| Field Name | Type | Max Length | Mandatory | Display | Status |
+|------------|------|------------|-----------|---------|--------|
+| u_name | String | 100 | Yes | Yes | ✅ Created |
+| u_namespace | String | 100 | Yes | Yes | ✅ Created |
+| u_cluster_name | String | 100 | No | Yes | ✅ Created |
+| u_image | String | 500 | No | Yes | ✅ Created |
+| u_replicas | Integer | 40 | No | Yes | ✅ Created |
+| u_ready_replicas | Integer | 40 | No | Yes | ✅ Created |
+| u_status | String | 50 | No | Yes | ✅ Created |
+| u_language | String | 50 | No | Yes | ✅ Created |
 
-6. Click **Save**
+6. Click **Submit** for each field
 
-**Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
+**Status**: ✅ **Completed** (2025-10-16)
 
 **CI Class Table Name**: `u_microservice`
+
+**Verification Results**:
+- ✅ Table accessible via API (HTTP 200)
+- ✅ All 8 custom fields created
+- ✅ Full CRUD operations tested (CREATE, READ, UPDATE, DELETE)
+- ✅ github_integration user has admin role and full access
+- ✅ Ready for GitHub Actions workflows
+
+**ServiceNow URL**: https://calitiiltddemo3.service-now.com/nav_to.do?uri=u_microservice_list.do
 
 ---
 

@@ -66,20 +66,60 @@ You need to create the `u_microservice` table in ServiceNow.
 
 #### Option 1: Create via ServiceNow UI (Recommended)
 
+**Method 1A: Direct Table Creation (Simplest)**
+
 **Step 1: Navigate to Tables**
 ```
 Filter Navigator: sys_db_object.list
-Click: New
+Press Enter
+Click: New (top right)
 ```
 
 **Step 2: Configure Table**
 ```
 Label: Microservice
 Name: u_microservice
-Extends table: Configuration Item [cmdb_ci]  (or empty for standalone)
-Add module to menu: CMDB
-Create access controls: Yes
+  ↳ ServiceNow automatically adds "u_" prefix
+
+Extends table: Configuration Item [cmdb_ci]
+  ↳ Click magnifying glass icon
+  ↳ Search for: cmdb_ci
+  ↳ Select: Configuration Item [cmdb_ci]
+
+Application: Global
+Create access controls: ✓ (checked)
+Add module to menu: ✓ (checked)
+Extensible: ✓ (checked)
 ```
+
+**Step 3: Submit**
+```
+Click: Submit (NOT "Submit and Make Dependent")
+```
+
+**Method 1B: CI Class Manager (Alternative)**
+
+If you see a screen asking for "Class" and "Application" with "Dependent-upon class":
+
+**Step 1: Select Class**
+```
+Class: Configuration Item [cmdb_ci]
+Application: Global
+```
+
+**Step 2: Dependency (if prompted)**
+```
+Dependent-upon class: (Leave blank or skip)
+  ↳ Microservices don't have CI dependencies
+```
+
+**Step 3: Identifier Entries (if prompted)**
+```
+Criterion attributes: u_name, u_namespace, u_cluster_name
+  ↳ Or skip and add identification rules later
+```
+
+**Note**: Method 1A is simpler and faster. Both produce the same table.
 
 **Step 3: Add Fields**
 
