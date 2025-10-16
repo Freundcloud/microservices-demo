@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: networking.istio.io/v1alpha3
+apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: frontend
 spec:
   hosts:
-  - "frontend.default.svc.cluster.local"
+  - "*"
+  gateways:
+  - istio-gateway
   http:
-  - route:
+  - match:
+    - uri:
+        prefix: "/"
+    route:
     - destination:
         host: frontend
         port:
