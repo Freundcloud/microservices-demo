@@ -59,3 +59,8 @@ terraform-aws/*.bak
 # Claude Code settings (may contain credentials)
 .claude/settings.local.json
 .claude/
+
+# ServiceNow credentials
+.github_sn_credentials
+*_sn_credentials
+SERVICENOW_SETUP_SUMMARY.md
