@@ -334,3 +334,136 @@ jobs:
           echo ""
           echo "All security findings are available at:"
           echo "${{ github.server_url }}/${{ github.repository }}/security/code-scanning"
+
+  # Upload security results to ServiceNow CMDB
+  upload-to-servicenow:
+    name: Upload to ServiceNow
+    needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan, owasp-dependency-check]
+    if: always() && secrets.SERVICENOW_PASSWORD != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Download CodeQL SARIF files
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: codeql-results-*
+          path: sarif-results/codeql
+
+      - name: Download Semgrep SARIF
+        continue-on-error: true
+        run: |
+          # Semgrep results are uploaded to GitHub, download if available
+          echo "Semgrep results in GitHub Security tab"
+
+      - name: Download Trivy SARIF
+        continue-on-error: true
+        run: |
+          # Trivy results are uploaded to GitHub, download if available
+          echo "Trivy results in GitHub Security tab"
+
+      - name: Download Checkov SARIF
+        continue-on-error: true
+        run: |
+          # Checkov results are uploaded to GitHub, download if available
+          echo "Checkov results in GitHub Security tab"
+
+      - name: Note about SARIF file locations
+        run: |
+          echo "## SARIF File Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Security scan tools upload SARIF files to different locations:" >> $GITHUB_STEP_SUMMARY
+          echo "- CodeQL: Embedded in workflow steps (requires API extraction)" >> $GITHUB_STEP_SUMMARY
+          echo "- Semgrep: Uploaded to GitHub Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "- Trivy: Uploaded to GitHub Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "- Checkov: Uploaded to GitHub Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This job will aggregate findings from GitHub Security API." >> $GITHUB_STEP_SUMMARY
+
+      - name: Fetch security findings from GitHub API
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "Fetching security findings from GitHub Security API..."
+
+          # Use GitHub API to get code scanning alerts
+          gh api repos/$GITHUB_REPOSITORY/code-scanning/alerts \
+            --paginate \
+            --jq '.[] | {tool: .tool.name, rule_id: .rule.id, severity: .rule.security_severity_level, state: .state, created_at, dismissed_at, url, location: .most_recent_instance.location}' \
+            > github-security-findings.json || echo '[]' > github-security-findings.json
+
+          echo "Fetched $(jq '. | length' github-security-findings.json) findings from GitHub Security"
+
+      - name: Aggregate Security Results
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          bash scripts/aggregate-security-results.sh
+
+      - name: Upload to ServiceNow
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          RESULTS_FILE: aggregated-security-results.json
+          SUMMARY_FILE: security-scan-summary.json
+        run: |
+          bash scripts/upload-security-to-servicenow.sh
+
+      - name: Create ServiceNow Summary
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        run: |
+          echo "## ServiceNow Security Upload" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "security-scan-summary.json" ]; then
+            TOTAL=$(jq '.total_findings' security-scan-summary.json)
+            CRITICAL=$(jq '.critical_count' security-scan-summary.json)
+            HIGH=$(jq '.high_count' security-scan-summary.json)
+            MEDIUM=$(jq '.medium_count' security-scan-summary.json)
+            LOW=$(jq '.low_count' security-scan-summary.json)
+
+            echo "✅ Security findings uploaded to ServiceNow CMDB" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Findings Summary" >> $GITHUB_STEP_SUMMARY
+            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔴 Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟠 High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟡 Medium | $MEDIUM |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Total** | **$TOTAL** |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### View in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "- [Security Scan Results](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do?sysparm_query=u_scan_id=${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [All Security Findings](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Scan Summaries](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_summary_list.do)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload aggregated results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-results-servicenow
+          path: |
+            aggregated-security-results.json
+            security-scan-summary.json
+            github-security-findings.json
+          retention-days: 90
