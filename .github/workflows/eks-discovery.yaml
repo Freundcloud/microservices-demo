@@ -144,22 +144,29 @@ jobs:
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Prepare cluster payload
-          CLUSTER_PAYLOAD=$(cat <<EOF
-          {
-            "u_name": "${{ env.CLUSTER_NAME }}",
-            "u_arn": "${{ steps.cluster-info.outputs.cluster_arn }}",
-            "u_version": "${{ steps.cluster-info.outputs.cluster_version }}",
-            "u_endpoint": "${{ steps.cluster-info.outputs.cluster_endpoint }}",
-            "u_status": "${{ steps.cluster-info.outputs.cluster_status }}",
-            "u_region": "${{ env.AWS_REGION }}",
-            "u_vpc_id": "${{ steps.cluster-info.outputs.vpc_id }}",
-            "u_provider": "AWS EKS",
-            "u_last_discovered": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "u_discovered_by": "GitHub Actions"
-          }
-          EOF
-          )
+          # Prepare cluster payload using jq to avoid shell escaping issues
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          CLUSTER_PAYLOAD=$(jq -n \
+            --arg name "${{ env.CLUSTER_NAME }}" \
+            --arg arn "${{ steps.cluster-info.outputs.cluster_arn }}" \
+            --arg version "${{ steps.cluster-info.outputs.cluster_version }}" \
+            --arg endpoint "${{ steps.cluster-info.outputs.cluster_endpoint }}" \
+            --arg status "${{ steps.cluster-info.outputs.cluster_status }}" \
+            --arg region "${{ env.AWS_REGION }}" \
+            --arg vpc "${{ steps.cluster-info.outputs.vpc_id }}" \
+            --arg timestamp "$TIMESTAMP" \
+            '{
+              u_name: $name,
+              u_arn: $arn,
+              u_version: $version,
+              u_endpoint: $endpoint,
+              u_status: $status,
+              u_region: $region,
+              u_vpc_id: $vpc,
+              u_provider: "AWS EKS",
+              u_last_discovered: $timestamp,
+              u_discovered_by: "GitHub Actions"
+            }')
 
           # Check if cluster exists in CMDB
           EXISTING_CLUSTER=$(curl -s -X GET \
@@ -216,23 +223,32 @@ jobs:
             IMAGE_TAG=$(echo $service | jq -r '.image_tag')
             STATUS=$(echo $service | jq -r '.status')
 
-            # Prepare service payload
-            SERVICE_PAYLOAD=$(cat <<EOF
-          {
-            "u_name": "$NAME",
-            "u_namespace": "$NAMESPACE",
-            "u_environment": "$ENV",
-            "u_replicas": "$REPLICAS",
-            "u_ready_replicas": "$READY_REPLICAS",
-            "u_image": "$IMAGE",
-            "u_image_tag": "$IMAGE_TAG",
-            "u_status": "$STATUS",
-            "u_cluster": "$CLUSTER_SYS_ID",
-            "u_last_discovered": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "u_discovered_by": "GitHub Actions"
-          }
-          EOF
-          )
+            # Prepare service payload using jq to avoid shell escaping issues
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            SERVICE_PAYLOAD=$(jq -n \
+              --arg name "$NAME" \
+              --arg namespace "$NAMESPACE" \
+              --arg env "$ENV" \
+              --arg replicas "$REPLICAS" \
+              --arg ready "$READY_REPLICAS" \
+              --arg image "$IMAGE" \
+              --arg tag "$IMAGE_TAG" \
+              --arg status "$STATUS" \
+              --arg cluster "$CLUSTER_SYS_ID" \
+              --arg timestamp "$TIMESTAMP" \
+              '{
+                u_name: $name,
+                u_namespace: $namespace,
+                u_environment: $env,
+                u_replicas: $replicas,
+                u_ready_replicas: $ready,
+                u_image: $image,
+                u_image_tag: $tag,
+                u_status: $status,
+                u_cluster: $cluster,
+                u_last_discovered: $timestamp,
+                u_discovered_by: "GitHub Actions"
+              }')
 
             # Check if service exists
             EXISTING_SERVICE=$(curl -s -X GET \

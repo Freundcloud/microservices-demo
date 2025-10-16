@@ -112,6 +112,24 @@ For developers working on the codebase:
   - OWASP Dependency Check
   - GitHub Security integration
 
+### 🔧 Workflow Troubleshooting
+
+- **[OWASP Dependency-Check Troubleshooting](workflows/TROUBLESHOOTING-DEPENDENCY-CHECK.md)**
+  - Fixing Maven Central connectivity issues
+  - Handling missing node_modules errors
+  - Configuring OSS Index authentication
+  - Alternative dependency scanning approaches
+  - Language-specific scanners (npm audit, govulncheck, pip-audit)
+  - Performance optimization and best practices
+
+- **[ServiceNow CMDB Discovery Troubleshooting](workflows/TROUBLESHOOTING-SERVICENOW-CMDB.md)**
+  - Fixing shell heredoc syntax errors
+  - Resolving ServiceNow API authentication issues
+  - Handling JSON payload construction safely
+  - Debugging rate limiting and permission errors
+  - Best practices for CMDB updates
+  - Data validation and verification
+
 ### 🌐 Service Mesh
 
 - **[Istio Deployment](architecture/ISTIO-DEPLOYMENT.md)**
