@@ -50,6 +50,14 @@
   - Automated creation script
 
 #### Change Management & Approvals
+- **[DevOps Change API Integration](SERVICENOW-DEVOPS-CHANGE-API-INTEGRATION.md)** ⭐ **NEW!**
+  - Official ServiceNow DevOps Change GitHub Actions
+  - Workspace integration (changes visible in DevOps workspace!)
+  - DORA metrics enabled
+  - Real-time pipeline tracking
+  - Automated approval handling
+  - Step-by-step setup guide
+
 - **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)** (Comprehensive)
   - Multi-level approval configuration
   - Dev/QA/Prod policies
