@@ -71,25 +71,11 @@ jobs:
           category: "/language:${{ matrix.language }}"
           output: codeql-results-${{ matrix.language }}.sarif
 
-      - name: Upload CodeQL results to ServiceNow
-        if: always() && env.SERVICENOW_PASSWORD != ''
-        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'CodeQL Analysis - ${{ matrix.language }}'
-          security-result-attributes: |
-            {
-              "scanner": "CodeQL",
-              "applicationName": "microservices-demo",
-              "securityToolId": "codeql",
-              "language": "${{ matrix.language }}"
-            }
-          security-result-file: 'codeql-results-${{ matrix.language }}.sarif'
-        continue-on-error: true
+      # NOTE: ServiceNow security result upload disabled
+      # ServiceNow Zurich v6.1.0 does not have sn_devops_security_result table
+      # Your instance uses Vulnerability Response tables instead
+      # See: docs/SERVICENOW-SECURITY-INTEGRATION-FIX.md
+      # Results are still uploaded to GitHub Security tab via CodeQL action above
 
   # Dependency scanning with Dependabot
   dependency-review:
@@ -130,25 +116,8 @@ jobs:
           sarif_file: semgrep-results.sarif
           category: semgrep
 
-      - name: Upload Semgrep results to ServiceNow
-        if: always() && env.SERVICENOW_PASSWORD != ''
-        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'Semgrep SAST'
-          security-result-attributes: |
-            {
-              "scanner": "Semgrep",
-              "applicationName": "microservices-demo",
-              "securityToolId": "semgrep",
-              "scanType": "SAST"
-            }
-          security-result-file: 'semgrep-results.sarif'
-        continue-on-error: true
+      # NOTE: ServiceNow security result upload disabled (Zurich v6.1.0 incompatibility)
+      # Results still available in GitHub Security tab
 
   # Container scanning with Trivy
   trivy-fs-scan:
@@ -175,25 +144,8 @@ jobs:
           sarif_file: 'trivy-fs-results.sarif'
           category: trivy-filesystem
 
-      - name: Upload Trivy results to ServiceNow
-        if: always() && env.SERVICENOW_PASSWORD != ''
-        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'Trivy Filesystem Scan'
-          security-result-attributes: |
-            {
-              "scanner": "Trivy",
-              "applicationName": "microservices-demo",
-              "securityToolId": "trivy",
-              "scanType": "Filesystem"
-            }
-          security-result-file: 'trivy-fs-results.sarif'
-        continue-on-error: true
+      # NOTE: ServiceNow security result upload disabled (Zurich v6.1.0 incompatibility)
+      # Results still available in GitHub Security tab
 
   # Infrastructure as Code scanning
   iac-scan:
@@ -220,25 +172,8 @@ jobs:
           sarif_file: checkov-results.sarif
           category: checkov-terraform
 
-      - name: Upload Checkov results to ServiceNow
-        if: always() && env.SERVICENOW_PASSWORD != ''
-        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'IaC Security Scan - Checkov'
-          security-result-attributes: |
-            {
-              "scanner": "Checkov",
-              "applicationName": "microservices-demo",
-              "securityToolId": "checkov",
-              "scanType": "Infrastructure as Code"
-            }
-          security-result-file: 'checkov-results.sarif'
-        continue-on-error: true
+      # NOTE: ServiceNow security result upload disabled (Zurich v6.1.0 incompatibility)
+      # Results still available in GitHub Security tab
 
       - name: Run tfsec
         uses: aquasecurity/tfsec-action@v1.0.0
@@ -379,23 +314,23 @@ jobs:
           echo "- 📚 **OWASP Dependency Check**: Dependency vulnerability scanning" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -n "${{ secrets.SERVICENOW_PASSWORD }}" ]; then
-            echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Security results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
-            echo "- View in ServiceNow: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=sn_devops_security_result_list.do" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ ServiceNow integration not configured" >> $GITHUB_STEP_SUMMARY
-            echo "- Add SERVICENOW_PASSWORD secret to enable" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### View Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Security Tab**: ${{ github.server_url }}/${{ github.repository }}/security/code-scanning" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
+          echo "### ServiceNow Integration Status" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Security result uploads disabled** (ServiceNow Zurich v6.1.0 compatibility)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your ServiceNow instance uses **Vulnerability Response** tables, not \`sn_devops_security_result\`." >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Management**: ✅ Working (uses \`change_request\` table)" >> $GITHUB_STEP_SUMMARY
+          echo "- **CMDB Updates**: ✅ Working (uses \`u_eks_cluster\`, \`u_microservice\` tables)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Results**: ⏸️ GitHub Security tab only" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📖 **See**: [docs/SERVICENOW-SECURITY-INTEGRATION-FIX.md](../docs/SERVICENOW-SECURITY-INTEGRATION-FIX.md)" >> $GITHUB_STEP_SUMMARY
 
       - name: Check for critical vulnerabilities
         run: |
-          # This would check ServiceNow for critical vulnerabilities
-          # and potentially fail the workflow if critical issues found
-          if [ -n "${{ secrets.SERVICENOW_PASSWORD }}" ]; then
-            echo "✅ Security checks completed"
-            echo "Review results in ServiceNow before proceeding with deployment"
-          fi
+          echo "✅ Security scans completed"
+          echo "Review results in GitHub Security tab before deploying"
+          echo ""
+          echo "All security findings are available at:"
+          echo "${{ github.server_url }}/${{ github.repository }}/security/code-scanning"

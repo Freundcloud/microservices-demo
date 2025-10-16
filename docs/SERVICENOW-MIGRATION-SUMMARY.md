@@ -1037,3 +1037,65 @@ The migration from token-based to Basic Authentication is **100% complete** for 
 ---
 
 *For questions or issues, refer to the troubleshooting guides in the docs/ directory.*
+
+## ⚠️ Update: ServiceNow Zurich v6.1.0 Compatibility (2025-10-16)
+
+After completing the Basic Authentication migration, we discovered your ServiceNow instance is **Zurich v6.1.0**, which has different table structures.
+
+### What Was Discovered
+
+**ServiceNow Version**: Zurich v6.1.0
+**DevOps Version**: v6.1.0
+
+**Table Compatibility**:
+- ✅ `change_request` - EXISTS (change management works)
+- ✅ `u_eks_cluster` - EXISTS (cluster CMDB works)
+- ❌ `u_microservice` - MISSING (needs creation)
+- ❌ `sn_devops_security_result` - DOESN'T EXIST IN ZURICH
+
+### Additional Changes Made
+
+**1. Security Scan Workflow** (security-scan-servicenow.yaml):
+- Removed ServiceNow security result uploads (table doesn't exist)
+- Security scans still run successfully
+- Results uploaded to GitHub Security tab instead
+- Added Zurich compatibility notice in summary
+
+**2. CMDB Discovery** (eks-discovery.yaml):
+- Cluster discovery works (u_eks_cluster exists)
+- Microservices upload will fail until u_microservice table is created
+
+**3. Change Management** (deploy-with-servicenow.yaml):
+- No changes needed
+- Works perfectly with Zurich
+
+### Action Required
+
+**Create u_microservice Table**:
+```
+1. Navigate to ServiceNow
+2. Create table: u_microservice
+3. Add required fields (name, namespace, cluster_name, etc.)
+4. Test discovery workflow
+
+Complete instructions: docs/SERVICENOW-ZURICH-COMPATIBILITY.md
+```
+
+### New Documentation
+
+- **[SERVICENOW-ZURICH-COMPATIBILITY.md](SERVICENOW-ZURICH-COMPATIBILITY.md)** - Complete Zurich guide
+- **[SERVICENOW-ZURICH-QUICK-REFERENCE.md](SERVICENOW-ZURICH-QUICK-REFERENCE.md)** - Navigation tips
+- Updated all existing docs for Zurich compatibility
+
+### What Still Works
+
+| Integration | Status | Notes |
+|-------------|--------|-------|
+| Change Management | ✅ Working | No issues |
+| Approval Gates | ✅ Working | No issues |
+| Cluster CMDB | ✅ Working | u_eks_cluster exists |
+| Security Scans | ✅ Working | Results in GitHub Security |
+| Microservices CMDB | ⏸️ Pending | Create u_microservice table |
+
+**Bottom Line**: Workflows are Zurich-compatible. Just need to create one table (u_microservice) for full functionality.
+
