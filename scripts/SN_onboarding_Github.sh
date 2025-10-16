@@ -358,6 +358,141 @@ create_microservice_table() {
     fi
 }
 
+# Create u_security_scan_result table
+create_security_scan_result_table() {
+    log_info "Creating u_security_scan_result table..."
+
+    # Check if table already exists
+    EXISTING_TABLE=$(curl -s -X GET \
+        "${SERVICENOW_INSTANCE_URL}/api/now/table/sys_db_object?sysparm_query=name=u_security_scan_result&sysparm_limit=1" \
+        -H "Authorization: Basic ${BASIC_AUTH}" \
+        -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+    TABLE_EXISTS=$(echo "$EXISTING_TABLE" | jq -r '.result[0].sys_id // empty')
+
+    if [ -n "$TABLE_EXISTS" ]; then
+        log_warning "Table 'u_security_scan_result' already exists"
+        return 0
+    fi
+
+    log_warning "Table creation via API requires specific permissions."
+    log_warning "Please create the u_security_scan_result table manually via ServiceNow UI:"
+    echo ""
+    echo "1. Navigate to: System Definition > Tables > New"
+    echo "2. Fill in:"
+    echo "   - Label: Security Scan Result"
+    echo "   - Name: u_security_scan_result"
+    echo "   - Extends table: Task [task] or Base Table"
+    echo "   - Application: Global"
+    echo "   - Create access controls: ✓"
+    echo "   - Add module to menu: ✓"
+    echo "3. Click 'Submit'"
+    echo ""
+    echo "4. Add the following custom fields to u_security_scan_result table:"
+    echo "   - u_scan_id (String, 100) - MANDATORY"
+    echo "   - u_scan_type (Choice: CodeQL, Semgrep, Trivy, Checkov, tfsec, Kubesec, Polaris, OWASP) - MANDATORY"
+    echo "   - u_scan_date (Date/Time) - MANDATORY"
+    echo "   - u_finding_id (String, 255) - MANDATORY (Unique identifier)"
+    echo "   - u_severity (Choice: CRITICAL, HIGH, MEDIUM, LOW, INFO) - MANDATORY"
+    echo "   - u_title (String, 255) - MANDATORY"
+    echo "   - u_description (Text, 4000)"
+    echo "   - u_file_path (String, 512)"
+    echo "   - u_line_number (Integer)"
+    echo "   - u_rule_id (String, 255)"
+    echo "   - u_cve_id (String, 100)"
+    echo "   - u_cvss_score (Decimal)"
+    echo "   - u_status (Choice: Open, In Progress, Resolved, False Positive) - MANDATORY, Default: Open"
+    echo "   - u_repository (String, 255) - MANDATORY"
+    echo "   - u_branch (String, 100) - MANDATORY"
+    echo "   - u_commit_sha (String, 40) - MANDATORY"
+    echo "   - u_github_url (URL, 1024)"
+    echo "   - u_sarif_data (JSON/Text)"
+    echo ""
+
+    read -p "Press Enter after creating the table to continue..."
+
+    # Verify table was created
+    VERIFY_TABLE=$(curl -s -X GET \
+        "${SERVICENOW_INSTANCE_URL}/api/now/table/sys_db_object?sysparm_query=name=u_security_scan_result&sysparm_limit=1" \
+        -H "Authorization: Basic ${BASIC_AUTH}" \
+        -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+    TABLE_CREATED=$(echo "$VERIFY_TABLE" | jq -r '.result[0].sys_id // empty')
+
+    if [ -n "$TABLE_CREATED" ]; then
+        log_success "Table 'u_security_scan_result' verified"
+    else
+        log_error "Table 'u_security_scan_result' not found. Please create it manually."
+        exit 1
+    fi
+}
+
+# Create u_security_scan_summary table
+create_security_scan_summary_table() {
+    log_info "Creating u_security_scan_summary table..."
+
+    # Check if table already exists
+    EXISTING_TABLE=$(curl -s -X GET \
+        "${SERVICENOW_INSTANCE_URL}/api/now/table/sys_db_object?sysparm_query=name=u_security_scan_summary&sysparm_limit=1" \
+        -H "Authorization: Basic ${BASIC_AUTH}" \
+        -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+    TABLE_EXISTS=$(echo "$EXISTING_TABLE" | jq -r '.result[0].sys_id // empty')
+
+    if [ -n "$TABLE_EXISTS" ]; then
+        log_warning "Table 'u_security_scan_summary' already exists"
+        return 0
+    fi
+
+    log_warning "Table creation via API requires specific permissions."
+    log_warning "Please create the u_security_scan_summary table manually via ServiceNow UI:"
+    echo ""
+    echo "1. Navigate to: System Definition > Tables > New"
+    echo "2. Fill in:"
+    echo "   - Label: Security Scan Summary"
+    echo "   - Name: u_security_scan_summary"
+    echo "   - Extends table: Base Table"
+    echo "   - Application: Global"
+    echo "   - Create access controls: ✓"
+    echo "   - Add module to menu: ✓"
+    echo "3. Click 'Submit'"
+    echo ""
+    echo "4. Add the following custom fields to u_security_scan_summary table:"
+    echo "   - u_scan_id (String, 100) - MANDATORY"
+    echo "   - u_workflow_run_id (String, 100)"
+    echo "   - u_repository (String, 255) - MANDATORY"
+    echo "   - u_branch (String, 100) - MANDATORY"
+    echo "   - u_commit_sha (String, 40) - MANDATORY"
+    echo "   - u_scan_date (Date/Time) - MANDATORY"
+    echo "   - u_total_findings (Integer) - MANDATORY"
+    echo "   - u_critical_count (Integer)"
+    echo "   - u_high_count (Integer)"
+    echo "   - u_medium_count (Integer)"
+    echo "   - u_low_count (Integer)"
+    echo "   - u_info_count (Integer)"
+    echo "   - u_tools_run (String, 512) - Comma-separated tool names"
+    echo "   - u_status (Choice: Success, Failed, In Progress) - Default: Success"
+    echo "   - u_github_url (URL, 1024)"
+    echo ""
+
+    read -p "Press Enter after creating the table to continue..."
+
+    # Verify table was created
+    VERIFY_TABLE=$(curl -s -X GET \
+        "${SERVICENOW_INSTANCE_URL}/api/now/table/sys_db_object?sysparm_query=name=u_security_scan_summary&sysparm_limit=1" \
+        -H "Authorization: Basic ${BASIC_AUTH}" \
+        -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+    TABLE_CREATED=$(echo "$VERIFY_TABLE" | jq -r '.result[0].sys_id // empty')
+
+    if [ -n "$TABLE_CREATED" ]; then
+        log_success "Table 'u_security_scan_summary' verified"
+    else
+        log_error "Table 'u_security_scan_summary' not found. Please create it manually."
+        exit 1
+    fi
+}
+
 # Add custom fields to cmdb_ci_server for EKS nodes
 add_node_custom_fields() {
     log_info "Adding custom fields to cmdb_ci_server table for EKS nodes..."
@@ -475,6 +610,36 @@ test_github_user_access() {
         exit 1
     fi
 
+    # Test u_security_scan_result table access
+    log_info "Testing u_security_scan_result table access..."
+    RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}\n" \
+        -u "${GITHUB_USERNAME}:${GITHUB_PASSWORD}" \
+        "${SERVICENOW_INSTANCE_URL}/api/now/table/u_security_scan_result?sysparm_limit=1" 2>/dev/null || echo "HTTP_CODE:000")
+
+    HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE" | cut -d':' -f2)
+
+    if [ "$HTTP_CODE" = "200" ]; then
+        log_success "u_security_scan_result table accessible"
+    else
+        log_error "Cannot access u_security_scan_result table (HTTP ${HTTP_CODE})"
+        exit 1
+    fi
+
+    # Test u_security_scan_summary table access
+    log_info "Testing u_security_scan_summary table access..."
+    RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}\n" \
+        -u "${GITHUB_USERNAME}:${GITHUB_PASSWORD}" \
+        "${SERVICENOW_INSTANCE_URL}/api/now/table/u_security_scan_summary?sysparm_limit=1" 2>/dev/null || echo "HTTP_CODE:000")
+
+    HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE" | cut -d':' -f2)
+
+    if [ "$HTTP_CODE" = "200" ]; then
+        log_success "u_security_scan_summary table accessible"
+    else
+        log_error "Cannot access u_security_scan_summary table (HTTP ${HTTP_CODE})"
+        exit 1
+    fi
+
     log_success "All API access tests passed"
 }
 
@@ -533,6 +698,45 @@ Standard ServiceNow server table with additional custom fields for EKS nodes:
 - u_ami_type (String, 100)
 - u_last_discovered (Date/Time)
 
+#### u_security_scan_result Table
+Stores individual security findings from all security scanning tools:
+- u_scan_id (String, 100) - MANDATORY
+- u_scan_type (Choice: CodeQL, Semgrep, Trivy, Checkov, tfsec, Kubesec, Polaris, OWASP) - MANDATORY
+- u_scan_date (Date/Time) - MANDATORY
+- u_finding_id (String, 255) - MANDATORY (Unique identifier)
+- u_severity (Choice: CRITICAL, HIGH, MEDIUM, LOW, INFO) - MANDATORY
+- u_title (String, 255) - MANDATORY
+- u_description (Text, 4000)
+- u_file_path (String, 512)
+- u_line_number (Integer)
+- u_rule_id (String, 255)
+- u_cve_id (String, 100)
+- u_cvss_score (Decimal)
+- u_status (Choice: Open, In Progress, Resolved, False Positive) - MANDATORY
+- u_repository (String, 255) - MANDATORY
+- u_branch (String, 100) - MANDATORY
+- u_commit_sha (String, 40) - MANDATORY
+- u_github_url (URL, 1024)
+- u_sarif_data (JSON/Text)
+
+#### u_security_scan_summary Table
+Stores summary statistics for each security scan execution:
+- u_scan_id (String, 100) - MANDATORY
+- u_workflow_run_id (String, 100)
+- u_repository (String, 255) - MANDATORY
+- u_branch (String, 100) - MANDATORY
+- u_commit_sha (String, 40) - MANDATORY
+- u_scan_date (Date/Time) - MANDATORY
+- u_total_findings (Integer) - MANDATORY
+- u_critical_count (Integer)
+- u_high_count (Integer)
+- u_medium_count (Integer)
+- u_low_count (Integer)
+- u_info_count (Integer)
+- u_tools_run (String, 512) - Comma-separated tool names
+- u_status (Choice: Success, Failed, In Progress)
+- u_github_url (URL, 1024)
+
 ### 3. Relationships
 - Cluster-to-Node relationships via cmdb_rel_ci table
 - Relationship type: "Contains::Contained by"
@@ -542,6 +746,8 @@ Standard ServiceNow server table with additional custom fields for EKS nodes:
 - ✅ u_microservice table (Read/Write)
 - ✅ cmdb_ci_server table (Read/Write)
 - ✅ cmdb_rel_ci table (Read/Write)
+- ✅ u_security_scan_result table (Read/Write)
+- ✅ u_security_scan_summary table (Read/Write)
 
 ## 🔐 GitHub Secrets Configuration
 
@@ -567,6 +773,8 @@ Or via GitHub UI:
 - **EKS Clusters**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do
 - **Microservices**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do
 - **EKS Nodes**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_server_list.do
+- **Security Scan Results**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do
+- **Security Scan Summaries**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_summary_list.do
 
 ### Filter Nodes by Cluster:
 1. Navigate to Servers list
@@ -579,10 +787,15 @@ Or via GitHub UI:
    \`\`\`bash
    gh workflow run eks-discovery.yaml
    \`\`\`
-3. **Verify Data Population**:
+3. **Run the Security Scanning Workflow**:
+   \`\`\`bash
+   gh workflow run security-scan-servicenow.yaml
+   \`\`\`
+4. **Verify Data Population**:
    - Check cluster record in ServiceNow
    - Check node records in ServiceNow
    - Check microservice records in ServiceNow
+   - Check security scan results in ServiceNow
    - Verify relationships between cluster and nodes
 
 ## 📝 Important Notes
@@ -640,6 +853,8 @@ main() {
     create_github_user
     create_eks_cluster_table
     create_microservice_table
+    create_security_scan_result_table
+    create_security_scan_summary_table
     add_node_custom_fields
     create_relationship_types
     test_github_user_access
