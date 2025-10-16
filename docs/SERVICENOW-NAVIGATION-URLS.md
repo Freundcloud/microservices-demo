@@ -120,10 +120,33 @@ https://calitiiltddemo3.service-now.com/u_security_scan_result_list.do
 
 ## DevOps Integration
 
-### DevOps Application (if available)
-**Note**: The "DevOps Change" workspace may require additional ServiceNow DevOps plugins to be installed.
+### ✅ DevOps Change Workspace (AVAILABLE!)
+**Direct URL**:
+```
+https://calitiiltddemo3.service-now.com/now/devops-change/home
+```
 
-**Alternative - Standard Change List**:
+**Plugin Status**:
+- ✅ DevOps Change Velocity v6.1.0 installed
+- ✅ Installed: September 26, 2025
+- ✅ Modern workspace with DORA metrics
+- ✅ CI/CD pipeline integration
+
+**Navigation**:
+- Search in filter navigator: `DevOps Change Workspace`
+- Or use direct URL above
+
+**Features**:
+- Modern, guided UI
+- Pipeline visibility
+- DORA metrics dashboard
+- AI-powered risk insights
+- Change automation
+
+**Setup Guide**: [SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md](SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md)
+
+### Alternative - Standard Change List
+If you prefer the classic UI:
 ```
 https://calitiiltddemo3.service-now.com/change_request_list.do
 ```
@@ -141,6 +164,7 @@ https://calitiiltddemo3.service-now.com/change_request_list.do
 
 | Resource | URL |
 |----------|-----|
+| **DevOps Change Workspace** ⭐ | https://calitiiltddemo3.service-now.com/now/devops-change/home |
 | All Change Requests | https://calitiiltddemo3.service-now.com/change_request_list.do |
 | Online Boutique Changes | https://calitiiltddemo3.service-now.com/change_request_list.do?sysparm_query=business_service.name=Online%20Boutique |
 | Business Applications | https://calitiiltddemo3.service-now.com/cmdb_ci_business_app_list.do |

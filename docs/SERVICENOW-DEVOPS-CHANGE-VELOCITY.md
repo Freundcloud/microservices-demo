@@ -1,26 +1,31 @@
-# ServiceNow DevOps Change Velocity - Setup Guide
+# ServiceNow DevOps Change Velocity - Overview
 
-**Current Status**: Not Installed/Configured
+**✅ UPDATE: DevOps Change Velocity IS INSTALLED!**
+
+**Plugin**: sn_devops_chgvlcty
+**Version**: 6.1.0
+**Installed**: September 26, 2025
 **Instance**: https://calitiiltddemo3.service-now.com
-**Version**: Zurich (v6.1.0)
 
 ---
 
-## 🔍 Current Situation
+## ✅ Current Status - Plugin Installed!
 
-### What You're Seeing
-- DevOps Change Velocity workspace is not available
-- Everything appears in "classic mode" (standard ServiceNow UI)
-- No DevOps Change menu items visible
+**Good News**: DevOps Change Velocity plugin **IS INSTALLED** in your ServiceNow instance!
 
-### Why This Is Happening
-**DevOps Change Velocity is a separate application that must be installed from the ServiceNow Store.**
+### Workspace Access:
+```
+https://calitiiltddemo3.service-now.com/now/devops-change/home
+```
 
-**Current State**:
+### Plugin Details:
 - ✅ ServiceNow instance: Running (Zurich v6.1.0)
 - ✅ Change Management: Available (standard ITSM)
-- ❌ DevOps Change Velocity plugin: **NOT INSTALLED**
-- ❌ DevOps Change workspace: **NOT AVAILABLE**
+- ✅ DevOps Change Velocity plugin: **INSTALLED** (v6.1.0)
+- ✅ DevOps Change workspace: **AVAILABLE**
+- ✅ User roles: Configured (`sn_devops.viewer`, `sn_devops.admin`, etc.)
+
+**See complete setup guide**: [SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md](SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md)
 
 ---
 

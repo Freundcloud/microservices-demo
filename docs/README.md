@@ -156,15 +156,20 @@ Complete ServiceNow CMDB integration with automated discovery and security scann
   - Troubleshooting issues
 
 **Change Management & Approvals:**
-- **[DevOps Change Velocity vs. Standard Change](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)** ⭐ **READ THIS FIRST**
-  - Why DevOps Change workspace isn't available
-  - Standard Change Management (current approach)
-  - DevOps Change Velocity (premium plugin)
-  - Comparison and recommendations
-  - What we've implemented without the plugin
+- **[DevOps Change Workspace Access](SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md)** ⭐ **START HERE**
+  - ✅ DevOps Change Velocity IS INSTALLED (v6.1.0)
+  - Direct workspace URL and access guide
+  - Initial setup wizard steps
+  - GitHub Actions connection
+  - DORA metrics and dashboards
+- **[DevOps Change Velocity Overview](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)**
+  - Plugin features and capabilities
+  - Comparison with Standard Change Management
+  - What's included in the installation
 - **[Navigation URLs](SERVICENOW-NAVIGATION-URLS.md)** ⭐ **BOOKMARK THIS**
-  - Correct URLs for all ServiceNow features
-  - Change Request list (not DevOps workspace)
+  - DevOps Change Workspace URL
+  - All ServiceNow feature URLs
+  - Change Request lists
   - Custom views and filters
   - Quick reference guide
 - **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)**
