@@ -339,8 +339,9 @@ jobs:
   upload-to-servicenow:
     name: Upload to ServiceNow
     needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan, owasp-dependency-check]
-    if: always() && secrets.SERVICENOW_PASSWORD != ''
+    if: always()
     runs-on: ubuntu-latest
+    # Job will skip upload step if SERVICENOW_PASSWORD is not set
 
     steps:
       - name: Checkout Code
@@ -422,16 +423,39 @@ jobs:
           RESULTS_FILE: aggregated-security-results.json
           SUMMARY_FILE: security-scan-summary.json
         run: |
+          if [ -z "${SERVICENOW_PASSWORD}" ]; then
+            echo "⚠️  ServiceNow credentials not configured - skipping upload"
+            echo ""
+            echo "To enable ServiceNow integration, configure these GitHub secrets:"
+            echo "  - SERVICENOW_INSTANCE_URL"
+            echo "  - SERVICENOW_USERNAME"
+            echo "  - SERVICENOW_PASSWORD"
+            echo ""
+            echo "See docs/SERVICENOW-SECURITY-VERIFICATION.md for setup instructions"
+            exit 0
+          fi
+
+          echo "📤 Uploading security results to ServiceNow..."
           bash scripts/upload-security-to-servicenow.sh
 
       - name: Create ServiceNow Summary
         env:
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
         run: |
           echo "## ServiceNow Security Upload" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f "security-scan-summary.json" ]; then
+          if [ -z "${SERVICENOW_PASSWORD}" ]; then
+            echo "⚠️  **ServiceNow integration not configured**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Security scan results were not uploaded to ServiceNow." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To enable ServiceNow integration:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Configure GitHub secrets (SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, SERVICENOW_PASSWORD)" >> $GITHUB_STEP_SUMMARY
+            echo "2. Create ServiceNow tables (see [docs/SERVICENOW-SECURITY-VERIFICATION.md](docs/SERVICENOW-SECURITY-VERIFICATION.md))" >> $GITHUB_STEP_SUMMARY
+            echo "3. Re-run this workflow" >> $GITHUB_STEP_SUMMARY
+          elif [ -f "security-scan-summary.json" ]; then
             TOTAL=$(jq '.total_findings' security-scan-summary.json)
             CRITICAL=$(jq '.critical_count' security-scan-summary.json)
             HIGH=$(jq '.high_count' security-scan-summary.json)
@@ -449,12 +473,11 @@ jobs:
             echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
             echo "| **Total** | **$TOTAL** |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### View in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "- [Security Scan Results](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do?sysparm_query=u_scan_id=${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+            echo "- [All Security Findings](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Scan Summaries](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_summary_list.do)" >> $GITHUB_STEP_SUMMARY
           fi
-
-          echo "### View in ServiceNow" >> $GITHUB_STEP_SUMMARY
-          echo "- [Security Scan Results](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do?sysparm_query=u_scan_id=${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-          echo "- [All Security Findings](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_result_list.do)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Scan Summaries](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_security_scan_summary_list.do)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload aggregated results as artifact
