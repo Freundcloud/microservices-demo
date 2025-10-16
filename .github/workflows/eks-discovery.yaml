@@ -103,10 +103,23 @@ jobs:
             if kubectl get namespace $NAMESPACE &> /dev/null; then
               echo "#### Environment: ${NAMESPACE##*-}" >> $GITHUB_STEP_SUMMARY
 
-              # Get all deployments
+              # Get all deployments with language detection
               kubectl get deployments -n $NAMESPACE -o json | \
                 jq --arg ns "$NAMESPACE" --arg env "${NAMESPACE##*-}" '
-                  .items[] | {
+                  .items[] |
+                  # Detect language from labels or common patterns
+                  (.metadata.labels.language //
+                   (.metadata.labels.app // .metadata.name) as $svc |
+                   if $svc | test("frontend|productcatalogservice|shippingservice") then "Go"
+                   elif $svc | test("emailservice|recommendationservice") then "Python"
+                   elif $svc | test("adservice|shoppingassistant") then "Java"
+                   elif $svc | test("currencyservice|paymentservice") then "Node.js"
+                   elif $svc | test("cartservice") then "C#"
+                   elif $svc | test("redis") then "Redis"
+                   else ""
+                   end
+                  ) as $language |
+                  {
                     name: .metadata.name,
                     namespace: $ns,
                     environment: $env,
@@ -116,7 +129,8 @@ jobs:
                     image_tag: (.spec.template.spec.containers[0].image | split(":")[1]),
                     created: .metadata.creationTimestamp,
                     labels: .metadata.labels,
-                    status: (if .status.readyReplicas == .spec.replicas then "Running" else "Degraded" end)
+                    status: (if .status.readyReplicas == .spec.replicas then "Running" else "Degraded" end),
+                    language: $language
                   }
                 ' > services-$NAMESPACE.json
 
@@ -247,20 +261,17 @@ jobs:
             # Prepare service payload using jq with proper escaping
             TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             SERVICE_PAYLOAD=$(echo "$service" | jq \
-              --arg cluster "$CLUSTER_SYS_ID" \
+              --arg cluster_name "$CLUSTER_NAME" \
               --arg timestamp "$TIMESTAMP" \
               '{
                 u_name: .name,
                 u_namespace: .namespace,
-                u_environment: .environment,
+                u_cluster_name: $cluster_name,
                 u_replicas: (.replicas | tostring),
                 u_ready_replicas: (.ready_replicas | tostring),
                 u_image: .image,
-                u_image_tag: .image_tag,
                 u_status: .status,
-                u_cluster: $cluster,
-                u_last_discovered: $timestamp,
-                u_discovered_by: "GitHub Actions"
+                u_language: .language
               }')
 
             # Check if service exists
