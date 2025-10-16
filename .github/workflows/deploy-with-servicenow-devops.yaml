@@ -197,8 +197,6 @@ jobs:
           tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
-          job-name: 'Deploy to ${{ github.event.inputs.environment }}'
-
           change-request-details: |
             {
               "close_code": "successful",
@@ -250,8 +248,6 @@ jobs:
           tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
-          job-name: 'Rollback Deployment'
-
           change-request-details: |
             {
               "close_code": "unsuccessful",
