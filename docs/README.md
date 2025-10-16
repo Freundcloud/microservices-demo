@@ -166,6 +166,22 @@ Complete ServiceNow CMDB integration with automated discovery and security scann
   - 15-minute setup guide
   - Step-by-step testing
   - Verification checklist
+
+**Application & Dependency Mapping:**
+- **[Application Setup Quick Start](SERVICENOW-APPLICATION-QUICKSTART.md)** ⭐ **START HERE**
+  - 10-minute setup guide
+  - DevOps Change workspace visibility
+  - Service dependency mapping
+  - Complete verification checklist
+- **[Application Setup Guide](SERVICENOW-APPLICATION-SETUP.md)**
+  - Complete implementation guide
+  - Business Application creation
+  - CMDB relationship mapping
+  - Health monitoring setup
+  - Impact analysis automation
+
+**Security Scanning Integration:**
+- **[Security Scanning Design](SERVICENOW-SECURITY-SCANNING.md)**
   - 8 security tools integrated
   - SARIF aggregation
   - Finding deduplication
