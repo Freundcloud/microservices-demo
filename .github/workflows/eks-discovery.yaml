@@ -13,8 +13,9 @@ on:
 env:
   AWS_REGION: eu-west-2
   CLUSTER_NAME: microservices
-  SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
-  SN_OAUTH_TOKEN: ${{ secrets.SN_OAUTH_TOKEN }}
+  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+  SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+  SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
 
 jobs:
   discover-eks-cluster:
@@ -139,7 +140,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload cluster info to ServiceNow CMDB
-        if: ${{ env.SN_OAUTH_TOKEN != '' }}
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
         env:
           CLUSTER_ARN: ${{ steps.cluster-info.outputs.cluster_arn }}
           CLUSTER_VERSION: ${{ steps.cluster-info.outputs.cluster_version }}
@@ -149,6 +150,9 @@ jobs:
         run: |
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Create Basic Auth header
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
 
           # Prepare cluster payload using jq with all values from environment variables
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -178,8 +182,8 @@ jobs:
 
           # Check if cluster exists in CMDB
           EXISTING_CLUSTER=$(curl -s -X GET \
-            "${SN_INSTANCE_URL}/api/now/table/u_eks_cluster?sysparm_query=u_name=${CLUSTER_NAME}&sysparm_limit=1" \
-            -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
+            "${SERVICENOW_INSTANCE_URL}/api/now/table/u_eks_cluster?sysparm_query=u_name=${CLUSTER_NAME}&sysparm_limit=1" \
+            -H "Authorization: Basic ${BASIC_AUTH}" \
             -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
           CLUSTER_SYS_ID=$(echo "$EXISTING_CLUSTER" | jq -r '.result[0].sys_id // empty')
@@ -187,8 +191,8 @@ jobs:
           if [ -n "$CLUSTER_SYS_ID" ]; then
             echo "Updating existing cluster record: $CLUSTER_SYS_ID"
             RESPONSE=$(curl -s -X PUT \
-              "${SN_INSTANCE_URL}/api/now/table/u_eks_cluster/$CLUSTER_SYS_ID" \
-              -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
+              "${SERVICENOW_INSTANCE_URL}/api/now/table/u_eks_cluster/$CLUSTER_SYS_ID" \
+              -H "Authorization: Basic ${BASIC_AUTH}" \
               -H "Content-Type: application/json" \
               -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{}')
 
@@ -196,8 +200,8 @@ jobs:
           else
             echo "Creating new cluster record"
             CLUSTER_RESPONSE=$(curl -s -X POST \
-              "${SN_INSTANCE_URL}/api/now/table/u_eks_cluster" \
-              -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
+              "${SERVICENOW_INSTANCE_URL}/api/now/table/u_eks_cluster" \
+              -H "Authorization: Basic ${BASIC_AUTH}" \
               -H "Content-Type: application/json" \
               -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
 
@@ -213,13 +217,16 @@ jobs:
           fi
 
       - name: Upload microservices to ServiceNow CMDB
-        if: ${{ env.SN_OAUTH_TOKEN != '' }}
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
         run: |
           # Check if CLUSTER_SYS_ID was set by previous step
           if [ -z "${CLUSTER_SYS_ID}" ]; then
             echo "⚠️ CLUSTER_SYS_ID not set, skipping microservices upload" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
+
+          # Create Basic Auth header
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
 
           echo "Uploading microservices to ServiceNow CMDB..."
 
@@ -258,22 +265,22 @@ jobs:
 
             # Check if service exists
             EXISTING_SERVICE=$(curl -s -X GET \
-              "${SN_INSTANCE_URL}/api/now/table/u_microservice?sysparm_query=u_name=$NAME^u_namespace=$NAMESPACE&sysparm_limit=1" \
-              -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
+              "${SERVICENOW_INSTANCE_URL}/api/now/table/u_microservice?sysparm_query=u_name=$NAME^u_namespace=$NAMESPACE&sysparm_limit=1" \
+              -H "Authorization: Basic ${BASIC_AUTH}" \
               -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
             SERVICE_SYS_ID=$(echo "$EXISTING_SERVICE" | jq -r '.result[0].sys_id // empty')
 
             if [ -n "$SERVICE_SYS_ID" ]; then
               curl -s -X PUT \
-                "${SN_INSTANCE_URL}/api/now/table/u_microservice/$SERVICE_SYS_ID" \
-                -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/u_microservice/$SERVICE_SYS_ID" \
+                -H "Authorization: Basic ${BASIC_AUTH}" \
                 -H "Content-Type: application/json" \
                 -d "$SERVICE_PAYLOAD" > /dev/null 2>&1
             else
               curl -s -X POST \
-                "${SN_INSTANCE_URL}/api/now/table/u_microservice" \
-                -H "Authorization: Bearer ${SN_OAUTH_TOKEN}" \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/u_microservice" \
+                -H "Authorization: Basic ${BASIC_AUTH}" \
                 -H "Content-Type: application/json" \
                 -d "$SERVICE_PAYLOAD" > /dev/null 2>&1
             fi
@@ -286,12 +293,12 @@ jobs:
           echo "✅ All microservices uploaded to CMDB" >> $GITHUB_STEP_SUMMARY
 
       - name: ServiceNow CMDB not configured
-        if: ${{ env.SN_OAUTH_TOKEN == '' }}
+        if: ${{ env.SERVICENOW_PASSWORD == '' }}
         run: |
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "⚠️ ServiceNow CMDB integration not configured" >> $GITHUB_STEP_SUMMARY
-          echo "Add \`SN_OAUTH_TOKEN\` secret to enable CMDB updates" >> $GITHUB_STEP_SUMMARY
+          echo "Add \`SERVICENOW_PASSWORD\` secret to enable CMDB updates" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Create discovery summary
@@ -322,10 +329,10 @@ jobs:
           echo "" >> discovery-summary.md
           echo "## ServiceNow Integration" >> discovery-summary.md
 
-          if [ -n "${SN_OAUTH_TOKEN}" ]; then
+          if [ -n "${SERVICENOW_PASSWORD}" ]; then
             echo "✅ Data uploaded to ServiceNow CMDB" >> discovery-summary.md
-            echo "- **Cluster Record**: ${SN_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do" >> discovery-summary.md
-            echo "- **Services**: ${SN_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
+            echo "- **Cluster Record**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do" >> discovery-summary.md
+            echo "- **Services**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
           else
             echo "⚠️ ServiceNow CMDB integration not configured" >> discovery-summary.md
           fi
@@ -351,11 +358,11 @@ jobs:
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**View ServiceNow CMDB**:" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${SN_OAUTH_TOKEN}" ]; then
-            echo "- [EKS Clusters](${SN_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do)" >> $GITHUB_STEP_SUMMARY
-            echo "- [Microservices](${SN_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${SERVICENOW_PASSWORD}" ]; then
+            echo "- [EKS Clusters](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Microservices](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Configure \`SN_OAUTH_TOKEN\` secret to enable CMDB integration" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Configure \`SERVICENOW_PASSWORD\` secret to enable CMDB integration" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Next Discovery**: Scheduled in 6 hours or run manually" >> $GITHUB_STEP_SUMMARY

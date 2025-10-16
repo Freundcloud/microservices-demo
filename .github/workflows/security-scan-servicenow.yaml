@@ -19,9 +19,10 @@ permissions:
   actions: read
 
 env:
-  SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
-  SN_DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-  SN_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+  SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+  SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+  SERVICENOW_ORCHESTRATION_TOOL_ID: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
 
 jobs:
   # CodeQL Analysis for multiple languages
@@ -71,12 +72,13 @@ jobs:
           output: codeql-results-${{ matrix.language }}.sarif
 
       - name: Upload CodeQL results to ServiceNow
-        if: always() && env.SN_DEVOPS_TOKEN != ''
-        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        if: always() && env.SERVICENOW_PASSWORD != ''
+        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'CodeQL Analysis - ${{ matrix.language }}'
           security-result-attributes: |
@@ -129,12 +131,13 @@ jobs:
           category: semgrep
 
       - name: Upload Semgrep results to ServiceNow
-        if: always() && env.SN_DEVOPS_TOKEN != ''
-        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        if: always() && env.SERVICENOW_PASSWORD != ''
+        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Semgrep SAST'
           security-result-attributes: |
@@ -173,12 +176,13 @@ jobs:
           category: trivy-filesystem
 
       - name: Upload Trivy results to ServiceNow
-        if: always() && env.SN_DEVOPS_TOKEN != ''
-        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        if: always() && env.SERVICENOW_PASSWORD != ''
+        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Trivy Filesystem Scan'
           security-result-attributes: |
@@ -217,12 +221,13 @@ jobs:
           category: checkov-terraform
 
       - name: Upload Checkov results to ServiceNow
-        if: always() && env.SN_DEVOPS_TOKEN != ''
-        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        if: always() && env.SERVICENOW_PASSWORD != ''
+        uses: ServiceNow/servicenow-devops-security-result@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'IaC Security Scan - Checkov'
           security-result-attributes: |
@@ -374,14 +379,14 @@ jobs:
           echo "- 📚 **OWASP Dependency Check**: Dependency vulnerability scanning" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -n "${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}" ]; then
+          if [ -n "${{ secrets.SERVICENOW_PASSWORD }}" ]; then
             echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
             echo "✅ Security results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
-            echo "- View in ServiceNow: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=sn_devops_security_result_list.do" >> $GITHUB_STEP_SUMMARY
+            echo "- View in ServiceNow: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=sn_devops_security_result_list.do" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
             echo "⚠️ ServiceNow integration not configured" >> $GITHUB_STEP_SUMMARY
-            echo "- Add SN_DEVOPS_INTEGRATION_TOKEN secret to enable" >> $GITHUB_STEP_SUMMARY
+            echo "- Add SERVICENOW_PASSWORD secret to enable" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
@@ -390,7 +395,7 @@ jobs:
         run: |
           # This would check ServiceNow for critical vulnerabilities
           # and potentially fail the workflow if critical issues found
-          if [ -n "${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}" ]; then
+          if [ -n "${{ secrets.SERVICENOW_PASSWORD }}" ]; then
             echo "✅ Security checks completed"
             echo "Review results in ServiceNow before proceeding with deployment"
           fi

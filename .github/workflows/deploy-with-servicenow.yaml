@@ -19,10 +19,10 @@ on:
 env:
   AWS_REGION: eu-west-2
   CLUSTER_NAME: microservices
-  SN_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
-  SN_DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-  SN_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-  SN_OAUTH_TOKEN: ${{ secrets.SN_OAUTH_TOKEN }}
+  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+  SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+  SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+  SERVICENOW_ORCHESTRATION_TOOL_ID: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
 
 jobs:
   # Job 1: Create ServiceNow Change Request
@@ -61,11 +61,12 @@ jobs:
 
       - name: Create ServiceNow Change Request
         id: change
-        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        uses: ServiceNow/servicenow-devops-change@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Deploy to ${{ github.event.inputs.environment }}'
           change-request: |
@@ -86,7 +87,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Change Request Number**: ${{ steps.change.outputs.change-request-number }}" >> $GITHUB_STEP_SUMMARY
           echo "**Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**View in ServiceNow**: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ steps.change.outputs.change-request-sys-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**View in ServiceNow**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ steps.change.outputs.change-request-sys-id }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
   # Job 2: Wait for Change Approval (QA and Prod only)
@@ -98,11 +99,12 @@ jobs:
 
     steps:
       - name: Wait for ServiceNow Change Approval
-        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        uses: ServiceNow/servicenow-devops-change@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Wait for Approval'
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
@@ -288,11 +290,12 @@ jobs:
 
       - name: Update ServiceNow Change Request - Success
         if: success()
-        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        uses: ServiceNow/servicenow-devops-change@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Update Change Request - Success'
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
@@ -343,7 +346,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Update CMDB with deployment info
-        if: ${{ env.SN_OAUTH_TOKEN != '' }}
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
         run: |
           ENV="${{ github.event.inputs.environment }}"
           NAMESPACE="microservices-$ENV"
@@ -360,6 +363,9 @@ jobs:
 
           echo "Updating CMDB for ${{ github.event.inputs.environment }} environment..."
 
+          # Create base64 Basic Auth
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+
           for service in "${SERVICES[@]}"; do
             # Get service details
             REPLICAS=$(kubectl get deployment $service -n $NAMESPACE -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
@@ -371,11 +377,9 @@ jobs:
 
               echo "✅ $service: $READY_REPLICAS/$REPLICAS ready" >> $GITHUB_STEP_SUMMARY
 
-              # In a real implementation, you would update ServiceNow CMDB here
-              # This requires the SN_OAUTH_TOKEN secret and proper API endpoint
-              # Example:
-              # curl -X POST "${{ secrets.SN_INSTANCE_URL }}/api/now/table/u_microservice" \
-              #   -H "Authorization: Bearer ${{ secrets.SN_OAUTH_TOKEN }}" \
+              # Update ServiceNow CMDB using Basic Auth
+              # curl -X POST "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/u_microservice" \
+              #   -H "Authorization: Basic $BASIC_AUTH" \
               #   -H "Content-Type: application/json" \
               #   -d "{...service data...}"
             fi
@@ -423,11 +427,12 @@ jobs:
           echo "✅ Rollback completed" >> $GITHUB_STEP_SUMMARY
 
       - name: Update ServiceNow Change Request - Failed
-        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        uses: ServiceNow/servicenow-devops-change@v2.0.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Update Change Request - Failed'
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}

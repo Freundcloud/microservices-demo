@@ -108,20 +108,69 @@ Version: [version number]
 #### Task 1.3: Create Integration User
 
 **Steps:**
+
 1. Navigate to: **User Administration > Users**
+   - Or: **All > User Administration > Users**
+
 2. Click **New**
-3. Fill in details:
+
+3. Fill in the **User Details**:
    - **User ID**: `github_integration`
    - **First Name**: `GitHub`
    - **Last Name**: `Integration`
    - **Email**: `devops@yourcompany.com` (use your actual email)
    - **Active**: ✅ Checked
    - **Web service access only**: ✅ Checked (for security)
-4. Click **Submit**
+
+4. **Set Password** (IMPORTANT):
+
+   📖 **Need detailed help?** See: [SERVICENOW-PASSWORD-MANAGEMENT.md](SERVICENOW-PASSWORD-MANAGEMENT.md)
+
+   **Method 1: Set password during creation (Recommended)**
+   - Scroll to the **Password** section on the form
+   - Click **Set Password** button
+   - Enter a strong password (see requirements below)
+   - Confirm the password
+   - **IMPORTANT**: Save this password securely!
+
+   **Method 2: Set password after creation**
+   - Click **Submit** to create the user first
+   - Find the user: **User Administration > Users** > Search `github_integration`
+   - Open the user record
+   - Right-click the header bar
+   - Select **Set Password**
+   - Enter a strong password
+   - Confirm the password
+
+5. Click **Submit**
+
+**Password Requirements:**
+
+ServiceNow typically requires:
+- Minimum 8-12 characters (check your instance policy)
+- Mix of uppercase and lowercase letters
+- At least one number
+- At least one special character (!, @, #, $, %, etc.)
+
+**Example Strong Password:**
+```
+GitHubInt3gr@ti0n2024!
+```
 
 **Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
 
-**Record SYS_ID here**: `________________________________`
+**Record These Values Securely:**
+```
+Username: github_integration
+Password: ________________________________
+SYS_ID: ________________________________
+```
+
+⚠️ **Security Notes:**
+- Store password in a secure password manager
+- Do NOT commit password to Git
+- This password will be used as `SERVICENOW_PASSWORD` in GitHub Secrets (Task 1.5)
+- Rotate password every 90 days
 
 ---
 
@@ -144,27 +193,118 @@ Version: [version number]
 
 ---
 
-#### Task 1.5: Generate DevOps Integration Token
+#### Task 1.5: Configure GitHub Tool and Authentication
 
-**Steps:**
-1. Navigate to: **DevOps > Configuration > Integration Tokens**
-2. Click **Generate New Token**
-3. Fill in:
-   - **Token Name**: `GitHub Actions Integration`
-   - **User**: Select `github_integration`
-   - **Expires**: Set to 1 year from now
-4. Click **Generate**
-5. **IMPORTANT**: Copy the token immediately and store securely
-6. You will not be able to see this token again!
+⚠️ **IMPORTANT**: The menu path "DevOps > Configuration > Integration Tokens" does NOT exist in ServiceNow. The `SN_DEVOPS_INTEGRATION_TOKEN` is actually obtained from the GitHub Tool configuration in ServiceNow DevOps.
+
+**What is the DevOps Integration Token?**
+
+The DevOps Integration Token is automatically generated when you create a GitHub tool in ServiceNow DevOps. This token is embedded in the GitHub tool record and is used to authenticate GitHub Actions workflows with your ServiceNow instance.
+
+**Steps to Configure GitHub Tool:**
+
+1. Navigate to: **DevOps > Orchestration > GitHub**
+   - Alternative path: **All > DevOps > Configuration > Tool Connections**
+
+2. Click **New** to create a new GitHub tool connection
+
+3. Fill in the GitHub Tool configuration:
+   - **Name**: `GitHub Actions Integration`
+   - **Type**: GitHub
+   - **URL**: `https://github.com/your-org/microservices-demo`
+   - **Branch**: `main` (or your default branch)
+
+4. Authentication section:
+   - **Credential Type**: Select `Basic Auth` or `Token`
+   - **GitHub Token**: Enter your GitHub Personal Access Token (PAT)
+     - Create PAT at: https://github.com/settings/tokens
+     - Required scopes: `repo`, `workflow`, `read:org`
+
+5. Click **Submit**
+
+6. **Copy the sys_id from the URL or record:**
+
+   📖 **Need help?** See detailed guide: [SERVICENOW-SYSID-EXTRACTION-GUIDE.md](SERVICENOW-SYSID-EXTRACTION-GUIDE.md)
+
+   **Modern ServiceNow (Vancouver/Utah+):**
+   - The URL will look like: `https://your-instance.service-now.com/now/devops-change/record/sn_devops_tool/4eaebb06c320f690e1bbf0cb05013135`
+   - The sys_id is the **last part** of the URL: `4eaebb06c320f690e1bbf0cb05013135`
+
+   **Example with your URL:**
+   ```
+   URL: https://calitiiltddemo3.service-now.com/now/devops-change/record/sn_devops_tool/4eaebb06c320f690e1bbf0cb05013135
+
+   Your sys_id is: 4eaebb06c320f690e1bbf0cb05013135
+   ```
+
+   **Older ServiceNow (Rome/Tokyo):**
+   - The URL will look like: `.../sn_devops_tool.do?sys_id=XXXXXXXXXX`
+   - The sys_id is in the query parameter
+
+   **Alternative Method (Works in all versions):**
+   - Right-click the form header
+   - Select **Copy sys_id** (if available)
+   - Or select **Copy URL** and extract the sys_id from it
+
+   ✅ **This sys_id is your `SN_ORCHESTRATION_TOOL_ID`**
+
+   **Verify your sys_id:**
+   - Length: Exactly 32 characters
+   - Format: Lowercase letters (a-f) and numbers (0-9) only
+   - Example: `4eaebb06c320f690e1bbf0cb05013135` ✅
+
+7. **Important Note about the Integration Token:**
+   - The `SN_DEVOPS_INTEGRATION_TOKEN` is used by ServiceNow's GitHub Actions
+   - In many cases, you can use **Basic Authentication** instead (username:password)
+   - The token-based authentication is version-dependent (requires ServiceNow DevOps v4.0.0+)
+
+**Authentication Options for GitHub Actions:**
+
+**Option A: Basic Authentication (Simpler, more widely supported)**
+```yaml
+# In GitHub Actions workflows
+- uses: ServiceNow/servicenow-devops-change@v2
+  with:
+    instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+    devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+    devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+    tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
+```
+
+**Option B: Token-Based Authentication (If supported by your ServiceNow version)**
+```yaml
+# In GitHub Actions workflows
+- uses: ServiceNow/servicenow-devops-change@v4
+  with:
+    instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+    devops-integration-token: ${{ secrets.SERVICENOW_DEVOPS_TOKEN }}
+    tool-id: ${{ secrets.SERVICENOW_ORCHESTRATION_TOOL_ID }}
+```
 
 **Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
 
-**Token Storage:**
+**Record These Values:**
 ```
-SN_DEVOPS_INTEGRATION_TOKEN=___________________________________________
+# GitHub Tool Configuration
+SN_ORCHESTRATION_TOOL_ID (sys_id)=________________________________
+
+# Choose ONE authentication method:
+
+# Method A: Basic Auth (username from Task 1.3)
+SERVICENOW_USERNAME=github_integration
+SERVICENOW_PASSWORD=________________________________
+
+# Method B: Token-based (if supported)
+SERVICENOW_DEVOPS_TOKEN=________________________________
 ```
 
-⚠️ **Security Warning**: Store this token securely. Do not commit to Git. We'll add to GitHub Secrets later.
+**Verification Steps:**
+
+1. Test the GitHub tool connection in ServiceNow
+2. Verify the tool appears in: **DevOps > Orchestration > GitHub**
+3. Confirm the sys_id is captured correctly
+
+⚠️ **Security Warning**: Store these credentials securely. Do not commit to Git. We'll add to GitHub Secrets in Week 2.
 
 ---
 
@@ -182,12 +322,85 @@ SN_DEVOPS_INTEGRATION_TOKEN=___________________________________________
 5. Click **Submit**
 6. Generate access token using client credentials
 
-**Alternative - Simple Token Method:**
+**Alternative Authentication Methods:**
+
+**Option 1: Basic Authentication (Simpler, but less secure)**
+
+Basic Authentication sends your username and password with every API request. While simpler to set up than OAuth, it's less secure because credentials are transmitted with each call (even though base64-encoded, not encrypted).
+
+**When to use:**
+- Quick testing or proof-of-concept
+- Small teams with limited ServiceNow configuration access
+- When OAuth setup is blocked by organizational policies
+
+**Setup Steps:**
+
+1. **Create the credentials string:**
+   - Format: `username:password`
+   - Example: `github_integration:MySecurePassword123!`
+
+2. **Encode to Base64:**
+   ```bash
+   # On Linux/Mac terminal
+   echo -n "github_integration:MySecurePassword123!" | base64
+
+   # Output example:
+   # Z2l0aHViX2ludGVncmF0aW9uOk15U2VjdXJlUGFzc3dvcmQxMjMh
+   ```
+
+   **Important:** The `-n` flag prevents adding a newline character, which would break authentication.
+
+3. **Add to GitHub Secrets:**
+   - Go to: `https://github.com/your-org/microservices-demo/settings/secrets/actions`
+   - Click **New repository secret**
+   - Name: `SERVICENOW_BASIC_AUTH`
+   - Value: Paste the base64 string (e.g., `Z2l0aHViX2ludGVncmF0aW9uOk15U2VjdXJlUGFzc3dvcmQxMjMh`)
+   - Click **Add secret**
+
+4. **Use in GitHub Actions workflows:**
+   ```yaml
+   - name: Call ServiceNow API
+     run: |
+       curl -X POST \
+         -H "Authorization: Basic ${{ secrets.SERVICENOW_BASIC_AUTH }}" \
+         -H "Content-Type: application/json" \
+         -d '{"field": "value"}' \
+         https://calitiiltddemo3.service-now.com/api/now/table/change_request
+   ```
+
+5. **Use in ServiceNow DevOps actions:**
+   ```yaml
+   - name: ServiceNow DevOps Change
+     uses: ServiceNow/servicenow-devops-change@v2
+     with:
+       instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+       username: github_integration
+       password: ${{ secrets.SERVICENOW_PASSWORD }}  # Store password separately, not base64
+   ```
+
+**Security Considerations:**
+
+⚠️ **Limitations:**
+- Credentials are sent with every API request
+- Base64 is encoding, NOT encryption (easily decoded)
+- If credentials are compromised, attacker has full user access
+- No expiration - credentials valid until manually changed
+- Harder to audit which application made which API call
+
+✅ **Best Practices if using Basic Auth:**
+- Use a dedicated service account (`github_integration`) with minimal required permissions
+- Set "Web service access only" = Yes (prevents UI login)
+- Rotate password regularly (every 90 days)
+- Monitor API access logs in ServiceNow
+- Consider IP allowlisting in ServiceNow for GitHub Actions IPs
+- Never commit credentials to Git (always use GitHub Secrets)
+
+**Option 2: User Token (If supported by your ServiceNow instance)**
 1. Navigate to: **System Security > Users and Groups > Users**
 2. Open `github_integration` user
-3. Right-click header, select **Personalize > Form Layout**
-4. Add field: **Token** (if available in your ServiceNow version)
-5. Or use Basic Auth (less secure): base64(username:password)
+3. Check if your instance supports REST API token generation
+4. Some ServiceNow versions have built-in token generation under user profile
+5. Consult your ServiceNow documentation for version-specific token features
 
 **Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
 
@@ -198,44 +411,55 @@ SN_OAUTH_TOKEN=___________________________________________
 
 ---
 
-### Day 2: GitHub Integration Configuration (2-3 hours)
+### Day 2: Verify GitHub Integration (30 minutes)
 
-#### Task 1.7: Configure GitHub Tool in ServiceNow
+#### Task 1.7: Verify GitHub Tool Configuration
 
-**Steps:**
-1. Navigate to: **DevOps > Configuration > Tool Configuration**
-2. Click **New**
-3. Fill in:
-   - **Name**: `GitHub Actions`
-   - **Type**: Select `GitHub`
-   - **URL**: `https://github.com/your-org/microservices-demo`
-   - **Tool ID**: Leave blank (will be auto-generated)
-4. Authentication section:
-   - **Username**: Your GitHub username
-   - **Token/Password**: GitHub Personal Access Token
-5. Click **Test Connection**
-6. Should see: ✅ Connection Successful
-7. Click **Submit**
-8. **IMPORTANT**: Copy the **Tool ID** from the record
+⚠️ **NOTE**: GitHub tool configuration was completed in Task 1.5. This task is for verification only.
+
+**Verification Steps:**
+
+1. Navigate to: **DevOps > Orchestration > GitHub**
+   - Or: **All > DevOps > Configuration > Tool Connections**
+
+2. Verify the GitHub tool exists:
+   - ✅ Name: `GitHub Actions Integration`
+   - ✅ Type: GitHub
+   - ✅ URL: Points to your repository
+   - ✅ Status: Active
+
+3. Test the connection:
+   - Click on the GitHub tool record
+   - Look for **Test Connection** button (if available)
+   - Verify: ✅ Connection Successful
+
+4. Confirm the sys_id is captured:
+   - Open the GitHub tool record
+   - **Modern URL format**: `https://your-instance.service-now.com/now/devops-change/record/sn_devops_tool/4eaebb06c320f690e1bbf0cb05013135`
+     - sys_id is the last part: `4eaebb06c320f690e1bbf0cb05013135`
+   - **Older URL format**: `.../sn_devops_tool.do?sys_id=XXXXXXXXXX`
+   - **Or**: Right-click header > **Copy sys_id**
+   - Verify this matches what you recorded in Task 1.5
 
 **Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
 
-**Tool Configuration:**
-```
-SN_ORCHESTRATION_TOOL_ID=___________________________________________
-```
+**Checklist:**
+- [ ] GitHub tool exists in ServiceNow
+- [ ] Connection test passes
+- [ ] sys_id (ORCHESTRATION_TOOL_ID) is recorded
+- [ ] GitHub PAT is stored securely
+- [ ] Authentication method chosen (Basic Auth or Token)
 
-**GitHub Personal Access Token Requirements:**
-- Permissions needed:
-  - ✅ `repo` (Full control of private repositories)
-  - ✅ `workflow` (Update GitHub Actions workflows)
-  - ✅ `read:org` (Read organization data)
+**Troubleshooting:**
 
-**To create GitHub PAT:**
-1. Go to: https://github.com/settings/tokens
-2. Click: **Generate new token (classic)**
-3. Select scopes above
-4. Copy token immediately
+If connection test fails:
+- Verify GitHub PAT has correct scopes: `repo`, `workflow`, `read:org`
+- Check if PAT has expired
+- Ensure repository URL is correct
+- Verify network connectivity from ServiceNow to GitHub
+
+If GitHub tool doesn't exist:
+- Return to Task 1.5 and complete the GitHub tool creation
 
 ---
 
