@@ -88,6 +88,135 @@ jobs:
         run: |
           aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
+      - name: Discover EKS nodes
+        id: discover-nodes
+        run: |
+          echo "### EKS Nodes Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get all node groups
+          NODE_GROUPS=$(aws eks list-nodegroups --cluster-name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} | jq -r '.nodegroups[]')
+
+          # Create JSON array for all nodes
+          echo '{"nodes": []}' > all-nodes.json
+
+          for NG in $NODE_GROUPS; do
+            echo "#### Node Group: $NG" >> $GITHUB_STEP_SUMMARY
+
+            # Get node group details
+            NG_INFO=$(aws eks describe-nodegroup --cluster-name ${{ env.CLUSTER_NAME }} --nodegroup-name "$NG" --region ${{ env.AWS_REGION }})
+
+            # Extract node group metadata
+            INSTANCE_TYPES=$(echo "$NG_INFO" | jq -r '.nodegroup.instanceTypes[]')
+            AMI_TYPE=$(echo "$NG_INFO" | jq -r '.nodegroup.amiType')
+            DISK_SIZE=$(echo "$NG_INFO" | jq -r '.nodegroup.diskSize')
+            SCALING_MIN=$(echo "$NG_INFO" | jq -r '.nodegroup.scalingConfig.minSize')
+            SCALING_MAX=$(echo "$NG_INFO" | jq -r '.nodegroup.scalingConfig.maxSize')
+            SCALING_DESIRED=$(echo "$NG_INFO" | jq -r '.nodegroup.scalingConfig.desiredSize')
+            NG_STATUS=$(echo "$NG_INFO" | jq -r '.nodegroup.status')
+            NG_ARN=$(echo "$NG_INFO" | jq -r '.nodegroup.nodegroupArn')
+            CREATED_AT=$(echo "$NG_INFO" | jq -r '.nodegroup.createdAt')
+
+            # Get EC2 instances in this node group via ASG
+            ASG_NAME=$(echo "$NG_INFO" | jq -r '.nodegroup.resources.autoScalingGroups[0].name')
+
+            if [ -n "$ASG_NAME" ] && [ "$ASG_NAME" != "null" ]; then
+              # Get instances from ASG
+              INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG_NAME" --region ${{ env.AWS_REGION }} | \
+                jq -r '.AutoScalingGroups[0].Instances[].InstanceId')
+
+              NODE_COUNT=0
+              for INSTANCE_ID in $INSTANCE_IDS; do
+                # Get EC2 instance details
+                INSTANCE_INFO=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --region ${{ env.AWS_REGION }} | jq -r '.Reservations[0].Instances[0]')
+
+                INSTANCE_TYPE=$(echo "$INSTANCE_INFO" | jq -r '.InstanceType')
+                PRIVATE_IP=$(echo "$INSTANCE_INFO" | jq -r '.PrivateIpAddress')
+                PUBLIC_IP=$(echo "$INSTANCE_INFO" | jq -r '.PublicIpAddress // "N/A"')
+                AZ=$(echo "$INSTANCE_INFO" | jq -r '.Placement.AvailabilityZone')
+                STATE=$(echo "$INSTANCE_INFO" | jq -r '.State.Name')
+                LAUNCH_TIME=$(echo "$INSTANCE_INFO" | jq -r '.LaunchTime')
+
+                # Get Kubernetes node name from kubectl
+                K8S_NODE_NAME=$(kubectl get nodes -o json | jq -r --arg instance_id "$INSTANCE_ID" \
+                  '.items[] | select(.spec.providerID | contains($instance_id)) | .metadata.name')
+
+                # Get node resources if node exists in Kubernetes
+                if [ -n "$K8S_NODE_NAME" ] && [ "$K8S_NODE_NAME" != "null" ]; then
+                  K8S_NODE_INFO=$(kubectl get node "$K8S_NODE_NAME" -o json)
+                  K8S_VERSION=$(echo "$K8S_NODE_INFO" | jq -r '.status.nodeInfo.kubeletVersion')
+                  CAPACITY_CPU=$(echo "$K8S_NODE_INFO" | jq -r '.status.capacity.cpu')
+                  CAPACITY_MEMORY=$(echo "$K8S_NODE_INFO" | jq -r '.status.capacity.memory')
+                  ALLOCATABLE_CPU=$(echo "$K8S_NODE_INFO" | jq -r '.status.allocatable.cpu')
+                  ALLOCATABLE_MEMORY=$(echo "$K8S_NODE_INFO" | jq -r '.status.allocatable.memory')
+                  K8S_STATUS=$(echo "$K8S_NODE_INFO" | jq -r '.status.conditions[] | select(.type=="Ready") | .status')
+                else
+                  K8S_VERSION=""
+                  CAPACITY_CPU=""
+                  CAPACITY_MEMORY=""
+                  ALLOCATABLE_CPU=""
+                  ALLOCATABLE_MEMORY=""
+                  K8S_STATUS="Unknown"
+                fi
+
+                # Create node JSON
+                NODE_JSON=$(jq -n \
+                  --arg ng "$NG" \
+                  --arg instance_id "$INSTANCE_ID" \
+                  --arg instance_type "$INSTANCE_TYPE" \
+                  --arg private_ip "$PRIVATE_IP" \
+                  --arg public_ip "$PUBLIC_IP" \
+                  --arg az "$AZ" \
+                  --arg state "$STATE" \
+                  --arg launch_time "$LAUNCH_TIME" \
+                  --arg k8s_name "$K8S_NODE_NAME" \
+                  --arg k8s_version "$K8S_VERSION" \
+                  --arg k8s_status "$K8S_STATUS" \
+                  --arg capacity_cpu "$CAPACITY_CPU" \
+                  --arg capacity_memory "$CAPACITY_MEMORY" \
+                  --arg allocatable_cpu "$ALLOCATABLE_CPU" \
+                  --arg allocatable_memory "$ALLOCATABLE_MEMORY" \
+                  --arg ng_arn "$NG_ARN" \
+                  --arg ami_type "$AMI_TYPE" \
+                  --arg disk_size "$DISK_SIZE" \
+                  '{
+                    nodegroup: $ng,
+                    instance_id: $instance_id,
+                    instance_type: $instance_type,
+                    private_ip: $private_ip,
+                    public_ip: $public_ip,
+                    availability_zone: $az,
+                    state: $state,
+                    launch_time: $launch_time,
+                    kubernetes_name: $k8s_name,
+                    kubernetes_version: $k8s_version,
+                    kubernetes_status: $k8s_status,
+                    capacity_cpu: $capacity_cpu,
+                    capacity_memory: $capacity_memory,
+                    allocatable_cpu: $allocatable_cpu,
+                    allocatable_memory: $allocatable_memory,
+                    nodegroup_arn: $ng_arn,
+                    ami_type: $ami_type,
+                    disk_size: $disk_size
+                  }')
+
+                # Append to all nodes
+                jq --argjson node "$NODE_JSON" '.nodes += [$node]' all-nodes.json > tmp-nodes.json
+                mv tmp-nodes.json all-nodes.json
+
+                echo "  - **$K8S_NODE_NAME** ($INSTANCE_TYPE) - $PRIVATE_IP - $STATE" >> $GITHUB_STEP_SUMMARY
+                NODE_COUNT=$((NODE_COUNT + 1))
+              done
+
+              echo "  - **Total nodes**: $NODE_COUNT" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          TOTAL_NODES=$(jq '.nodes | length' all-nodes.json)
+          echo "**Total EKS nodes discovered**: $TOTAL_NODES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Discover microservices in all environments
         id: discover-services
         run: |
@@ -240,6 +369,160 @@ jobs:
             echo "⚠️ Failed to create/update cluster CI" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Upload EKS nodes to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          # Check if CLUSTER_SYS_ID was set by previous step
+          if [ -z "${CLUSTER_SYS_ID}" ]; then
+            echo "⚠️ CLUSTER_SYS_ID not set, skipping nodes upload" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Create Basic Auth header
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+
+          echo "Uploading EKS nodes to ServiceNow CMDB..."
+
+          # Read all nodes
+          NODES=$(jq -c '.nodes[]' all-nodes.json)
+          NODE_COUNT=0
+
+          while IFS= read -r node; do
+            INSTANCE_ID=$(echo "$node" | jq -r '.instance_id')
+            K8S_NAME=$(echo "$node" | jq -r '.kubernetes_name')
+            INSTANCE_TYPE=$(echo "$node" | jq -r '.instance_type')
+            PRIVATE_IP=$(echo "$node" | jq -r '.private_ip')
+            PUBLIC_IP=$(echo "$node" | jq -r '.public_ip')
+            AZ=$(echo "$node" | jq -r '.availability_zone')
+            STATE=$(echo "$node" | jq -r '.state')
+            K8S_VERSION=$(echo "$node" | jq -r '.kubernetes_version')
+            K8S_STATUS=$(echo "$node" | jq -r '.kubernetes_status')
+            CAPACITY_CPU=$(echo "$node" | jq -r '.capacity_cpu')
+            CAPACITY_MEMORY=$(echo "$node" | jq -r '.capacity_memory')
+            ALLOCATABLE_CPU=$(echo "$node" | jq -r '.allocatable_cpu')
+            ALLOCATABLE_MEMORY=$(echo "$node" | jq -r '.allocatable_memory')
+            NODEGROUP=$(echo "$node" | jq -r '.nodegroup')
+            AMI_TYPE=$(echo "$node" | jq -r '.ami_type')
+            DISK_SIZE=$(echo "$node" | jq -r '.disk_size')
+
+            # Prepare node payload for cmdb_ci_server table
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+            # Use Kubernetes node name as primary name, fallback to instance ID
+            NODE_NAME="${K8S_NAME:-$INSTANCE_ID}"
+
+            # Parse CPU count and memory from Kubernetes format
+            # CPU: usually a number like "4" or "8"
+            # Memory: format like "16237988Ki" - convert to MB
+            CPU_COUNT="${CAPACITY_CPU:-0}"
+            MEMORY_KB=$(echo "$CAPACITY_MEMORY" | sed 's/Ki$//')
+            MEMORY_MB=$((MEMORY_KB / 1024))
+            DISK_SIZE_GB="${DISK_SIZE:-0}"
+
+            NODE_PAYLOAD=$(jq -n \
+              --arg name "$NODE_NAME" \
+              --arg ip "$PRIVATE_IP" \
+              --arg instance_id "$INSTANCE_ID" \
+              --arg instance_type "$INSTANCE_TYPE" \
+              --arg az "$AZ" \
+              --arg state "$STATE" \
+              --arg k8s_version "$K8S_VERSION" \
+              --arg k8s_status "$K8S_STATUS" \
+              --arg cpu_count "$CPU_COUNT" \
+              --arg memory_mb "$MEMORY_MB" \
+              --arg alloc_cpu "$ALLOCATABLE_CPU" \
+              --arg alloc_memory "$ALLOCATABLE_MEMORY" \
+              --arg nodegroup "$NODEGROUP" \
+              --arg ami "$AMI_TYPE" \
+              --arg disk "$DISK_SIZE_GB" \
+              --arg cluster_name "$CLUSTER_NAME" \
+              --arg timestamp "$TIMESTAMP" \
+              '{
+                name: $name,
+                ip_address: $ip,
+                host_name: $name,
+                short_description: ("EKS Node - " + $nodegroup),
+                comments: ("Instance ID: " + $instance_id + "\nNode Group: " + $nodegroup + "\nKubernetes Version: " + $k8s_version + "\nAllocatable CPU: " + $alloc_cpu + "\nAllocatable Memory: " + $alloc_memory),
+                operational_status: (if $state == "running" and $k8s_status == "True" then "1" else "2" end),
+                cpu_count: $cpu_count,
+                ram: $memory_mb,
+                disk_space: $disk,
+                os_version: $k8s_version,
+                cluster_name: $cluster_name,
+                u_instance_id: $instance_id,
+                u_instance_type: $instance_type,
+                u_availability_zone: $az,
+                u_eks_state: $state,
+                u_kubernetes_status: $k8s_status,
+                u_nodegroup: $nodegroup,
+                u_ami_type: $ami,
+                u_last_discovered: $timestamp
+              }')
+
+            # Check if node exists (query by u_instance_id)
+            EXISTING_NODE=$(curl -s -X GET \
+              "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_server?sysparm_query=u_instance_id=$INSTANCE_ID&sysparm_limit=1" \
+              -H "Authorization: Basic ${BASIC_AUTH}" \
+              -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+            NODE_SYS_ID=$(echo "$EXISTING_NODE" | jq -r '.result[0].sys_id // empty')
+
+            if [ -n "$NODE_SYS_ID" ]; then
+              # Update existing node
+              curl -s -X PUT \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_server/$NODE_SYS_ID" \
+                -H "Authorization: Basic ${BASIC_AUTH}" \
+                -H "Content-Type: application/json" \
+                -d "$NODE_PAYLOAD" > /dev/null 2>&1
+            else
+              # Create new node
+              NODE_RESPONSE=$(curl -s -X POST \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_server" \
+                -H "Authorization: Basic ${BASIC_AUTH}" \
+                -H "Content-Type: application/json" \
+                -d "$NODE_PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
+
+              NODE_SYS_ID=$(echo "$NODE_RESPONSE" | jq -r '.result.sys_id // empty')
+            fi
+
+            # Create relationship between cluster and node if node was created/updated successfully
+            if [ -n "$NODE_SYS_ID" ]; then
+              # Create relationship using cmdb_rel_ci table
+              # Relationship type: "Contains::Contained by" (cluster contains nodes)
+              REL_PAYLOAD=$(jq -n \
+                --arg parent "$CLUSTER_SYS_ID" \
+                --arg child "$NODE_SYS_ID" \
+                '{
+                  parent: $parent,
+                  child: $child,
+                  type: "d93304fb0a0a0b78006081a72ef08444"
+                }')
+
+              # Check if relationship already exists
+              EXISTING_REL=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_rel_ci?sysparm_query=parent=$CLUSTER_SYS_ID^child=$NODE_SYS_ID&sysparm_limit=1" \
+                -H "Authorization: Basic ${BASIC_AUTH}" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              REL_EXISTS=$(echo "$EXISTING_REL" | jq -r '.result[0].sys_id // empty')
+
+              if [ -z "$REL_EXISTS" ]; then
+                # Create new relationship
+                curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_rel_ci" \
+                  -H "Authorization: Basic ${BASIC_AUTH}" \
+                  -H "Content-Type: application/json" \
+                  -d "$REL_PAYLOAD" > /dev/null 2>&1
+              fi
+            fi
+
+            NODE_COUNT=$((NODE_COUNT + 1))
+          done <<< "$NODES"
+
+          echo "- **EKS nodes updated**: $NODE_COUNT nodes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Relationships created**: Cluster ↔ Nodes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload microservices to ServiceNow CMDB
         if: ${{ env.SERVICENOW_PASSWORD != '' }}
         run: |
@@ -342,8 +625,18 @@ jobs:
           - **Status**: ${CLUSTER_STATUS}
           - **VPC**: ${VPC_ID}
 
-          ## Microservices Discovered
+          ## EKS Nodes Discovered
           EOF
+
+          if [ -f all-nodes.json ]; then
+            jq -r '.nodes[] | "- **\(.kubernetes_name)** (\(.instance_type)) - \(.private_ip) - \(.nodegroup) - \(.state)"' all-nodes.json >> discovery-summary.md
+            TOTAL_NODES=$(jq '.nodes | length' all-nodes.json)
+            echo "" >> discovery-summary.md
+            echo "**Total nodes**: $TOTAL_NODES" >> discovery-summary.md
+          fi
+
+          echo "" >> discovery-summary.md
+          echo "## Microservices Discovered" >> discovery-summary.md
 
           jq -r '.services[] | "- \(.name) [\(.environment)]: \(.ready_replicas)/\(.replicas) replicas - \(.status)"' all-services.json >> discovery-summary.md
 
@@ -353,7 +646,8 @@ jobs:
           if [ -n "${SERVICENOW_PASSWORD}" ]; then
             echo "✅ Data uploaded to ServiceNow CMDB" >> discovery-summary.md
             echo "- **Cluster Record**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do" >> discovery-summary.md
-            echo "- **Services**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
+            echo "- **EKS Nodes**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_server_list.do" >> discovery-summary.md
+            echo "- **Microservices**: ${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
           else
             echo "⚠️ ServiceNow CMDB integration not configured" >> discovery-summary.md
           fi
@@ -371,6 +665,7 @@ jobs:
           path: |
             discovery-summary.md
             all-services.json
+            all-nodes.json
             cluster.json
           retention-days: 30
 
@@ -381,6 +676,7 @@ jobs:
           echo "**View ServiceNow CMDB**:" >> $GITHUB_STEP_SUMMARY
           if [ -n "${SERVICENOW_PASSWORD}" ]; then
             echo "- [EKS Clusters](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [EKS Nodes](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_server_list.do)" >> $GITHUB_STEP_SUMMARY
             echo "- [Microservices](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do)" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Configure \`SERVICENOW_PASSWORD\` secret to enable CMDB integration" >> $GITHUB_STEP_SUMMARY
