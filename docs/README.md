@@ -147,6 +147,25 @@ Complete ServiceNow CMDB integration with automated discovery and security scann
 **Security Scanning Integration:**
 - **[Security Scanning Design](SERVICENOW-SECURITY-SCANNING.md)**
   - Architecture overview
+  - SARIF aggregation from 8 security tools
+  - Custom table schema
+  - Upload automation
+- **[Security Verification Guide](SERVICENOW-SECURITY-VERIFICATION.md)**
+  - Testing connectivity
+  - Verifying uploads
+  - Troubleshooting issues
+
+**Change Management & Approvals:**
+- **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)** ⭐ **COMPREHENSIVE GUIDE**
+  - Multi-level approval configuration
+  - Dev/QA/Prod approval policies
+  - Approval groups setup
+  - Email notifications
+  - Best practices and metrics
+- **[Approval Quick Start](SERVICENOW-APPROVALS-QUICKSTART.md)**
+  - 15-minute setup guide
+  - Step-by-step testing
+  - Verification checklist
   - 8 security tools integrated
   - SARIF aggregation
   - Finding deduplication
