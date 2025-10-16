@@ -110,7 +110,7 @@ jobs:
                   # Detect language from labels or common patterns
                   (.metadata.labels.language //
                    (.metadata.labels.app // .metadata.name) as $svc |
-                   if $svc | test("frontend|productcatalogservice|shippingservice") then "Go"
+                   if $svc | test("frontend|productcatalogservice|shippingservice|checkoutservice") then "Go"
                    elif $svc | test("emailservice|recommendationservice") then "Python"
                    elif $svc | test("adservice|shoppingassistant") then "Java"
                    elif $svc | test("currencyservice|paymentservice") then "Node.js"
@@ -171,32 +171,42 @@ jobs:
           # Prepare cluster payload using jq with all values from environment variables
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+          # Extract IP address from endpoint URL (remove https:// and take the hostname part)
+          IP_ADDRESS=$(echo "${CLUSTER_ENDPOINT}" | sed 's|https://||' | cut -d'.' -f1 | sed 's|^||')
+
+          # Get the full hostname for ip_address field
+          ENDPOINT_HOST=$(echo "${CLUSTER_ENDPOINT}" | sed 's|https://||' | cut -d':' -f1)
+
           # Create payload using jq with --arg to safely handle all values
+          # NOTE: u_eks_cluster table has u_u_ prefix fields due to ServiceNow CMDB inheritance
           CLUSTER_PAYLOAD=$(jq -n \
             --arg name "${CLUSTER_NAME}" \
             --arg arn "${CLUSTER_ARN}" \
-            --arg version "${CLUSTER_VERSION}" \
+            --arg version "Kubernetes ${CLUSTER_VERSION}" \
             --arg endpoint "${CLUSTER_ENDPOINT}" \
             --arg status "${CLUSTER_STATUS}" \
             --arg region "${AWS_REGION}" \
             --arg vpc "${VPC_ID}" \
             --arg timestamp "${TIMESTAMP}" \
+            --arg ip_addr "${ENDPOINT_HOST}" \
             '{
-              u_name: $name,
-              u_arn: $arn,
-              u_version: $version,
-              u_endpoint: $endpoint,
-              u_status: $status,
-              u_region: $region,
-              u_vpc_id: $vpc,
-              u_provider: "AWS EKS",
-              u_last_discovered: $timestamp,
-              u_discovered_by: "GitHub Actions"
+              name: $name,
+              ip_address: $ip_addr,
+              u_u_cluster_name: $name,
+              u_u_arn: $arn,
+              u_u_version: $version,
+              u_u_endpoint: $endpoint,
+              u_u_status: $status,
+              u_u_region: $region,
+              u_u_vpc_id: $vpc,
+              u_u_provider: "AWS EKS",
+              u_u_last_discovered: $timestamp,
+              u_u_discovered_by: "GitHub Actions"
             }')
 
-          # Check if cluster exists in CMDB
+          # Check if cluster exists in CMDB (query by name field, not u_u_cluster_name)
           EXISTING_CLUSTER=$(curl -s -X GET \
-            "${SERVICENOW_INSTANCE_URL}/api/now/table/u_eks_cluster?sysparm_query=u_name=${CLUSTER_NAME}&sysparm_limit=1" \
+            "${SERVICENOW_INSTANCE_URL}/api/now/table/u_eks_cluster?sysparm_query=name=${CLUSTER_NAME}&sysparm_limit=1" \
             -H "Authorization: Basic ${BASIC_AUTH}" \
             -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
