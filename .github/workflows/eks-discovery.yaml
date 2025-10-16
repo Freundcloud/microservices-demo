@@ -289,19 +289,24 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Create discovery summary
+        env:
+          CLUSTER_ARN: ${{ steps.cluster-info.outputs.cluster_arn }}
+          CLUSTER_VERSION: ${{ steps.cluster-info.outputs.cluster_version }}
+          CLUSTER_STATUS: ${{ steps.cluster-info.outputs.cluster_status }}
+          VPC_ID: ${{ steps.cluster-info.outputs.vpc_id }}
         run: |
-          cat << 'EOF' > discovery-summary.md
+          cat > discovery-summary.md << EOF
           # EKS Discovery Summary
 
           **Discovery Date**: $(date)
-          **Cluster**: ${{ env.CLUSTER_NAME }}
-          **Region**: ${{ env.AWS_REGION }}
+          **Cluster**: ${CLUSTER_NAME}
+          **Region**: ${AWS_REGION}
 
           ## Cluster Information
-          - **ARN**: ${{ steps.cluster-info.outputs.cluster_arn }}
-          - **Version**: Kubernetes ${{ steps.cluster-info.outputs.cluster_version }}
-          - **Status**: ${{ steps.cluster-info.outputs.cluster_status }}
-          - **VPC**: ${{ steps.cluster-info.outputs.vpc_id }}
+          - **ARN**: ${CLUSTER_ARN}
+          - **Version**: Kubernetes ${CLUSTER_VERSION}
+          - **Status**: ${CLUSTER_STATUS}
+          - **VPC**: ${VPC_ID}
 
           ## Microservices Discovered
           EOF
@@ -311,10 +316,10 @@ jobs:
           echo "" >> discovery-summary.md
           echo "## ServiceNow Integration" >> discovery-summary.md
 
-          if [ -n "${{ secrets.SN_OAUTH_TOKEN }}" ]; then
+          if [ -n "${SN_OAUTH_TOKEN}" ]; then
             echo "✅ Data uploaded to ServiceNow CMDB" >> discovery-summary.md
-            echo "- **Cluster Record**: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_eks_cluster_list.do" >> discovery-summary.md
-            echo "- **Services**: ${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
+            echo "- **Cluster Record**: ${SN_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do" >> discovery-summary.md
+            echo "- **Services**: ${SN_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do" >> discovery-summary.md
           else
             echo "⚠️ ServiceNow CMDB integration not configured" >> discovery-summary.md
           fi
@@ -340,9 +345,9 @@ jobs:
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**View ServiceNow CMDB**:" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${{ secrets.SN_OAUTH_TOKEN }}" ]; then
-            echo "- [EKS Clusters](${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_eks_cluster_list.do)" >> $GITHUB_STEP_SUMMARY
-            echo "- [Microservices](${{ secrets.SN_INSTANCE_URL }}/nav_to.do?uri=u_microservice_list.do)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${SN_OAUTH_TOKEN}" ]; then
+            echo "- [EKS Clusters](${SN_INSTANCE_URL}/nav_to.do?uri=u_eks_cluster_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Microservices](${SN_INSTANCE_URL}/nav_to.do?uri=u_microservice_list.do)" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Configure \`SN_OAUTH_TOKEN\` secret to enable CMDB integration" >> $GITHUB_STEP_SUMMARY
           fi
