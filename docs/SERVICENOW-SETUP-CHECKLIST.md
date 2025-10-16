@@ -332,43 +332,89 @@ SN_ORCHESTRATION_TOOL_ID=___________________________________________
 
 ### Day 3: Security Tool Configuration (2-3 hours)
 
-#### Task 1.11: Configure Security Tool Mappings
+#### Task 1.11: Verify Security Integration via GitHub Actions
 
-**Steps:**
-1. Navigate to: **DevOps > Security > Tool Configuration**
-2. Add each security tool:
+**⚠️ IMPORTANT**: ServiceNow DevOps integrates with security tools via **API calls from GitHub Actions**, not through a UI menu. Security tools are automatically registered when scan results are sent via the ServiceNow DevOps Security Result action.
 
-**Tool 1: Trivy**
-- Name: `Trivy`
-- Type: `Container Scanner`
-- Tool ID: `trivy`
-- Click **Submit**
+**Understanding the Integration:**
 
-**Tool 2: CodeQL**
-- Name: `CodeQL`
-- Type: `SAST`
-- Tool ID: `codeql`
-- Click **Submit**
+ServiceNow DevOps receives security scan results programmatically through GitHub Actions workflows using the `ServiceNow/servicenow-devops-security-result@v2` action. Each security tool is identified by its `tool-id` parameter in the workflow.
 
-**Tool 3: Checkov**
-- Name: `Checkov`
-- Type: `IaC Scanner`
-- Tool ID: `checkov`
-- Click **Submit**
+**Security Tools Integrated via GitHub Actions:**
 
-**Tool 4: Gitleaks**
-- Name: `Gitleaks`
-- Type: `Secret Scanner`
-- Tool ID: `gitleaks`
-- Click **Submit**
+Our repository already has the following security tools configured in `.github/workflows/`:
 
-**Tool 5: Semgrep**
-- Name: `Semgrep`
-- Type: `SAST`
-- Tool ID: `semgrep`
-- Click **Submit**
+1. **Trivy** (Container Scanner)
+   - Workflow: `security-scan.yaml`
+   - Tool ID: `trivy`
+   - Scans: Container images for vulnerabilities
+
+2. **CodeQL** (SAST)
+   - Workflow: `security-scan.yaml`
+   - Tool ID: `codeql`
+   - Scans: Source code for security issues (5 languages)
+
+3. **Checkov** (IaC Scanner)
+   - Workflow: `terraform-validate.yaml`
+   - Tool ID: `checkov`
+   - Scans: Terraform infrastructure code
+
+4. **Gitleaks** (Secret Scanner)
+   - Workflow: `security-scan.yaml`
+   - Tool ID: `gitleaks`
+   - Scans: Git history for exposed secrets
+
+5. **Semgrep** (SAST)
+   - Workflow: `security-scan.yaml`
+   - Tool ID: `semgrep`
+   - Scans: Source code with semantic rules
+
+**Verification Steps:**
+
+1. **Check that GitHub workflows are configured correctly:**
+   ```bash
+   # Verify security scan workflow exists
+   cat .github/workflows/security-scan.yaml | grep -A 5 "servicenow-devops-security-result"
+   ```
+
+2. **Verify ServiceNow secrets are configured in GitHub:**
+   - Go to: https://github.com/your-org/microservices-demo/settings/secrets/actions
+   - Confirm these secrets exist:
+     - ✅ `SERVICENOW_INSTANCE_URL`
+     - ✅ `SERVICENOW_DEVOPS_TOKEN`
+     - ✅ `SERVICENOW_ORCHESTRATION_TOOL_ID`
+
+3. **Trigger a test security scan:**
+   ```bash
+   # Manually trigger security scan workflow
+   gh workflow run security-scan.yaml
+   ```
+
+4. **Verify results appear in ServiceNow:**
+   - Navigate to: **DevOps > Security > Security Results**
+   - Look for scan results from each tool
+   - Verify tool names appear correctly (Trivy, CodeQL, Checkov, Gitleaks, Semgrep)
+
+**What Happens Automatically:**
+
+When GitHub Actions runs a security scan, it:
+1. Executes the security tool (e.g., Trivy, CodeQL)
+2. Formats the results into ServiceNow-compatible JSON
+3. Sends results to ServiceNow via REST API using `servicenow-devops-security-result` action
+4. ServiceNow automatically registers the tool if it's the first time seeing that `tool-id`
+5. ServiceNow creates security records and associates them with the change request
+
+**Reference Documentation:**
+- ServiceNow DevOps Security Result Action: https://github.com/ServiceNow/servicenow-devops-security-result
+- Official Documentation: https://docs.servicenow.com/bundle/vancouver-devops/page/product/enterprise-dev-ops/reference/security-tool-framework.html
 
 **Status**: ⬜ Not Started | ⏳ In Progress | ✅ Completed
+
+**Notes:**
+```
+Tool registration date: __________
+First successful scan: __________
+```
 
 ---
 

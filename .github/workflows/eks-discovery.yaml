@@ -144,29 +144,27 @@ jobs:
           echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Prepare cluster payload using jq to avoid shell escaping issues
+          # Prepare cluster payload using jq with proper escaping
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          CLUSTER_PAYLOAD=$(jq -n \
-            --arg name "${{ env.CLUSTER_NAME }}" \
-            --arg arn "${{ steps.cluster-info.outputs.cluster_arn }}" \
-            --arg version "${{ steps.cluster-info.outputs.cluster_version }}" \
-            --arg endpoint "${{ steps.cluster-info.outputs.cluster_endpoint }}" \
-            --arg status "${{ steps.cluster-info.outputs.cluster_status }}" \
-            --arg region "${{ env.AWS_REGION }}" \
-            --arg vpc "${{ steps.cluster-info.outputs.vpc_id }}" \
-            --arg timestamp "$TIMESTAMP" \
-            '{
-              u_name: $name,
-              u_arn: $arn,
-              u_version: $version,
-              u_endpoint: $endpoint,
-              u_status: $status,
-              u_region: $region,
-              u_vpc_id: $vpc,
-              u_provider: "AWS EKS",
-              u_last_discovered: $timestamp,
-              u_discovered_by: "GitHub Actions"
-            }')
+
+          # Write cluster data to JSON file to avoid shell escaping issues
+          cat > cluster-payload.json << 'CLUSTER_EOF'
+          {
+            "u_name": "${{ env.CLUSTER_NAME }}",
+            "u_arn": "${{ steps.cluster-info.outputs.cluster_arn }}",
+            "u_version": "${{ steps.cluster-info.outputs.cluster_version }}",
+            "u_endpoint": "${{ steps.cluster-info.outputs.cluster_endpoint }}",
+            "u_status": "${{ steps.cluster-info.outputs.cluster_status }}",
+            "u_region": "${{ env.AWS_REGION }}",
+            "u_vpc_id": "${{ steps.cluster-info.outputs.vpc_id }}",
+            "u_provider": "AWS EKS",
+            "u_last_discovered": "TIMESTAMP_PLACEHOLDER",
+            "u_discovered_by": "GitHub Actions"
+          }
+          CLUSTER_EOF
+
+          # Replace timestamp placeholder with actual timestamp
+          CLUSTER_PAYLOAD=$(jq --arg ts "$TIMESTAMP" '.u_last_discovered = $ts' cluster-payload.json)
 
           # Check if cluster exists in CMDB
           EXISTING_CLUSTER=$(curl -s -X GET \
@@ -174,7 +172,7 @@ jobs:
             -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
             -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
-          CLUSTER_SYS_ID=$(echo $EXISTING_CLUSTER | jq -r '.result[0].sys_id // empty')
+          CLUSTER_SYS_ID=$(echo "$EXISTING_CLUSTER" | jq -r '.result[0].sys_id // empty')
 
           if [ -n "$CLUSTER_SYS_ID" ]; then
             echo "Updating existing cluster record: $CLUSTER_SYS_ID"
@@ -193,7 +191,7 @@ jobs:
               -H "Content-Type: application/json" \
               -d "$CLUSTER_PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
 
-            CLUSTER_SYS_ID=$(echo $CLUSTER_RESPONSE | jq -r '.result.sys_id // empty')
+            CLUSTER_SYS_ID=$(echo "$CLUSTER_RESPONSE" | jq -r '.result.sys_id // empty')
             echo "✅ Created new cluster CI in ServiceNow" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -214,37 +212,29 @@ jobs:
           SERVICE_COUNT=0
 
           while IFS= read -r service; do
-            NAME=$(echo $service | jq -r '.name')
-            NAMESPACE=$(echo $service | jq -r '.namespace')
-            ENV=$(echo $service | jq -r '.environment')
-            REPLICAS=$(echo $service | jq -r '.replicas')
-            READY_REPLICAS=$(echo $service | jq -r '.ready_replicas')
-            IMAGE=$(echo $service | jq -r '.image')
-            IMAGE_TAG=$(echo $service | jq -r '.image_tag')
-            STATUS=$(echo $service | jq -r '.status')
+            NAME=$(echo "$service" | jq -r '.name')
+            NAMESPACE=$(echo "$service" | jq -r '.namespace')
+            ENV=$(echo "$service" | jq -r '.environment')
+            REPLICAS=$(echo "$service" | jq -r '.replicas')
+            READY_REPLICAS=$(echo "$service" | jq -r '.ready_replicas')
+            IMAGE=$(echo "$service" | jq -r '.image')
+            IMAGE_TAG=$(echo "$service" | jq -r '.image_tag')
+            STATUS=$(echo "$service" | jq -r '.status')
 
-            # Prepare service payload using jq to avoid shell escaping issues
+            # Prepare service payload using jq with proper escaping
             TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            SERVICE_PAYLOAD=$(jq -n \
-              --arg name "$NAME" \
-              --arg namespace "$NAMESPACE" \
-              --arg env "$ENV" \
-              --arg replicas "$REPLICAS" \
-              --arg ready "$READY_REPLICAS" \
-              --arg image "$IMAGE" \
-              --arg tag "$IMAGE_TAG" \
-              --arg status "$STATUS" \
+            SERVICE_PAYLOAD=$(echo "$service" | jq \
               --arg cluster "$CLUSTER_SYS_ID" \
               --arg timestamp "$TIMESTAMP" \
               '{
-                u_name: $name,
-                u_namespace: $namespace,
-                u_environment: $env,
-                u_replicas: $replicas,
-                u_ready_replicas: $ready,
-                u_image: $image,
-                u_image_tag: $tag,
-                u_status: $status,
+                u_name: .name,
+                u_namespace: .namespace,
+                u_environment: .environment,
+                u_replicas: (.replicas | tostring),
+                u_ready_replicas: (.ready_replicas | tostring),
+                u_image: .image,
+                u_image_tag: .image_tag,
+                u_status: .status,
                 u_cluster: $cluster,
                 u_last_discovered: $timestamp,
                 u_discovered_by: "GitHub Actions"
@@ -256,7 +246,7 @@ jobs:
               -H "Authorization: Bearer ${{ env.SN_OAUTH_TOKEN }}" \
               -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
 
-            SERVICE_SYS_ID=$(echo $EXISTING_SERVICE | jq -r '.result[0].sys_id // empty')
+            SERVICE_SYS_ID=$(echo "$EXISTING_SERVICE" | jq -r '.result[0].sys_id // empty')
 
             if [ -n "$SERVICE_SYS_ID" ]; then
               curl -s -X PUT \
