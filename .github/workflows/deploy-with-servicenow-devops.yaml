@@ -69,10 +69,25 @@ jobs:
 
       - name: Change Request Created
         run: |
+          CHANGE_NUMBER="${{ steps.create-change.outputs.change-request-number }}"
+          CHANGE_SYS_ID="${{ steps.create-change.outputs.change-request-sys-id }}"
+
+          if [ -z "$CHANGE_NUMBER" ] || [ "$CHANGE_NUMBER" == "" ]; then
+            echo "❌ ERROR: Change request number not returned from create-change action" >> $GITHUB_STEP_SUMMARY
+            echo "This means the ServiceNow DevOps Change API call failed." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Possible causes**:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Token authentication failed" >> $GITHUB_STEP_SUMMARY
+            echo "2. Tool ID incorrect" >> $GITHUB_STEP_SUMMARY
+            echo "3. ServiceNow API error" >> $GITHUB_STEP_SUMMARY
+            echo "4. Change Control API not configured" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
           echo "✅ Change Request Created via DevOps Change API" >> $GITHUB_STEP_SUMMARY
-          echo "**Number**: ${{ steps.create-change.outputs.change-request-number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Sys ID**: ${{ steps.create-change.outputs.change-request-sys-id }}" >> $GITHUB_STEP_SUMMARY
-          echo "**View in ServiceNow**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ steps.create-change.outputs.change-request-sys-id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Number**: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
+          echo "**Sys ID**: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+          echo "**View in ServiceNow**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**DevOps Workspace**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home" >> $GITHUB_STEP_SUMMARY
 
@@ -187,7 +202,7 @@ jobs:
           fi
 
       - name: Update ServiceNow Change Request - Success
-        if: success()
+        if: success() && needs.create-change-request.outputs.change_request_number != ''
         uses: ServiceNow/servicenow-devops-update-change@v5.1.0
         with:
           # Authentication (token-based)
@@ -202,6 +217,12 @@ jobs:
               "close_notes": "Deployment completed successfully to ${{ github.event.inputs.environment }}.\n\nAll pods running.\nCommit: ${{ github.sha }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               "state": "3"
             }
+
+      - name: Update ServiceNow via REST API - Success (Fallback)
+        if: success() && needs.create-change-request.outputs.change_request_number == ''
+        run: |
+          echo "⚠️ Change number not available from DevOps API, skipping update" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment succeeded but change request update failed" >> $GITHUB_STEP_SUMMARY
 
   # Job 4: Rollback on Failure
   rollback:
