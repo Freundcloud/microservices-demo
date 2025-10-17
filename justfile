@@ -910,3 +910,171 @@ cluster-help:
     @echo ""
     @echo "Run 'just' to see all commands"
 
+
+# ==============================================================================
+# Release Management
+# ==============================================================================
+
+# Release a new version and deploy to specified environment
+release VERSION ENV="dev":
+    @echo "🚀 Starting release process for v{{VERSION}} to {{ENV}}..."
+    @./scripts/release.sh {{VERSION}} {{ENV}}
+
+# Quick dev deployment (auto-increment patch version)
+release-dev:
+    #!/usr/bin/env bash
+    CURRENT_VERSION=$(cat VERSION)
+    # Extract major, minor, patch
+    IFS='.' read -ra VER <<< "$CURRENT_VERSION"
+    MAJOR="${VER[0]}"
+    MINOR="${VER[1]}"
+    PATCH="${VER[2]}"
+    # Increment patch
+    NEW_PATCH=$((PATCH + 1))
+    NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+    echo "📦 Auto-incrementing version: $CURRENT_VERSION → $NEW_VERSION"
+    just release $NEW_VERSION dev
+
+# Release to QA (creates release branch and tag)
+release-qa VERSION:
+    @echo "🧪 Releasing v{{VERSION}} to QA..."
+    @just release {{VERSION}} qa
+
+# Release to Production (creates release branch and tag)
+release-prod VERSION:
+    @echo "🚀 Releasing v{{VERSION}} to Production..."
+    @just release {{VERSION}} prod
+
+# Show current version
+version:
+    @echo "Current version: $(cat VERSION)"
+    @echo "Git tags:"
+    @git tag -l | tail -5
+
+# Build, tag, and push specific service
+build-service SERVICE VERSION="dev":
+    @echo "🐳 Building {{SERVICE}} with version {{VERSION}}..."
+    @./scripts/build-service.sh {{SERVICE}} {{VERSION}}
+
+# Deploy specific environment using GitHub Actions
+deploy ENV="dev":
+    @echo "🚀 Triggering deployment to {{ENV}}..."
+    @if [ "{{ENV}}" = "dev" ]; then \
+        gh workflow run auto-deploy-dev.yaml; \
+        echo "✅ Dev deployment triggered (automatic)"; \
+    else \
+        gh workflow run deploy-with-servicenow-hybrid.yaml --field environment={{ENV}}; \
+        echo "✅ {{ENV}} deployment triggered via ServiceNow"; \
+        echo "⚠️  Remember to approve the ServiceNow change request!"; \
+    fi
+
+# Watch latest GitHub Actions workflow run
+watch-deploy:
+    @gh run watch
+
+# List recent deployments
+deployments:
+    @echo "Recent deployments:"
+    @gh run list --limit 10
+
+# Rollback to previous version in environment
+rollback ENV="dev":
+    @echo "⏮️  Rolling back {{ENV}} environment..."
+    @kubectl rollout undo deployment --all -n microservices-{{ENV}}
+    @echo "✅ Rollback initiated"
+
+# ==============================================================================
+# Version Management Helper Commands
+# ==============================================================================
+
+# Bump major version (1.0.0 → 2.0.0)
+bump-major:
+    #!/usr/bin/env bash
+    CURRENT_VERSION=$(cat VERSION)
+    IFS='.' read -ra VER <<< "$CURRENT_VERSION"
+    MAJOR="${VER[0]}"
+    NEW_MAJOR=$((MAJOR + 1))
+    NEW_VERSION="$NEW_MAJOR.0.0"
+    echo "📦 Bumping MAJOR version: $CURRENT_VERSION → $NEW_VERSION"
+    echo "$NEW_VERSION" > VERSION
+    git add VERSION
+    git commit -m "chore: Bump version to $NEW_VERSION"
+    echo "✅ Version bumped to $NEW_VERSION"
+
+# Bump minor version (1.0.0 → 1.1.0)
+bump-minor:
+    #!/usr/bin/env bash
+    CURRENT_VERSION=$(cat VERSION)
+    IFS='.' read -ra VER <<< "$CURRENT_VERSION"
+    MAJOR="${VER[0]}"
+    MINOR="${VER[1]}"
+    NEW_MINOR=$((MINOR + 1))
+    NEW_VERSION="$MAJOR.$NEW_MINOR.0"
+    echo "📦 Bumping MINOR version: $CURRENT_VERSION → $NEW_VERSION"
+    echo "$NEW_VERSION" > VERSION
+    git add VERSION
+    git commit -m "chore: Bump version to $NEW_VERSION"
+    echo "✅ Version bumped to $NEW_VERSION"
+
+# Bump patch version (1.0.0 → 1.0.1)
+bump-patch:
+    #!/usr/bin/env bash
+    CURRENT_VERSION=$(cat VERSION)
+    IFS='.' read -ra VER <<< "$CURRENT_VERSION"
+    MAJOR="${VER[0]}"
+    MINOR="${VER[1]}"
+    PATCH="${VER[2]}"
+    NEW_PATCH=$((PATCH + 1))
+    NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+    echo "📦 Bumping PATCH version: $CURRENT_VERSION → $NEW_VERSION"
+    echo "$NEW_VERSION" > VERSION
+    git add VERSION
+    git commit -m "chore: Bump version to $NEW_VERSION"
+    echo "✅ Version bumped to $NEW_VERSION"
+
+# ==============================================================================
+# Development Helpers
+# ==============================================================================
+
+# Show release help
+release-help:
+    @echo "🚀 Release Management Commands"
+    @echo ""
+    @echo "Quick Commands:"
+    @echo "  just release-dev          - Auto-increment patch and deploy to dev"
+    @echo "  just release-qa 1.1.0     - Release v1.1.0 to QA (creates branch/tag)"
+    @echo "  just release-prod 1.1.0   - Release v1.1.0 to Production (creates branch/tag)"
+    @echo ""
+    @echo "Version Bumping:"
+    @echo "  just bump-major           - Bump major version (1.0.0 → 2.0.0)"
+    @echo "  just bump-minor           - Bump minor version (1.0.0 → 1.1.0)"
+    @echo "  just bump-patch           - Bump patch version (1.0.0 → 1.0.1)"
+    @echo ""
+    @echo "Manual Release:"
+    @echo "  just release 1.2.3 dev    - Release specific version to dev"
+    @echo "  just release 1.2.3 qa     - Release specific version to QA"
+    @echo "  just release 1.2.3 prod   - Release specific version to prod"
+    @echo ""
+    @echo "Deployment:"
+    @echo "  just deploy dev           - Deploy to dev"
+    @echo "  just deploy qa            - Deploy to QA (via ServiceNow)"
+    @echo "  just deploy prod          - Deploy to prod (via ServiceNow)"
+    @echo ""
+    @echo "Monitoring:"
+    @echo "  just watch-deploy         - Watch current deployment"
+    @echo "  just deployments          - List recent deployments"
+    @echo "  just version              - Show current version"
+    @echo ""
+    @echo "Rollback:"
+    @echo "  just rollback dev         - Rollback dev environment"
+    @echo "  just rollback qa          - Rollback QA environment"
+    @echo "  just rollback prod        - Rollback prod environment"
+    @echo ""
+    @echo "Workflows:"
+    @echo "  • Dev: Push to main → Auto builds/tests/deploys to dev"
+    @echo "  • QA/Prod: Use 'just release-qa' or 'just release-prod'"
+    @echo "    - Creates release/X.Y branch"
+    @echo "    - Creates vX.Y.Z tag"
+    @echo "    - Builds and pushes images"
+    @echo "    - Triggers ServiceNow change management"
+    @echo "    - Deploys after approval"
