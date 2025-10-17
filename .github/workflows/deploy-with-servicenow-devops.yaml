@@ -34,10 +34,9 @@ jobs:
         id: create-change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          # Authentication (username/password)
+          # Authentication (token-based - recommended)
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}  # GitHubARC tool sys_id: 4eaebb06c320f690e1bbf0cb05013135
 
           # GitHub context (required for pipeline tracking)
@@ -191,9 +190,9 @@ jobs:
         if: success()
         uses: ServiceNow/servicenow-devops-update-change@v5.1.0
         with:
+          # Authentication (token-based)
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
@@ -242,9 +241,9 @@ jobs:
       - name: Update ServiceNow Change Request - Failed
         uses: ServiceNow/servicenow-devops-update-change@v5.1.0
         with:
+          # Authentication (token-based)
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}

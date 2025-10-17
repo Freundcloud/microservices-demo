@@ -46,23 +46,29 @@ Your GitHubARC tool sys_id (already exists):
 4eaebb06c320f690e1bbf0cb05013135
 ```
 
-### 2. GitHub Secret Required
-
-Create a new GitHub secret:
+### 2. GitHub Secrets Required
 
 **Go to**: https://github.com/Freundcloud/microservices-demo/settings/secrets/actions
 
-**Add secret**:
+**Add these secrets**:
 - **Name**: `SERVICENOW_TOOL_ID`
 - **Value**: `4eaebb06c320f690e1bbf0cb05013135`
 
+- **Name**: `SN_DEVOPS_INTEGRATION_TOKEN` ⭐ **NEW!**
+- **Value**: `<token generated from ServiceNow OAuth setup>`
+
 ### 3. Existing Secrets (already configured):
 - ✅ `SERVICENOW_INSTANCE_URL`
-- ✅ `SERVICENOW_USERNAME`
-- ✅ `SERVICENOW_PASSWORD`
 - ✅ `SERVICENOW_APP_SYS_ID`
 - ✅ `AWS_ACCESS_KEY_ID`
 - ✅ `AWS_SECRET_ACCESS_KEY`
+
+### 4. Authentication Method: Token-Based (Recommended)
+
+The workflow now uses **token-based authentication** instead of username/password:
+- More secure
+- Better for CI/CD automation
+- Recommended by ServiceNow for v4.0.0+
 
 ---
 
@@ -71,11 +77,11 @@ Create a new GitHub secret:
 ### Step 1: Create Change Request
 
 ```yaml
-uses: ServiceNow/servicenow-devops-change@v4.0.0
+uses: ServiceNow/servicenow-devops-change@v6.1.0
 with:
+  # Token-based authentication (recommended)
+  devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
   instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-  devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-  devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
   tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
   context-github: ${{ toJSON(github) }}
   job-name: 'Create Change Request'
@@ -111,8 +117,13 @@ deploy:
 ### Step 3: Update Change on Success
 
 ```yaml
-uses: ServiceNow/servicenow-devops-update-change@v4.0.0
+uses: ServiceNow/servicenow-devops-update-change@v5.1.0
 with:
+  # Token-based authentication
+  devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+  instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+  tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
+  context-github: ${{ toJSON(github) }}
   change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
   change-request-details: |
     {
