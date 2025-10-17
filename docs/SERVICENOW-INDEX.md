@@ -50,12 +50,20 @@
   - Automated creation script
 
 #### Change Management & Approvals
+
+- **[DevOps API Prerequisites](SERVICENOW-DEVOPS-API-PREREQUISITES.md)** ⚠️ **READ FIRST!**
+  - **Root cause**: IntegrationHub plugins may be missing
+  - Required plugins for DevOps Change API
+  - How to verify plugin installation
+  - Why API fails with "Internal server error"
+  - Workaround: Use hybrid workflow
+
 - **[DevOps Change API Integration](SERVICENOW-DEVOPS-CHANGE-API-INTEGRATION.md)** ⭐ **NEW!**
   - Official ServiceNow DevOps Change GitHub Actions
-  - Workspace integration (changes visible in DevOps workspace!)
+  - Token-based authentication (OAuth)
+  - Workspace integration (requires IntegrationHub!)
   - DORA metrics enabled
   - Real-time pipeline tracking
-  - Automated approval handling
   - Step-by-step setup guide
 
 - **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)** (Comprehensive)
