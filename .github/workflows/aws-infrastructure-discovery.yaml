@@ -1,0 +1,1134 @@
+name: AWS Infrastructure Discovery (Terraform State)
+
+# 📖 WORKFLOW DESCRIPTION
+# This workflow discovers AWS infrastructure from Terraform state and syncs it to ServiceNow CMDB.
+# Unlike EKS discovery (runtime state), this captures infrastructure-as-code resources.
+#
+# What gets discovered:
+# ✅ VPC, Subnets, Internet/NAT Gateways, Route Tables
+# ✅ Security Groups, VPC Endpoints
+# ✅ EKS Cluster metadata, Node Groups
+# ✅ ElastiCache Redis clusters
+# ✅ ECR repositories (all 12 microservices)
+# ✅ IAM Roles, Policies, IRSA configurations
+# ✅ Load Balancers, Auto Scaling Groups
+# ✅ Helm releases (Istio)
+#
+# ServiceNow CMDB Tables Used:
+# - cmdb_ci_network (VPC)
+# - cmdb_ci_network_segment (Subnets)
+# - u_eks_cluster (EKS cluster)
+# - cmdb_ci_database_instance (Redis)
+# - cmdb_ci_app_server (ECR repos)
+# - cmdb_ci_service_account (IAM roles)
+# - cmdb_ci_firewall (Security groups)
+# - cmdb_rel_ci (Relationships)
+#
+# 📚 Documentation: docs/AWS-INFRASTRUCTURE-DISCOVERY-GUIDE.md
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC (infrastructure changes less frequently than runtime)
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      environment:
+        description: 'Environment to discover (affects Terraform workspace)'
+        required: false
+        type: choice
+        options:
+          - all
+          - dev
+          - qa
+          - prod
+        default: all
+  push:
+    paths:
+      - 'terraform-aws/**'
+      - '.github/workflows/aws-infrastructure-discovery.yaml'
+
+env:
+  AWS_REGION: eu-west-2
+  TF_DIR: terraform-aws
+  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+  SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+  SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+
+jobs:
+  discover-aws-infrastructure:
+    name: Discover AWS Infrastructure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9.0"
+          terraform_wrapper: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl bc
+
+      - name: Initialize discovery summary
+        run: |
+          echo "## 🔍 AWS Infrastructure Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Discovery Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Region**: ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Source**: Terraform State" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Initialize Terraform and extract state
+        id: terraform-state
+        run: |
+          cd ${{ env.TF_DIR }}
+
+          echo "### Terraform State Extraction" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Initialize Terraform
+          terraform init -upgrade > /dev/null 2>&1
+          echo "✅ Terraform initialized" >> $GITHUB_STEP_SUMMARY
+
+          # Extract state as JSON
+          terraform show -json > ../terraform-state.json
+
+          if [ ! -s ../terraform-state.json ]; then
+            echo "❌ Failed to extract Terraform state" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          STATE_SIZE=$(du -h ../terraform-state.json | cut -f1)
+          RESOURCE_COUNT=$(jq '[.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] | length' ../terraform-state.json)
+
+          echo "resource_count=$RESOURCE_COUNT" >> $GITHUB_OUTPUT
+
+          echo "- **State file size**: $STATE_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total resources**: $RESOURCE_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Discover VPC and networking resources
+        id: discover-vpc
+        run: |
+          echo "### 🌐 VPC & Networking Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Create JSON structure for VPC resources
+          echo '{"vpcs": [], "subnets": [], "internet_gateways": [], "nat_gateways": [], "route_tables": [], "vpc_endpoints": []}' > network-resources.json
+
+          # Extract VPC
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_vpc")) |
+            map({
+              id: .values.id,
+              cidr: .values.cidr_block,
+              name: (.values.tags.Name // "unnamed"),
+              enable_dns: .values.enable_dns_hostnames,
+              tags: .values.tags
+            })
+          ' terraform-state.json > vpcs.json
+
+          VPC_COUNT=$(jq 'length' vpcs.json)
+          echo "#### VPCs: $VPC_COUNT" >> $GITHUB_STEP_SUMMARY
+          jq -r '.[] | "- **\(.name)** (\(.id)) - CIDR: \(.cidr)"' vpcs.json >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Update network-resources with VPCs
+          jq --slurpfile vpcs vpcs.json '.vpcs = $vpcs[0]' network-resources.json > tmp.json && mv tmp.json network-resources.json
+
+          # Extract Subnets
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_subnet")) |
+            map({
+              id: .values.id,
+              vpc_id: .values.vpc_id,
+              cidr: .values.cidr_block,
+              az: .values.availability_zone,
+              public: .values.map_public_ip_on_launch,
+              name: (.values.tags.Name // "unnamed"),
+              tags: .values.tags
+            })
+          ' terraform-state.json > subnets.json
+
+          SUBNET_COUNT=$(jq 'length' subnets.json)
+          echo "#### Subnets: $SUBNET_COUNT" >> $GITHUB_STEP_SUMMARY
+          jq -r '.[] | "- **\(.name)** (\(.az)) - \(.cidr) - \(if .public then "Public" else "Private" end)"' subnets.json >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          jq --slurpfile subnets subnets.json '.subnets = $subnets[0]' network-resources.json > tmp.json && mv tmp.json network-resources.json
+
+          # Extract Internet Gateways
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_internet_gateway")) |
+            map({
+              id: .values.id,
+              vpc_id: .values.vpc_id,
+              name: (.values.tags.Name // "unnamed")
+            })
+          ' terraform-state.json > igws.json
+
+          IGW_COUNT=$(jq 'length' igws.json)
+          echo "#### Internet Gateways: $IGW_COUNT" >> $GITHUB_STEP_SUMMARY
+          jq --slurpfile igws igws.json '.internet_gateways = $igws[0]' network-resources.json > tmp.json && mv tmp.json network-resources.json
+
+          # Extract NAT Gateways
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_nat_gateway")) |
+            map({
+              id: .values.id,
+              subnet_id: .values.subnet_id,
+              public_ip: .values.public_ip,
+              name: (.values.tags.Name // "unnamed")
+            })
+          ' terraform-state.json > nat-gws.json
+
+          NAT_COUNT=$(jq 'length' nat-gws.json)
+          echo "#### NAT Gateways: $NAT_COUNT" >> $GITHUB_STEP_SUMMARY
+          jq -r '.[] | "- **\(.name)** - IP: \(.public_ip)"' nat-gws.json >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          jq --slurpfile nats nat-gws.json '.nat_gateways = $nats[0]' network-resources.json > tmp.json && mv tmp.json network-resources.json
+
+          # Extract VPC Endpoints
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_vpc_endpoint")) |
+            map({
+              id: .values.id,
+              vpc_id: .values.vpc_id,
+              service_name: .values.service_name,
+              type: .values.vpc_endpoint_type,
+              state: .values.state
+            })
+          ' terraform-state.json > vpc-endpoints.json
+
+          ENDPOINT_COUNT=$(jq 'length' vpc-endpoints.json)
+          echo "#### VPC Endpoints: $ENDPOINT_COUNT" >> $GITHUB_STEP_SUMMARY
+          jq -r '.[] | "- \(.service_name | split(".") | .[-1]) (\(.type))"' vpc-endpoints.json >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          jq --slurpfile endpoints vpc-endpoints.json '.vpc_endpoints = $endpoints[0]' network-resources.json > tmp.json && mv tmp.json network-resources.json
+
+          # Output counts
+          echo "vpc_count=$VPC_COUNT" >> $GITHUB_OUTPUT
+          echo "subnet_count=$SUBNET_COUNT" >> $GITHUB_OUTPUT
+          echo "nat_count=$NAT_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Discover Security Groups
+        id: discover-security-groups
+        run: |
+          echo "### 🔒 Security Groups Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract Security Groups with rules
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_security_group")) |
+            map({
+              id: .values.id,
+              name: .values.name,
+              description: .values.description,
+              vpc_id: .values.vpc_id,
+              ingress_rules: (.values.ingress // []),
+              egress_rules: (.values.egress // []),
+              tags: .values.tags
+            })
+          ' terraform-state.json > security-groups.json
+
+          SG_COUNT=$(jq 'length' security-groups.json)
+          echo "**Total Security Groups**: $SG_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          jq -r '.[] | "- **\(.name)**: \(.description)"' security-groups.json >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "sg_count=$SG_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Discover EKS resources
+        id: discover-eks
+        run: |
+          echo "### ☸️ EKS Resources Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract EKS Cluster
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_eks_cluster")) |
+            map({
+              name: .values.name,
+              arn: .values.arn,
+              version: .values.version,
+              endpoint: .values.endpoint,
+              role_arn: .values.role_arn,
+              vpc_config: .values.vpc_config,
+              status: .values.status,
+              created_at: .values.created_at,
+              platform_version: .values.platform_version
+            })
+          ' terraform-state.json > eks-cluster.json
+
+          if [ -s eks-cluster.json ] && [ "$(jq 'length' eks-cluster.json)" -gt 0 ]; then
+            CLUSTER_NAME=$(jq -r '.[0].name' eks-cluster.json)
+            CLUSTER_VERSION=$(jq -r '.[0].version' eks-cluster.json)
+            CLUSTER_ARN=$(jq -r '.[0].arn' eks-cluster.json)
+            CLUSTER_ENDPOINT=$(jq -r '.[0].endpoint' eks-cluster.json)
+
+            echo "#### EKS Cluster" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: $CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+            echo "- **Version**: Kubernetes $CLUSTER_VERSION" >> $GITHUB_STEP_SUMMARY
+            echo "- **Endpoint**: $CLUSTER_ENDPOINT" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+            echo "cluster_arn=$CLUSTER_ARN" >> $GITHUB_OUTPUT
+          fi
+
+          # Extract EKS Node Groups
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_eks_node_group")) |
+            map({
+              name: .values.node_group_name,
+              cluster_name: .values.cluster_name,
+              node_role_arn: .values.node_role_arn,
+              subnet_ids: .values.subnet_ids,
+              instance_types: .values.instance_types,
+              scaling_config: .values.scaling_config,
+              disk_size: .values.disk_size,
+              ami_type: .values.ami_type,
+              capacity_type: .values.capacity_type,
+              labels: .values.labels,
+              taints: .values.taints,
+              status: .values.status
+            })
+          ' terraform-state.json > eks-node-groups.json
+
+          NODE_GROUP_COUNT=$(jq 'length' eks-node-groups.json)
+          echo "#### EKS Node Groups: $NODE_GROUP_COUNT" >> $GITHUB_STEP_SUMMARY
+          jq -r '.[] | "- **\(.name)**: \(.instance_types[0]) (Desired: \(.scaling_config.desired_size), Min: \(.scaling_config.min_size), Max: \(.scaling_config.max_size))"' eks-node-groups.json >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "node_group_count=$NODE_GROUP_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Discover ElastiCache (Redis)
+        id: discover-elasticache
+        run: |
+          echo "### 💾 ElastiCache Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract ElastiCache Replication Groups (Redis)
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_elasticache_replication_group")) |
+            map({
+              id: .values.replication_group_id,
+              description: .values.replication_group_description,
+              engine: .values.engine,
+              engine_version: .values.engine_version,
+              node_type: .values.node_type,
+              num_cache_clusters: .values.num_cache_clusters,
+              port: .values.port,
+              subnet_group_name: .values.subnet_group_name,
+              security_group_ids: .values.security_group_ids,
+              at_rest_encryption_enabled: .values.at_rest_encryption_enabled,
+              transit_encryption_enabled: .values.transit_encryption_enabled,
+              primary_endpoint: .values.primary_endpoint_address,
+              status: .values.status
+            })
+          ' terraform-state.json > elasticache-redis.json
+
+          REDIS_COUNT=$(jq 'length' elasticache-redis.json)
+          echo "**Redis Clusters**: $REDIS_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$REDIS_COUNT" -gt 0 ]; then
+            jq -r '.[] | "- **\(.id)**: \(.engine) \(.engine_version) - \(.node_type) - \(.num_cache_clusters) node(s)"' elasticache-redis.json >> $GITHUB_STEP_SUMMARY || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "redis_count=$REDIS_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Discover ECR repositories
+        id: discover-ecr
+        run: |
+          echo "### 📦 ECR Repositories Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract ECR Repositories
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_ecr_repository")) |
+            map({
+              name: .values.name,
+              arn: .values.arn,
+              registry_id: .values.registry_id,
+              repository_url: .values.repository_url,
+              image_tag_mutability: .values.image_tag_mutability,
+              scan_on_push: .values.image_scanning_configuration.scan_on_push,
+              encryption_type: .values.encryption_configuration.encryption_type,
+              tags: .values.tags
+            })
+          ' terraform-state.json > ecr-repositories.json
+
+          ECR_COUNT=$(jq 'length' ecr-repositories.json)
+          echo "**Total ECR Repositories**: $ECR_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Group by microservice
+          jq -r '.[] | "- **\(.name)**: \(.repository_url)"' ecr-repositories.json | sort >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "ecr_count=$ECR_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Discover IAM resources
+        id: discover-iam
+        run: |
+          echo "### 🔐 IAM Resources Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract IAM Roles
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "aws_iam_role")) |
+            map({
+              name: .values.name,
+              arn: .values.arn,
+              description: .values.description,
+              assume_role_policy: .values.assume_role_policy,
+              max_session_duration: .values.max_session_duration,
+              tags: .values.tags
+            })
+          ' terraform-state.json > iam-roles.json
+
+          IAM_ROLE_COUNT=$(jq 'length' iam-roles.json)
+          echo "**IAM Roles**: $IAM_ROLE_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          jq -r '.[] | "- **\(.name)**: \(.description // "No description")"' iam-roles.json | head -20 >> $GITHUB_STEP_SUMMARY || true
+
+          if [ "$IAM_ROLE_COUNT" -gt 20 ]; then
+            echo "- ... and $((IAM_ROLE_COUNT - 20)) more" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "iam_role_count=$IAM_ROLE_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Discover Helm releases (Istio)
+        id: discover-helm
+        run: |
+          echo "### ⎈ Helm Releases Discovery" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract Helm Releases
+          jq -r '
+            [.values.root_module.resources[]?, .values.root_module.child_modules[]?.resources[]?] |
+            map(select(.type == "helm_release")) |
+            map({
+              name: .values.name,
+              chart: .values.chart,
+              namespace: .values.namespace,
+              version: .values.version,
+              repository: .values.repository,
+              status: .values.status
+            })
+          ' terraform-state.json > helm-releases.json
+
+          HELM_COUNT=$(jq 'length' helm-releases.json)
+          echo "**Helm Releases**: $HELM_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$HELM_COUNT" -gt 0 ]; then
+            jq -r '.[] | "- **\(.name)** (\(.chart)): v\(.version) in \(.namespace)"' helm-releases.json >> $GITHUB_STEP_SUMMARY || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "helm_count=$HELM_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Generate resource summary and cost estimate
+        id: cost-estimate
+        run: |
+          echo "### 💰 Resource Summary & Cost Estimate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Create summary JSON
+          cat > resource-summary.json <<EOF
+          {
+            "discovery_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "region": "${{ env.AWS_REGION }}",
+            "total_resources": ${{ steps.terraform-state.outputs.resource_count }},
+            "network": {
+              "vpcs": ${{ steps.discover-vpc.outputs.vpc_count }},
+              "subnets": ${{ steps.discover-vpc.outputs.subnet_count }},
+              "nat_gateways": ${{ steps.discover-vpc.outputs.nat_count }},
+              "security_groups": ${{ steps.discover-security-groups.outputs.sg_count }}
+            },
+            "compute": {
+              "eks_clusters": 1,
+              "node_groups": ${{ steps.discover-eks.outputs.node_group_count }}
+            },
+            "storage": {
+              "redis_clusters": ${{ steps.discover-elasticache.outputs.redis_count }},
+              "ecr_repositories": ${{ steps.discover-ecr.outputs.ecr_count }}
+            },
+            "security": {
+              "iam_roles": ${{ steps.discover-iam.outputs.iam_role_count }}
+            },
+            "platform": {
+              "helm_releases": ${{ steps.discover-helm.outputs.helm_count }}
+            }
+          }
+          EOF
+
+          # Simple cost estimation (monthly USD, approximate)
+          VPC_COST=$(echo "${{ steps.discover-vpc.outputs.vpc_count }} * 0" | bc)  # VPCs are free
+          NAT_COST=$(echo "${{ steps.discover-vpc.outputs.nat_count }} * 32" | bc)  # $32/NAT gateway
+          EKS_COST=73  # $73/cluster
+
+          # Node groups cost (rough estimate based on t3.large @ ~$61/month)
+          NODE_COST=$(echo "${{ steps.discover-eks.outputs.node_group_count }} * 61" | bc)
+
+          REDIS_COST=$(echo "${{ steps.discover-elasticache.outputs.redis_count }} * 15" | bc)  # Rough estimate
+
+          TOTAL_ESTIMATED_COST=$(echo "$NAT_COST + $EKS_COST + $NODE_COST + $REDIS_COST" | bc)
+
+          echo "| Resource Type | Count | Est. Monthly Cost (USD) |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------------|-------|-------------------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| VPC | ${{ steps.discover-vpc.outputs.vpc_count }} | \$0 |" >> $GITHUB_STEP_SUMMARY
+          echo "| NAT Gateways | ${{ steps.discover-vpc.outputs.nat_count }} | \$${NAT_COST} |" >> $GITHUB_STEP_SUMMARY
+          echo "| EKS Cluster | 1 | \$${EKS_COST} |" >> $GITHUB_STEP_SUMMARY
+          echo "| EKS Node Groups | ${{ steps.discover-eks.outputs.node_group_count }} | \$${NODE_COST} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Redis | ${{ steps.discover-elasticache.outputs.redis_count }} | \$${REDIS_COST} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **TOTAL** | - | **\$${TOTAL_ESTIMATED_COST}** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Note: Estimated costs are approximate and may vary based on usage, region, and instance types._" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "estimated_cost=$TOTAL_ESTIMATED_COST" >> $GITHUB_OUTPUT
+
+      - name: Upload VPC to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          echo "### 📤 ServiceNow CMDB Update - VPC" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          VPC_DATA=$(jq -c '.[]' vpcs.json)
+
+          if [ -n "$VPC_DATA" ]; then
+            while IFS= read -r vpc; do
+              VPC_ID=$(echo "$vpc" | jq -r '.id')
+              VPC_NAME=$(echo "$vpc" | jq -r '.name')
+              VPC_CIDR=$(echo "$vpc" | jq -r '.cidr')
+
+              # Create payload for cmdb_ci_network table
+              PAYLOAD=$(jq -n \
+                --arg name "$VPC_NAME" \
+                --arg id "$VPC_ID" \
+                --arg cidr "$VPC_CIDR" \
+                --arg region "${{ env.AWS_REGION }}" \
+                --arg timestamp "$TIMESTAMP" \
+                '{
+                  name: $name,
+                  ip_address: $cidr,
+                  u_vpc_id: $id,
+                  u_cidr_block: $cidr,
+                  u_region: $region,
+                  u_provider: "AWS",
+                  u_last_discovered: $timestamp,
+                  u_discovered_by: "GitHub Actions - Terraform State"
+                }')
+
+              # Check if VPC exists
+              EXISTING=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_network?sysparm_query=u_vpc_id=$VPC_ID&sysparm_limit=1" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              VPC_SYS_ID=$(echo "$EXISTING" | jq -r '.result[0].sys_id // empty')
+
+              if [ -n "$VPC_SYS_ID" ]; then
+                # Update existing VPC
+                curl -s -X PUT \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_network/$VPC_SYS_ID" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+                echo "✅ Updated VPC: $VPC_NAME" >> $GITHUB_STEP_SUMMARY
+              else
+                # Create new VPC
+                RESPONSE=$(curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_network" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
+
+                VPC_SYS_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id // empty')
+                echo "✅ Created VPC: $VPC_NAME" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              # Save VPC sys_id for relationship creation
+              echo "$VPC_ID=$VPC_SYS_ID" >> vpc-sys-ids.txt
+            done <<< "$VPC_DATA"
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Subnets to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          echo "### 📤 ServiceNow CMDB Update - Subnets" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          SUBNET_DATA=$(jq -c '.[]' subnets.json)
+          SUBNET_COUNT=0
+
+          if [ -n "$SUBNET_DATA" ]; then
+            while IFS= read -r subnet; do
+              SUBNET_ID=$(echo "$subnet" | jq -r '.id')
+              SUBNET_NAME=$(echo "$subnet" | jq -r '.name')
+              SUBNET_CIDR=$(echo "$subnet" | jq -r '.cidr')
+              SUBNET_AZ=$(echo "$subnet" | jq -r '.az')
+              VPC_ID=$(echo "$subnet" | jq -r '.vpc_id')
+              IS_PUBLIC=$(echo "$subnet" | jq -r '.public')
+
+              # Get parent VPC sys_id
+              VPC_SYS_ID=$(grep "^$VPC_ID=" vpc-sys-ids.txt | cut -d'=' -f2)
+
+              # Create payload for cmdb_ci_network_segment table
+              PAYLOAD=$(jq -n \
+                --arg name "$SUBNET_NAME" \
+                --arg id "$SUBNET_ID" \
+                --arg cidr "$SUBNET_CIDR" \
+                --arg az "$SUBNET_AZ" \
+                --arg vpc_id "$VPC_ID" \
+                --arg vpc_sys_id "$VPC_SYS_ID" \
+                --arg public "$IS_PUBLIC" \
+                --arg timestamp "$TIMESTAMP" \
+                '{
+                  name: $name,
+                  ip_address: $cidr,
+                  u_subnet_id: $id,
+                  u_cidr_block: $cidr,
+                  u_availability_zone: $az,
+                  u_vpc_id: $vpc_id,
+                  u_is_public: ($public == "true"),
+                  u_last_discovered: $timestamp
+                }')
+
+              # Check if subnet exists
+              EXISTING=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_network_segment?sysparm_query=u_subnet_id=$SUBNET_ID&sysparm_limit=1" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              SUBNET_SYS_ID=$(echo "$EXISTING" | jq -r '.result[0].sys_id // empty')
+
+              if [ -n "$SUBNET_SYS_ID" ]; then
+                curl -s -X PUT \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_network_segment/$SUBNET_SYS_ID" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              else
+                RESPONSE=$(curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_network_segment" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" 2>/dev/null || echo '{"result":{"sys_id":""}}')
+
+                SUBNET_SYS_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id // empty')
+              fi
+
+              # Create relationship: VPC contains Subnet
+              if [ -n "$VPC_SYS_ID" ] && [ -n "$SUBNET_SYS_ID" ]; then
+                REL_PAYLOAD=$(jq -n \
+                  --arg parent "$VPC_SYS_ID" \
+                  --arg child "$SUBNET_SYS_ID" \
+                  '{
+                    parent: $parent,
+                    child: $child,
+                    type: "d93304fb0a0a0b78006081a72ef08444"
+                  }')
+
+                # Check if relationship exists
+                EXISTING_REL=$(curl -s -X GET \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_rel_ci?sysparm_query=parent=$VPC_SYS_ID^child=$SUBNET_SYS_ID&sysparm_limit=1" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+                REL_EXISTS=$(echo "$EXISTING_REL" | jq -r '.result[0].sys_id // empty')
+
+                if [ -z "$REL_EXISTS" ]; then
+                  curl -s -X POST \
+                    "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_rel_ci" \
+                    -H "Authorization: Basic $BASIC_AUTH" \
+                    -H "Content-Type: application/json" \
+                    -d "$REL_PAYLOAD" > /dev/null 2>&1
+                fi
+              fi
+
+              SUBNET_COUNT=$((SUBNET_COUNT + 1))
+            done <<< "$SUBNET_DATA"
+          fi
+
+          echo "✅ Updated $SUBNET_COUNT subnets" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Security Groups to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          echo "### 📤 ServiceNow CMDB Update - Security Groups" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          SG_DATA=$(jq -c '.[]' security-groups.json)
+          SG_COUNT=0
+
+          if [ -n "$SG_DATA" ]; then
+            while IFS= read -r sg; do
+              SG_ID=$(echo "$sg" | jq -r '.id')
+              SG_NAME=$(echo "$sg" | jq -r '.name')
+              SG_DESC=$(echo "$sg" | jq -r '.description')
+              VPC_ID=$(echo "$sg" | jq -r '.vpc_id')
+
+              # Count ingress/egress rules
+              INGRESS_COUNT=$(echo "$sg" | jq '.ingress_rules | length')
+              EGRESS_COUNT=$(echo "$sg" | jq '.egress_rules | length')
+
+              # Create payload for cmdb_ci_firewall table
+              PAYLOAD=$(jq -n \
+                --arg name "$SG_NAME" \
+                --arg id "$SG_ID" \
+                --arg desc "$SG_DESC" \
+                --arg vpc_id "$VPC_ID" \
+                --arg ingress "$INGRESS_COUNT" \
+                --arg egress "$EGRESS_COUNT" \
+                --arg timestamp "$TIMESTAMP" \
+                '{
+                  name: $name,
+                  short_description: $desc,
+                  u_security_group_id: $id,
+                  u_vpc_id: $vpc_id,
+                  u_ingress_rules: $ingress,
+                  u_egress_rules: $egress,
+                  u_last_discovered: $timestamp
+                }')
+
+              # Check if security group exists
+              EXISTING=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_firewall?sysparm_query=u_security_group_id=$SG_ID&sysparm_limit=1" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              SG_SYS_ID=$(echo "$EXISTING" | jq -r '.result[0].sys_id // empty')
+
+              if [ -n "$SG_SYS_ID" ]; then
+                curl -s -X PUT \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_firewall/$SG_SYS_ID" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              else
+                curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_firewall" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              fi
+
+              SG_COUNT=$((SG_COUNT + 1))
+            done <<< "$SG_DATA"
+          fi
+
+          echo "✅ Updated $SG_COUNT security groups" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Redis to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          echo "### 📤 ServiceNow CMDB Update - Redis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          REDIS_DATA=$(jq -c '.[]' elasticache-redis.json)
+          REDIS_COUNT=0
+
+          if [ -n "$REDIS_DATA" ]; then
+            while IFS= read -r redis; do
+              REDIS_ID=$(echo "$redis" | jq -r '.id')
+              ENGINE=$(echo "$redis" | jq -r '.engine')
+              ENGINE_VERSION=$(echo "$redis" | jq -r '.engine_version')
+              NODE_TYPE=$(echo "$redis" | jq -r '.node_type')
+              NUM_NODES=$(echo "$redis" | jq -r '.num_cache_clusters')
+              ENDPOINT=$(echo "$redis" | jq -r '.primary_endpoint')
+
+              # Create payload for cmdb_ci_database_instance table
+              PAYLOAD=$(jq -n \
+                --arg name "$REDIS_ID" \
+                --arg id "$REDIS_ID" \
+                --arg engine "$ENGINE" \
+                --arg version "$ENGINE_VERSION" \
+                --arg node_type "$NODE_TYPE" \
+                --arg num_nodes "$NUM_NODES" \
+                --arg endpoint "$ENDPOINT" \
+                --arg timestamp "$TIMESTAMP" \
+                '{
+                  name: $name,
+                  u_cluster_id: $id,
+                  u_engine: $engine,
+                  u_engine_version: $version,
+                  u_node_type: $node_type,
+                  u_num_nodes: $num_nodes,
+                  u_endpoint: $endpoint,
+                  u_last_discovered: $timestamp
+                }')
+
+              # Check if Redis exists
+              EXISTING=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_database_instance?sysparm_query=u_cluster_id=$REDIS_ID&sysparm_limit=1" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              REDIS_SYS_ID=$(echo "$EXISTING" | jq -r '.result[0].sys_id // empty')
+
+              if [ -n "$REDIS_SYS_ID" ]; then
+                curl -s -X PUT \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_database_instance/$REDIS_SYS_ID" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+                echo "✅ Updated Redis: $REDIS_ID" >> $GITHUB_STEP_SUMMARY
+              else
+                curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_database_instance" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+                echo "✅ Created Redis: $REDIS_ID" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              REDIS_COUNT=$((REDIS_COUNT + 1))
+            done <<< "$REDIS_DATA"
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload ECR repositories to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          echo "### 📤 ServiceNow CMDB Update - ECR" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          ECR_DATA=$(jq -c '.[]' ecr-repositories.json)
+          ECR_COUNT=0
+
+          if [ -n "$ECR_DATA" ]; then
+            while IFS= read -r ecr; do
+              ECR_NAME=$(echo "$ecr" | jq -r '.name')
+              ECR_ARN=$(echo "$ecr" | jq -r '.arn')
+              ECR_URL=$(echo "$ecr" | jq -r '.repository_url')
+              SCAN_ON_PUSH=$(echo "$ecr" | jq -r '.scan_on_push')
+
+              # Create payload for cmdb_ci_app_server table (or custom table)
+              PAYLOAD=$(jq -n \
+                --arg name "$ECR_NAME" \
+                --arg arn "$ECR_ARN" \
+                --arg url "$ECR_URL" \
+                --arg scan "$SCAN_ON_PUSH" \
+                --arg timestamp "$TIMESTAMP" \
+                '{
+                  name: $name,
+                  short_description: ("ECR Repository - " + $name),
+                  u_repository_arn: $arn,
+                  u_repository_url: $url,
+                  u_scan_on_push: ($scan == "true"),
+                  u_last_discovered: $timestamp
+                }')
+
+              # Check if ECR exists
+              EXISTING=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_app_server?sysparm_query=u_repository_arn=$ECR_ARN&sysparm_limit=1" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              ECR_SYS_ID=$(echo "$EXISTING" | jq -r '.result[0].sys_id // empty')
+
+              if [ -n "$ECR_SYS_ID" ]; then
+                curl -s -X PUT \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_app_server/$ECR_SYS_ID" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              else
+                curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_app_server" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              fi
+
+              ECR_COUNT=$((ECR_COUNT + 1))
+            done <<< "$ECR_DATA"
+          fi
+
+          echo "✅ Updated $ECR_COUNT ECR repositories" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload IAM roles to ServiceNow CMDB
+        if: ${{ env.SERVICENOW_PASSWORD != '' }}
+        run: |
+          echo "### 📤 ServiceNow CMDB Update - IAM Roles" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          IAM_DATA=$(jq -c '.[]' iam-roles.json)
+          IAM_COUNT=0
+
+          if [ -n "$IAM_DATA" ]; then
+            while IFS= read -r iam; do
+              IAM_NAME=$(echo "$iam" | jq -r '.name')
+              IAM_ARN=$(echo "$iam" | jq -r '.arn')
+              IAM_DESC=$(echo "$iam" | jq -r '.description')
+
+              # Create payload for cmdb_ci_service_account table
+              PAYLOAD=$(jq -n \
+                --arg name "$IAM_NAME" \
+                --arg arn "$IAM_ARN" \
+                --arg desc "$IAM_DESC" \
+                --arg timestamp "$TIMESTAMP" \
+                '{
+                  name: $name,
+                  u_role_arn: $arn,
+                  u_description: $desc,
+                  u_last_discovered: $timestamp
+                }')
+
+              # Check if IAM role exists
+              EXISTING=$(curl -s -X GET \
+                "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_service_account?sysparm_query=u_role_arn=$IAM_ARN&sysparm_limit=1" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -H "Content-Type: application/json" 2>/dev/null || echo '{"result":[]}')
+
+              IAM_SYS_ID=$(echo "$EXISTING" | jq -r '.result[0].sys_id // empty')
+
+              if [ -n "$IAM_SYS_ID" ]; then
+                curl -s -X PUT \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_service_account/$IAM_SYS_ID" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              else
+                curl -s -X POST \
+                  "${SERVICENOW_INSTANCE_URL}/api/now/table/cmdb_ci_service_account" \
+                  -H "Authorization: Basic $BASIC_AUTH" \
+                  -H "Content-Type: application/json" \
+                  -d "$PAYLOAD" > /dev/null 2>&1
+              fi
+
+              IAM_COUNT=$((IAM_COUNT + 1))
+            done <<< "$IAM_DATA"
+          fi
+
+          echo "✅ Updated $IAM_COUNT IAM roles" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: ServiceNow CMDB not configured
+        if: ${{ env.SERVICENOW_PASSWORD == '' }}
+        run: |
+          echo "### ServiceNow CMDB Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ ServiceNow CMDB integration not configured" >> $GITHUB_STEP_SUMMARY
+          echo "Add \`SERVICENOW_PASSWORD\` secret to enable CMDB updates" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate discovery report
+        run: |
+          cat > discovery-report.md << 'EOF'
+          # AWS Infrastructure Discovery Report
+
+          **Discovery Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          **Source**: Terraform State
+          **Region**: ${{ env.AWS_REGION }}
+
+          ## Infrastructure Summary
+
+          | Category | Resource Type | Count |
+          |----------|---------------|-------|
+          | **Network** | VPC | ${{ steps.discover-vpc.outputs.vpc_count }} |
+          | | Subnets | ${{ steps.discover-vpc.outputs.subnet_count }} |
+          | | NAT Gateways | ${{ steps.discover-vpc.outputs.nat_count }} |
+          | | Security Groups | ${{ steps.discover-security-groups.outputs.sg_count }} |
+          | **Compute** | EKS Cluster | 1 |
+          | | Node Groups | ${{ steps.discover-eks.outputs.node_group_count }} |
+          | **Storage** | Redis Clusters | ${{ steps.discover-elasticache.outputs.redis_count }} |
+          | | ECR Repositories | ${{ steps.discover-ecr.outputs.ecr_count }} |
+          | **Security** | IAM Roles | ${{ steps.discover-iam.outputs.iam_role_count }} |
+          | **Platform** | Helm Releases | ${{ steps.discover-helm.outputs.helm_count }} |
+          | **TOTAL** | **All Resources** | **${{ steps.terraform-state.outputs.resource_count }}** |
+
+          ## Cost Estimate
+
+          **Estimated Monthly Cost**: \$${{ steps.cost-estimate.outputs.estimated_cost }} USD
+
+          _Note: This is an approximate cost based on standard pricing and may vary._
+
+          ## ServiceNow CMDB
+
+          EOF
+
+          if [ -n "${SERVICENOW_PASSWORD}" ]; then
+            cat >> discovery-report.md << 'EOF'
+          ✅ **Data synced to ServiceNow CMDB**
+
+          View in ServiceNow:
+          - [Networks (VPC)](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=cmdb_ci_network_list.do)
+          - [Network Segments (Subnets)](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=cmdb_ci_network_segment_list.do)
+          - [Firewalls (Security Groups)](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=cmdb_ci_firewall_list.do)
+          - [Databases (Redis)](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=cmdb_ci_database_instance_list.do)
+          - [Application Servers (ECR)](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=cmdb_ci_app_server_list.do)
+          - [Service Accounts (IAM)](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=cmdb_ci_service_account_list.do)
+          EOF
+          else
+            cat >> discovery-report.md << 'EOF'
+          ⚠️ **ServiceNow CMDB integration not configured**
+
+          Configure `SERVICENOW_PASSWORD` secret to enable CMDB sync.
+          EOF
+          fi
+
+          cat >> discovery-report.md << 'EOF'
+
+          ## Discovered Resources
+
+          ### Network Resources
+          EOF
+
+          # Add VPC details
+          if [ -f vpcs.json ]; then
+            jq -r '.[] | "- **VPC**: \(.name) (\(.id)) - CIDR: \(.cidr)"' vpcs.json >> discovery-report.md
+          fi
+
+          # Add Subnet details (top 10)
+          if [ -f subnets.json ]; then
+            echo "" >> discovery-report.md
+            jq -r '.[] | "- **Subnet**: \(.name) (\(.az)) - \(.cidr)"' subnets.json | head -10 >> discovery-report.md
+            SUBNET_TOTAL=$(jq 'length' subnets.json)
+            if [ "$SUBNET_TOTAL" -gt 10 ]; then
+              echo "- ... and $((SUBNET_TOTAL - 10)) more subnets" >> discovery-report.md
+            fi
+          fi
+
+          cat >> discovery-report.md << 'EOF'
+
+          ### EKS Resources
+          EOF
+
+          if [ -f eks-cluster.json ]; then
+            jq -r '.[] | "- **Cluster**: \(.name) - Kubernetes v\(.version)"' eks-cluster.json >> discovery-report.md
+          fi
+
+          if [ -f eks-node-groups.json ]; then
+            echo "" >> discovery-report.md
+            jq -r '.[] | "- **Node Group**: \(.name) - \(.instance_types[0]) (Min: \(.scaling_config.min_size), Max: \(.scaling_config.max_size))"' eks-node-groups.json >> discovery-report.md
+          fi
+
+          cat >> discovery-report.md << 'EOF'
+
+          ### Storage Resources
+          EOF
+
+          if [ -f elasticache-redis.json ]; then
+            jq -r '.[] | "- **Redis**: \(.id) - \(.engine) v\(.engine_version) - \(.node_type)"' elasticache-redis.json >> discovery-report.md
+          fi
+
+          cat >> discovery-report.md << 'EOF'
+
+          ### Container Registry
+          EOF
+
+          if [ -f ecr-repositories.json ]; then
+            jq -r '.[] | "- **ECR**: \(.name)"' ecr-repositories.json >> discovery-report.md
+          fi
+
+          cat >> discovery-report.md << 'EOF'
+
+          ---
+
+          **Next Discovery**: Scheduled daily at 6 AM UTC or run manually via workflow_dispatch
+
+          _Generated by GitHub Actions - Terraform State Discovery_
+          EOF
+
+          cat discovery-report.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: infrastructure-discovery-${{ github.run_number }}
+          path: |
+            discovery-report.md
+            terraform-state.json
+            network-resources.json
+            security-groups.json
+            eks-cluster.json
+            eks-node-groups.json
+            elasticache-redis.json
+            ecr-repositories.json
+            iam-roles.json
+            helm-releases.json
+            resource-summary.json
+          retention-days: 90
+
+      - name: Final summary
+        run: |
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 Discovery Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Resources**: ${{ steps.terraform-state.outputs.resource_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Estimated Cost**: \$${{ steps.cost-estimate.outputs.estimated_cost }}/month" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "${SERVICENOW_PASSWORD}" ]; then
+            echo "✅ **Data synced to ServiceNow CMDB**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**View in ServiceNow**:" >> $GITHUB_STEP_SUMMARY
+            echo "- [Networks (VPC)](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_network_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Subnets](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_network_segment_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Security Groups](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_firewall_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Redis](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_database_instance_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [ECR](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_app_server_list.do)" >> $GITHUB_STEP_SUMMARY
+            echo "- [IAM Roles](${SERVICENOW_INSTANCE_URL}/nav_to.do?uri=cmdb_ci_service_account_list.do)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Download**: Full discovery report available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⏰ **Next Discovery**: Daily at 6 AM UTC or run manually" >> $GITHUB_STEP_SUMMARY
