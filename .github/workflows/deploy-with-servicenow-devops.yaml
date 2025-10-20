@@ -37,7 +37,7 @@ jobs:
           # Authentication (token-based - recommended)
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}  # GitHubARC tool sys_id: 4eaebb06c320f690e1bbf0cb05013135
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}  # GitHub Demo tool sys_id: 2fe9c38bc36c72d0e1bbf0cb050131cc
 
           # GitHub context (required for pipeline tracking)
           context-github: ${{ toJSON(github) }}
@@ -208,7 +208,7 @@ jobs:
           # Authentication (token-based)
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
           change-request-details: |
@@ -265,7 +265,7 @@ jobs:
           # Authentication (token-based)
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SERVICENOW_TOOL_ID }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
           change-request-details: |
