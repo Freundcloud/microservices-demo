@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # This patch adds node affinity and tolerations to ensure pods
-# in the prod namespace only run on prod node group
+# can be scheduled on the ultra-minimal single-node cluster
+# Configuration for: 1x t3.large "all-in-one" node with role=all-in-one, workload=shared
 
 apiVersion: apps/v1
 kind: Deployment
@@ -22,29 +23,26 @@ metadata:
 spec:
   template:
     spec:
-      # Node selector - simple way to target specific nodes
+      # Node selector - target shared all-in-one node
       nodeSelector:
-        environment: prod
-        workload: microservices-prod
+        role: all-in-one
+        workload: shared
 
-      # Tolerations - allow pods to be scheduled on tainted prod nodes
-      tolerations:
-      - key: "environment"
-        operator: "Equal"
-        value: "prod"
-        effect: "NoSchedule"
+      # No tolerations needed - all-in-one node has no taints
+      tolerations: []
 
-      # Node affinity - preferred scheduling rules
+      # Node affinity - target the all-in-one node
       affinity:
         nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: environment
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: role
                 operator: In
                 values:
-                - prod
+                - all-in-one
               - key: workload
                 operator: In
                 values:
-                - microservices-prod
+                - shared
