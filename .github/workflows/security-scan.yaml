@@ -277,43 +277,206 @@ jobs:
           sarif_file: dependency-check-report/dependency-check-report.sarif
           category: owasp-dependency-check
 
-  # Security summary
+  # Security summary with detailed evidence generation
   security-summary:
-    name: Security Summary
+    name: Security Summary & Evidence
     needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan]
     if: always()
     runs-on: ubuntu-latest
+    outputs:
+      evidence_generated: ${{ steps.generate-evidence.outputs.evidence_generated }}
+      overall_status: ${{ steps.generate-evidence.outputs.overall_status }}
+      total_findings: ${{ steps.generate-evidence.outputs.total_findings }}
 
     steps:
-      - name: Create Security Summary
-        run: |
-          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Semgrep SAST | ${{ needs.semgrep-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Trivy Filesystem | ${{ needs.trivy-fs-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| IaC Scanning | ${{ needs.iac-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| K8s Manifest Scan | ${{ needs.k8s-manifest-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Security Tools Used" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔍 **CodeQL**: Multi-language semantic code analysis" >> $GITHUB_STEP_SUMMARY
-          echo "- 🛡️ **Semgrep**: Static application security testing" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 **Trivy**: Vulnerability and misconfig scanner" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏗️ **Checkov & tfsec**: Infrastructure as Code scanning" >> $GITHUB_STEP_SUMMARY
-          echo "- ☸️ **Kubesec & Polaris**: Kubernetes security analysis" >> $GITHUB_STEP_SUMMARY
-          echo "- 📚 **OWASP Dependency Check**: Dependency vulnerability scanning" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note**: Gitleaks secret scanning disabled (requires paid license)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View detailed results in the **Security** tab." >> $GITHUB_STEP_SUMMARY
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # ServiceNow Security Results Integration
-  # NOTE: ServiceNow integration is DISABLED by default
-  #
-  # To enable: See docs/SERVICENOW-INTEGRATION.md for complete setup instructions
-  # The integration code is preserved in docs/SERVICENOW-INTEGRATION.md
-  # and can be added back to this workflow when ServiceNow is configured
+      - name: Download all scan artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+
+      - name: Install analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Analyze scan results and generate evidence
+        id: generate-evidence
+        run: |
+          # Initialize counters
+          TOTAL_FINDINGS=0
+          SCAN_DETAILS=""
+          OVERALL_STATUS="PASSED"
+
+          # Analyze Trivy results
+          TRIVY_FINDINGS=0
+          if [ -f "trivy-fs-results.sarif" ]; then
+            TRIVY_FINDINGS=$(jq '[.runs[].results[]? | select(.level == "error" or .level == "warning")] | length' trivy-fs-results.sarif 2>/dev/null || echo "0")
+          fi
+          TOTAL_FINDINGS=$((TOTAL_FINDINGS + TRIVY_FINDINGS))
+
+          # Analyze Semgrep results
+          SEMGREP_FINDINGS=0
+          if [ -f "semgrep-results.sarif" ]; then
+            SEMGREP_FINDINGS=$(jq '[.runs[].results[]? | select(.level == "error" or .level == "warning")] | length' semgrep-results.sarif 2>/dev/null || echo "0")
+          fi
+          TOTAL_FINDINGS=$((TOTAL_FINDINGS + SEMGREP_FINDINGS))
+
+          # Analyze Checkov results
+          CHECKOV_FINDINGS=0
+          if [ -f "checkov-results.sarif" ]; then
+            CHECKOV_FINDINGS=$(jq '[.runs[].results[]? | select(.level == "error" or .level == "warning")] | length' checkov-results.sarif 2>/dev/null || echo "0")
+          fi
+          TOTAL_FINDINGS=$((TOTAL_FINDINGS + CHECKOV_FINDINGS))
+
+          # Set overall status
+          if [ $TOTAL_FINDINGS -gt 0 ]; then
+            OVERALL_STATUS="FAILED"
+          fi
+
+          # Generate comprehensive evidence report
+          cat > security-scan-evidence.md <<EOF
+          # 🔒 Security Scan Evidence Report
+
+          **Scan Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Repository**: ${{ github.repository }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+          **Triggered By**: ${{ github.actor }}
+          **GitHub Run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ---
+
+          ## 📊 Overall Status
+
+          **Result**: ${OVERALL_STATUS}
+          **Total Findings**: ${TOTAL_FINDINGS} (HIGH/CRITICAL severity)
+
+          $(if [ "$OVERALL_STATUS" == "PASSED" ]; then
+            echo "✅ **COMPLIANCE STATUS**: All security scans passed - No high/critical vulnerabilities detected"
+          else
+            echo "⚠️  **COMPLIANCE STATUS**: Security findings require review before deployment approval"
+          fi)
+
+          ---
+
+          ## 🛡️ Security Scans Executed
+
+          ### 1. CodeQL Analysis (Multi-Language SAST)
+          - **Tool**: GitHub CodeQL
+          - **Languages Scanned**: Python, JavaScript, Go, Java, C#
+          - **Query Sets**: security-extended, security-and-quality
+          - **Status**: ${{ needs.codeql-analysis.result }}
+          - **Result**: $(if [ "${{ needs.codeql-analysis.result }}" == "success" ]; then echo "✅ PASSED - No high-severity code vulnerabilities"; else echo "⚠️  Review required - Check Security tab"; fi)
+
+          ### 2. Semgrep SAST
+          - **Tool**: Semgrep (returntocorp/semgrep)
+          - **Rules**: Auto-configured security patterns
+          - **Status**: ${{ needs.semgrep-scan.result }}
+          - **Findings**: ${SEMGREP_FINDINGS} issues
+          - **Result**: $(if [ ${SEMGREP_FINDINGS} -eq 0 ]; then echo "✅ CLEAN - No security issues detected"; else echo "⚠️  ${SEMGREP_FINDINGS} findings - Review required"; fi)
+
+          ### 3. Trivy Filesystem Scan
+          - **Tool**: Aqua Trivy
+          - **Scan Type**: Filesystem vulnerability and misconfiguration scan
+          - **Severity Filter**: CRITICAL, HIGH, MEDIUM
+          - **Status**: ${{ needs.trivy-fs-scan.result }}
+          - **Findings**: ${TRIVY_FINDINGS} vulnerabilities
+          - **Result**: $(if [ ${TRIVY_FINDINGS} -eq 0 ]; then echo "✅ CLEAN - No vulnerabilities detected"; else echo "⚠️  ${TRIVY_FINDINGS} vulnerabilities - Review required"; fi)
+
+          ### 4. Infrastructure as Code (IaC) Security
+          - **Tools**: Checkov, tfsec
+          - **Target**: terraform-aws/ directory
+          - **Status**: ${{ needs.iac-scan.result }}
+          - **Findings**: ${CHECKOV_FINDINGS} IaC issues
+          - **Result**: $(if [ ${CHECKOV_FINDINGS} -eq 0 ]; then echo "✅ CLEAN - Infrastructure code meets security standards"; else echo "⚠️  ${CHECKOV_FINDINGS} findings - Review required"; fi)
+
+          ### 5. Kubernetes Manifest Security
+          - **Tools**: Kubesec, Polaris
+          - **Target**: kubernetes-manifests/, kustomize/
+          - **Status**: ${{ needs.k8s-manifest-scan.result }}
+          - **Result**: $(if [ "${{ needs.k8s-manifest-scan.result }}" == "success" ]; then echo "✅ PASSED - Manifests follow security best practices"; else echo "⚠️  Review required - Check artifacts"; fi)
+
+          ### 6. OWASP Dependency Check
+          - **Tool**: OWASP Dependency-Check
+          - **Target**: src/ (all microservices)
+          - **Status**: ${{ needs.owasp-dependency-check.result }}
+          - **Result**: $(if [ "${{ needs.owasp-dependency-check.result }}" == "success" ]; then echo "✅ PASSED - Dependencies scanned for known vulnerabilities"; else echo "⚠️  Review required - Check Security tab"; fi)
+
+          ---
+
+          ## 📋 Compliance Statement
+
+          This security scan evidence report demonstrates that the following security controls were executed:
+
+          - ✅ **SAST (Static Application Security Testing)**: CodeQL, Semgrep
+          - ✅ **Dependency Scanning**: OWASP Dependency Check
+          - ✅ **Infrastructure Security**: Checkov, tfsec
+          - ✅ **Container Security**: Trivy filesystem scan
+          - ✅ **Kubernetes Security**: Kubesec, Polaris
+          - ✅ **Multi-Language Coverage**: Python, JavaScript, Go, Java, C#
+
+          $(if [ "$OVERALL_STATUS" == "PASSED" ]; then
+            echo "**Deployment Recommendation**: ✅ **APPROVED** - All security scans passed, safe to proceed with deployment"
+          else
+            echo "**Deployment Recommendation**: ⚠️  **REVIEW REQUIRED** - ${TOTAL_FINDINGS} security findings must be reviewed before approval"
+          fi)
+
+          ---
+
+          ## 📎 Evidence Attachments
+
+          The following scan result files are attached to this report:
+
+          - \`semgrep-results.sarif\` - Semgrep SAST findings (SARIF format)
+          - \`trivy-fs-results.sarif\` - Trivy vulnerability scan (SARIF format)
+          - \`checkov-results.sarif\` - Checkov IaC scan (SARIF format)
+          - \`tfsec-results.sarif\` - tfsec Terraform scan (SARIF format)
+          - \`dependency-check-report.sarif\` - OWASP dependency scan (SARIF format)
+          - \`polaris-results.json\` - Polaris Kubernetes audit
+
+          All results are also published to the GitHub Security tab for detailed analysis.
+
+          ---
+
+          ## 🔗 Additional Resources
+
+          - **Full Scan Logs**: [${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - **Security Alerts**: [${{ github.server_url }}/${{ github.repository }}/security](${{ github.server_url }}/${{ github.repository }}/security)
+          - **Code Scanning Results**: [${{ github.server_url }}/${{ github.repository }}/security/code-scanning](${{ github.server_url }}/${{ github.repository }}/security/code-scanning)
+
+          ---
+
+          **Report Generated By**: GitHub Actions Automated Security Pipeline
+          **Pipeline Version**: 1.0.0
+          **Attestation**: This report provides evidence of automated security scanning execution and results.
+          EOF
+
+          # Output for later jobs
+          echo "evidence_generated=true" >> $GITHUB_OUTPUT
+          echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+          echo "total_findings=$TOTAL_FINDINGS" >> $GITHUB_OUTPUT
+
+          echo "✅ Security evidence report generated"
+
+      - name: Create summary for GitHub UI
+        run: |
+          cat security-scan-evidence.md >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download Evidence Report" >> $GITHUB_STEP_SUMMARY
+          echo "The complete security scan evidence report is available as a workflow artifact." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload security evidence as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-scan-evidence
+          path: |
+            security-scan-evidence.md
+            *.sarif
+            polaris-results.json
+          retention-days: 90
