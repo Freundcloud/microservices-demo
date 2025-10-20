@@ -608,6 +608,98 @@ source .envrc                              # Reload credentials
 9. **Forgetting to update image tags**: When promoting between environments, update `newTag` values in kustomization.yaml
 10. **Not checking resource quotas**: Deployments fail if namespace quota is exceeded, check with `kubectl describe resourcequota -n <namespace>`
 
+---
+
+## GitHub + ServiceNow Integration Antipatterns
+
+**⚠️ Critical**: These antipatterns can cause security issues, compliance violations, or deployment failures.
+
+### Top 10 Integration Antipatterns to Avoid
+
+1. **🚫 Fire and Forget** - Creating change requests but not waiting for approval
+   - Creates change in ServiceNow, immediately deploys without checking approval status
+   - Defeats the entire purpose of change management
+   - **Fix**: Always poll for approval status before proceeding with deployment
+
+2. **🚫 Credential Exposure** - Hardcoding credentials in workflows
+   - Credentials in plain text in YAML files or logs
+   - Anyone with repo access can see them
+   - **Fix**: Use GitHub Secrets exclusively for all credentials
+
+3. **🚫 Vague Change Descriptions** - Using generic descriptions like "Deploy"
+   - No context for approvers or future audits
+   - Difficult to understand what changed
+   - **Fix**: Include commit SHA, service names, what's changing, why, and impact
+
+4. **🚫 Infinite Timeout** - Waiting forever for approvals
+   - Workflow runs indefinitely if never approved
+   - Wastes GitHub Actions minutes
+   - **Fix**: Set realistic timeouts (2 hours QA, 24 hours prod)
+
+5. **🚫 Silent Failures** - Suppressing errors with `> /dev/null 2>&1`
+   - Hides API errors and failures
+   - Leaves change requests in wrong state
+   - **Fix**: Always check HTTP status codes and response validity
+
+6. **🚫 Assumed Success** - Not verifying deployment actually worked
+   - Marks change as successful even if deployment failed
+   - Incorrect audit trail and metrics
+   - **Fix**: Use `if: success()` and `if: failure()` conditions properly
+
+7. **🚫 One Size Fits All** - Same rules for dev and production
+   - Requires approval for dev (slows iteration)
+   - Or no approval for prod (compliance violation)
+   - **Fix**: Environment-specific risk levels and approval requirements
+
+8. **🚫 Skip Testing** - Deploying directly to production
+   - Uses customers as testers
+   - High change failure rate
+   - **Fix**: Always test in dev, then qa, then prod
+
+9. **🚫 Over-Privileged Accounts** - Using admin account for automation
+   - If compromised, full system access
+   - Can't audit automation vs human actions
+   - **Fix**: Use dedicated service account with minimal required permissions
+
+10. **🚫 Missing Correlation IDs** - No way to track changes back to GitHub
+    - Can't link ServiceNow changes to deployments
+    - No DevOps workspace visibility
+    - **Fix**: Always include correlation_id in change requests
+
+### Quick Detection Checklist
+
+Run through this checklist before committing workflow changes:
+
+**Security**:
+- [ ] ❌ Credentials hardcoded in workflow?
+- [ ] ❌ Credentials logged to output?
+- [ ] ❌ Using admin account?
+
+**Change Management**:
+- [ ] ❌ Change descriptions too vague?
+- [ ] ❌ No implementation/backout/test plans?
+- [ ] ❌ Same risk for all environments?
+
+**Approval Workflow**:
+- [ ] ❌ No approval for production?
+- [ ] ❌ No timeout configured?
+- [ ] ❌ Polling too aggressively (< 15 seconds)?
+
+**Error Handling**:
+- [ ] ❌ Errors suppressed or ignored?
+- [ ] ❌ No validation of API responses?
+- [ ] ❌ Assumes operations always succeed?
+
+**If you checked ANY boxes, you have antipatterns to fix!**
+
+### Documentation
+
+For comprehensive antipattern details, fixes, and examples:
+- **[Complete Antipatterns Guide](docs/GITHUB-SERVICENOW-ANTIPATTERNS.md)** - Detailed explanations
+- **[Integration Guide](docs/GITHUB-SERVICENOW-INTEGRATION-GUIDE.md)** - Correct patterns
+- **[Best Practices](docs/GITHUB-SERVICENOW-BEST-PRACTICES.md)** - How to do it right
+- **[Developer Onboarding](docs/GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md)** - New developer guide
+
 ## Quick Reference Card
 
 | Task | Command |

@@ -10,17 +10,24 @@
 
 **New to ServiceNow integration?** Follow this path:
 
-1. **[Quick Start Guide](SERVICENOW-QUICK-START.md)** (5 minutes)
+1. **[Developer Onboarding](GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md)** 🎓 **NEW!** (30 minutes)
+   - Complete onboarding guide for new developers
+   - Your first deployment walkthrough
+   - Understanding environments and approvals
+   - Common tasks and troubleshooting
+   - **START HERE if you're new to the team!**
+
+2. **[Quick Start Guide](SERVICENOW-QUICK-START.md)** (5 minutes)
    - Prerequisites check
    - First-time setup
    - Verify everything works
 
-2. **[DevOps Change Workspace Access](SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md)** ⭐ (15 minutes)
+3. **[DevOps Change Workspace Access](SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md)** ⭐ (15 minutes)
    - Access the modern workspace
    - Connect GitHub Actions
    - View DORA metrics
 
-3. **[Navigation URLs](SERVICENOW-NAVIGATION-URLS.md)** 🔖 (Bookmark this!)
+4. **[Navigation URLs](SERVICENOW-NAVIGATION-URLS.md)** 🔖 (Bookmark this!)
    - All ServiceNow URLs
    - Quick reference table
    - How to find everything
@@ -132,6 +139,43 @@
   - Custom views
 
 ---
+
+### 📚 GitHub Integration Guides **NEW!**
+
+- **[Complete Integration Guide](GITHUB-SERVICENOW-INTEGRATION-GUIDE.md)** 📖 **COMPREHENSIVE**
+  - Integration architecture overview
+  - Authentication methods (Basic Auth, OAuth, Hybrid)
+  - Implementation examples for all approaches
+  - Decision tree: which approach to use
+  - Migration paths and rollback plans
+  - **Your definitive technical reference**
+
+- **[Best Practices Guide](GITHUB-SERVICENOW-BEST-PRACTICES.md)** ✅ **ESSENTIAL**
+  - Workflow design principles
+  - Security best practices
+  - Change request quality guidelines
+  - Approval management strategies
+  - Error handling & resilience patterns
+  - Testing strategies
+  - Monitoring & observability
+  - **Read this to build production-ready workflows**
+
+- **[Antipatterns Guide](GITHUB-SERVICENOW-ANTIPATTERNS.md)** 🚫 **CRITICAL**
+  - Top 10 integration antipatterns to avoid
+  - Security violations and how to prevent them
+  - Change management pitfalls
+  - Detection checklist for code reviews
+  - Step-by-step remediation guide
+  - **Learn from common mistakes before making them**
+
+- **[Developer Onboarding](GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md)** 🎓 **FOR NEW DEVS**
+  - 30-minute onboarding walkthrough
+  - Your first deployment step-by-step
+  - Understanding dev/qa/prod environments
+  - The approval process explained
+  - Common tasks with examples
+  - Troubleshooting guide
+  - **Perfect for team onboarding**
 
 ### 🔧 Troubleshooting & Fixes
 
@@ -298,6 +342,9 @@ bash scripts/map-service-dependencies.sh
 
 # Setup approval groups
 bash scripts/setup-servicenow-approvals.sh
+
+# Workflow examples (source for reusable functions)
+source scripts/servicenow-workflow-examples.sh
 ```
 
 ### GitHub Secrets Required

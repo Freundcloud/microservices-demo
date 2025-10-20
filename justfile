@@ -508,6 +508,12 @@ sn-discover:
     @echo "📊 Watch progress: gh run watch"
     @echo "🔗 ServiceNow: Configuration > CMDB > EKS Clusters"
 
+# Diagnose ServiceNow DevOps Change Workspace integration
+sn-diagnose:
+    @echo "🔍 Diagnosing ServiceNow DevOps integration..."
+    @echo ""
+    @./scripts/diagnose-servicenow.sh
+
 # View ServiceNow workflow status
 sn-status:
     @echo "📊 ServiceNow Integration Status"
