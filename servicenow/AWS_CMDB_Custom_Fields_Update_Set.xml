@@ -1,0 +1,828 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2025-10-20 12:00:00">
+  <sys_remote_update_set action="INSERT_OR_UPDATE">
+    <application display_value="Global">global</application>
+    <application_name>Global</application_name>
+    <application_scope>global</application_scope>
+    <application_version/>
+    <collisions/>
+    <commit_date/>
+    <deleted/>
+    <description>Custom fields for AWS Infrastructure Discovery integration. Adds all required u_* fields to CMDB tables for VPC, Subnets, Security Groups, EKS, ElastiCache, ECR, and IAM resources.</description>
+    <inserted/>
+    <name>AWS CMDB Custom Fields</name>
+    <origin_sys_id/>
+    <parent display_value=""/>
+    <release_date/>
+    <remote_base_update_set display_value=""/>
+    <remote_sys_id/>
+    <state>loaded</state>
+    <summary/>
+    <sys_class_name>sys_remote_update_set</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-20 12:00:00</sys_created_on>
+    <sys_id>aws_cmdb_custom_fields_001</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-10-20 12:00:00</sys_updated_on>
+    <update_set display_value=""/>
+    <update_source display_value=""/>
+    <updated/>
+  </sys_remote_update_set>
+
+  <!-- VPC Fields (cmdb_ci_network) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <array>false</array>
+    <attributes/>
+    <audit>false</audit>
+    <calculation/>
+    <choice>0</choice>
+    <choice_field/>
+    <choice_table/>
+    <column_label>VPC ID</column_label>
+    <comments/>
+    <create_roles/>
+    <default_value/>
+    <defaultsort/>
+    <delete_roles/>
+    <dependent/>
+    <dependent_on_field/>
+    <display>false</display>
+    <dynamic_creation>false</dynamic_creation>
+    <dynamic_creation_script/>
+    <dynamic_default_value/>
+    <dynamic_ref_qual/>
+    <element>u_vpc_id</element>
+    <element_reference>false</element_reference>
+    <foreign_database/>
+    <formula/>
+    <function_definition/>
+    <function_field>false</function_field>
+    <internal_type display_value="String">string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network</name>
+    <next_element/>
+    <primary>false</primary>
+    <read_only>false</read_only>
+    <read_roles/>
+    <reference/>
+    <reference_cascade_rule/>
+    <reference_floats>false</reference_floats>
+    <reference_key/>
+    <reference_qual/>
+    <reference_qual_condition/>
+    <reference_type/>
+    <spell_check>false</spell_check>
+    <staged>false</staged>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-10-20 12:00:00</sys_created_on>
+    <sys_name>VPC ID</sys_name>
+    <text_index>false</text_index>
+    <unique>false</unique>
+    <use_dependent_field>false</use_dependent_field>
+    <use_dynamic_default>false</use_dynamic_default>
+    <use_reference_qualifier>simple</use_reference_qualifier>
+    <virtual>false</virtual>
+    <virtual_type>script</virtual_type>
+    <widget/>
+    <write_roles/>
+    <xml_view>false</xml_view>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cidr_block</element>
+    <column_label>CIDR Block</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_region</element>
+    <column_label>AWS Region</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_provider</element>
+    <column_label>Cloud Provider</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_enable_dns_support</element>
+    <column_label>Enable DNS Support</column_label>
+    <internal_type>boolean</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_enable_dns_hostnames</element>
+    <column_label>Enable DNS Hostnames</column_label>
+    <internal_type>boolean</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_network</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- Subnet Fields (cmdb_ci_network_segment) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_subnet_id</element>
+    <column_label>Subnet ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cidr_block</element>
+    <column_label>CIDR Block</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_availability_zone</element>
+    <column_label>Availability Zone</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_vpc_id</element>
+    <column_label>VPC ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_is_public</element>
+    <column_label>Is Public</column_label>
+    <internal_type>boolean</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_available_ips</element>
+    <column_label>Available IPs</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_network_segment</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- Security Group Fields (cmdb_ci_firewall) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_security_group_id</element>
+    <column_label>Security Group ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_firewall</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_vpc_id</element>
+    <column_label>VPC ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_firewall</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_ingress_rules</element>
+    <column_label>Ingress Rules Count</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_firewall</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_egress_rules</element>
+    <column_label>Egress Rules Count</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_firewall</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_firewall</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_firewall</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- NAT Gateway Fields (cmdb_ci_network_adapter) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_nat_gateway_id</element>
+    <column_label>NAT Gateway ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_adapter</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_subnet_id</element>
+    <column_label>Subnet ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_adapter</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_vpc_id</element>
+    <column_label>VPC ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_adapter</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_allocation_id</element>
+    <column_label>Elastic IP Allocation ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_adapter</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_public_ip</element>
+    <column_label>Public IP Address</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_network_adapter</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_network_adapter</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- ElastiCache Redis Fields (cmdb_ci_database_instance) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cache_cluster_id</element>
+    <column_label>Cache Cluster ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_replication_group_id</element>
+    <column_label>Replication Group ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cache_node_type</element>
+    <column_label>Node Type</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_engine</element>
+    <column_label>Engine</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_engine_version</element>
+    <column_label>Engine Version</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_num_cache_nodes</element>
+    <column_label>Number of Cache Nodes</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cache_subnet_group</element>
+    <column_label>Cache Subnet Group</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cache_parameter_group</element>
+    <column_label>Parameter Group</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_vpc_id</element>
+    <column_label>VPC ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_database_instance</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- ECR Repository Fields (cmdb_ci_app_server) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_repository_name</element>
+    <column_label>Repository Name</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_repository_arn</element>
+    <column_label>Repository ARN</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_repository_uri</element>
+    <column_label>Repository URI</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_registry_id</element>
+    <column_label>Registry ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_region</element>
+    <column_label>AWS Region</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_image_scan_on_push</element>
+    <column_label>Image Scan on Push</column_label>
+    <internal_type>boolean</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_app_server</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- IAM Role Fields (cmdb_ci_service_account) -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_role_arn</element>
+    <column_label>Role ARN</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_role_id</element>
+    <column_label>Role ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_assume_role_policy</element>
+    <column_label>Assume Role Policy</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>4000</max_length>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_path</element>
+    <column_label>IAM Path</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_max_session_duration</element>
+    <column_label>Max Session Duration</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>cmdb_ci_service_account</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <!-- EKS Cluster Fields (u_eks_cluster) - Note: Custom table must exist -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cluster_name</element>
+    <column_label>Cluster Name</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cluster_arn</element>
+    <column_label>Cluster ARN</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cluster_version</element>
+    <column_label>Kubernetes Version</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>20</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_cluster_endpoint</element>
+    <column_label>Cluster Endpoint</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>255</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_region</element>
+    <column_label>AWS Region</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_vpc_id</element>
+    <column_label>VPC ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_node_groups_count</element>
+    <column_label>Node Groups Count</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_last_discovered</element>
+    <column_label>Last Discovered</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_discovered_by</element>
+    <column_label>Discovered By</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>u_eks_cluster</name>
+    <read_only>false</read_only>
+    <sys_class_name>sys_dictionary</sys_class_name>
+  </sys_dictionary>
+
+</unload>

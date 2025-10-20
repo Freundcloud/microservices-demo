@@ -1,0 +1,160 @@
+name: Setup ServiceNow CMDB for AWS Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (check existing fields without creating new ones)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+  SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+  SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+
+permissions:
+  contents: read
+
+jobs:
+  setup-custom-fields:
+    name: Setup Custom Fields in ServiceNow CMDB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate ServiceNow credentials
+        run: |
+          if [[ -z "$SERVICENOW_INSTANCE_URL" || -z "$SERVICENOW_USERNAME" || -z "$SERVICENOW_PASSWORD" ]]; then
+            echo "::error::ServiceNow credentials not configured"
+            echo "Please configure the following secrets:"
+            echo "  - SERVICENOW_INSTANCE_URL"
+            echo "  - SERVICENOW_USERNAME"
+            echo "  - SERVICENOW_PASSWORD"
+            exit 1
+          fi
+
+          echo "✅ ServiceNow credentials configured"
+          echo "Instance: $SERVICENOW_INSTANCE_URL"
+          echo "Username: $SERVICENOW_USERNAME"
+
+      - name: Test ServiceNow connection
+        run: |
+          BASIC_AUTH=$(echo -n "${SERVICENOW_USERNAME}:${SERVICENOW_PASSWORD}" | base64)
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            "${SERVICENOW_INSTANCE_URL}/api/now/table/sys_user?sysparm_limit=1" \
+            -H "Authorization: Basic ${BASIC_AUTH}" \
+            -H "Accept: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Failed to connect to ServiceNow (HTTP ${HTTP_CODE})"
+            echo "$RESPONSE" | sed '$d'
+            exit 1
+          fi
+
+          echo "✅ Successfully connected to ServiceNow"
+
+      - name: Run custom fields setup (dry run)
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          echo "🔍 Running in DRY RUN mode - checking existing fields only"
+          echo ""
+
+          # Override the create function to only check, not create
+          export DRY_RUN=true
+          bash scripts/setup-servicenow-fields.sh
+        continue-on-error: true
+
+      - name: Run custom fields setup
+        if: ${{ inputs.dry_run != true }}
+        id: setup
+        run: |
+          echo "🚀 Creating custom fields in ServiceNow CMDB"
+          echo ""
+
+          bash scripts/setup-servicenow-fields.sh | tee setup-output.log
+
+          # Extract summary
+          TOTAL=$(grep "Total fields processed:" setup-output.log | awk '{print $NF}')
+          CREATED=$(grep "^Created:" setup-output.log | awk '{print $NF}')
+          EXISTING=$(grep "^Already existed:" setup-output.log | awk '{print $NF}')
+          FAILED=$(grep "^Failed:" setup-output.log | awk '{print $NF}')
+
+          echo "total_fields=$TOTAL" >> $GITHUB_OUTPUT
+          echo "created_fields=$CREATED" >> $GITHUB_OUTPUT
+          echo "existing_fields=$EXISTING" >> $GITHUB_OUTPUT
+          echo "failed_fields=$FAILED" >> $GITHUB_OUTPUT
+
+      - name: Generate summary
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # ✅ ServiceNow CMDB Setup Complete
+
+          ## Summary
+
+          | Metric | Count |
+          |--------|-------|
+          | Total Fields | ${{ steps.setup.outputs.total_fields }} |
+          | ✅ Created | ${{ steps.setup.outputs.created_fields }} |
+          | ⚠️ Already Existed | ${{ steps.setup.outputs.existing_fields }} |
+          | ❌ Failed | ${{ steps.setup.outputs.failed_fields }} |
+
+          ## Tables Configured
+
+          - ✅ **cmdb_ci_network** - VPC resources
+          - ✅ **cmdb_ci_network_segment** - Subnet resources
+          - ✅ **cmdb_ci_firewall** - Security Groups
+          - ✅ **cmdb_ci_network_adapter** - NAT Gateways
+          - ✅ **u_eks_cluster** - EKS Clusters (custom table)
+          - ✅ **cmdb_ci_database_instance** - ElastiCache Redis
+          - ✅ **cmdb_ci_app_server** - ECR Repositories
+          - ✅ **cmdb_ci_service_account** - IAM Roles
+
+          ## Next Steps
+
+          1. ✅ Custom fields are now configured
+          2. 🚀 Run the [AWS Infrastructure Discovery workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/aws-infrastructure-discovery.yaml)
+          3. 🔍 Verify data in ServiceNow CMDB tables
+          4. 📊 View infrastructure topology in ServiceNow
+
+          ## ServiceNow Access
+
+          - **Instance**: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          - **CMDB**: Navigate to **Configuration → Configuration Management → All Configuration Items**
+          - **Relationships**: View **Configuration → Relationship Types** to see VPC → Subnet relationships
+
+          ## Troubleshooting
+
+          If you see failed fields:
+          1. Check ServiceNow admin permissions for the user
+          2. Verify table exists (especially **u_eks_cluster** custom table)
+          3. Review detailed logs above for specific error messages
+          4. Consult [AWS-INFRASTRUCTURE-DISCOVERY-GUIDE.md](docs/AWS-INFRASTRUCTURE-DISCOVERY-GUIDE.md)
+          EOF
+
+      - name: Upload setup logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: servicenow-setup-logs
+          path: setup-output.log
+          retention-days: 30
+
+      - name: Check for failures
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          FAILED=${{ steps.setup.outputs.failed_fields }}
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED field(s) failed to create"
+            echo "Review the logs above for details"
+            exit 1
+          fi
+
+          echo "✅ All fields created successfully!"

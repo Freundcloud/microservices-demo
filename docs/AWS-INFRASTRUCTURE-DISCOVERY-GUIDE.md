@@ -261,6 +261,137 @@ u_last_discovered (Date/Time)
 
 **Note**: The workflow uses `u_eks_cluster` custom table from the existing EKS discovery workflow.
 
+### Setting Up Custom Fields (3 Methods)
+
+You have **three options** to create the required custom fields in ServiceNow:
+
+#### Method 1: Import Update Set XML (Recommended - Fastest)
+
+**Perfect for:** First-time setup, bulk field creation
+
+1. **Download the Update Set**
+   - File: [servicenow/AWS_CMDB_Custom_Fields_Update_Set.xml](../servicenow/AWS_CMDB_Custom_Fields_Update_Set.xml)
+   - Contains all 63 custom fields for all tables
+
+2. **Import in ServiceNow**
+   - Navigate to: **System Update Sets → Retrieved Update Sets**
+   - Click: **Import Update Set from XML**
+   - Upload: `AWS_CMDB_Custom_Fields_Update_Set.xml`
+   - Click: **Preview Update Set**
+   - Click: **Commit Update Set**
+
+3. **Verify Installation**
+   - Navigate to: **System Definition → Dictionary**
+   - Filter by: "Column label" starting with "u_"
+   - Verify: All fields are present
+
+**Time:** ~2 minutes
+**See:** [servicenow/README.md](../servicenow/README.md) for detailed instructions
+
+#### Method 2: Run GitHub Actions Workflow (Automated API)
+
+**Perfect for:** Automation, CI/CD pipelines, repeatable setups
+
+1. **Prerequisites**
+   - ServiceNow credentials configured as GitHub secrets:
+     - `SERVICENOW_INSTANCE_URL`
+     - `SERVICENOW_USERNAME`
+     - `SERVICENOW_PASSWORD`
+
+2. **Run Workflow**
+
+   ```bash
+   # Via GitHub Actions UI
+   Actions → Setup ServiceNow CMDB for AWS Discovery → Run workflow
+
+   # Via GitHub CLI
+   gh workflow run setup-servicenow-cmdb.yaml
+   ```
+
+3. **Dry Run Mode (Optional)**
+   - Check existing fields without creating new ones:
+
+   ```bash
+   gh workflow run setup-servicenow-cmdb.yaml -f dry_run=true
+   ```
+
+4. **Review Results**
+   - Check workflow summary for:
+     - Total fields processed
+     - Created fields
+     - Already existing fields
+     - Any failures
+
+**Time:** ~3-5 minutes
+**Workflow:** [.github/workflows/setup-servicenow-cmdb.yaml](../.github/workflows/setup-servicenow-cmdb.yaml)
+
+#### Method 3: Run Shell Script (Local Execution)
+
+**Perfect for:** Local development, testing, custom automation
+
+1. **Set Environment Variables**
+
+   ```bash
+   export SERVICENOW_INSTANCE_URL="https://your-instance.service-now.com"
+   export SERVICENOW_USERNAME="admin"
+   export SERVICENOW_PASSWORD="your-password"
+   ```
+
+2. **Run Setup Script**
+
+   ```bash
+   cd /path/to/microservices-demo
+   bash scripts/setup-servicenow-fields.sh
+   ```
+
+3. **Review Output**
+   - Script shows progress for each field
+   - Color-coded results: ✅ Created, ⚠️ Exists, ❌ Failed
+   - Summary at the end
+
+**Time:** ~2-3 minutes
+**Script:** [scripts/setup-servicenow-fields.sh](../scripts/setup-servicenow-fields.sh)
+
+### Comparison of Setup Methods
+
+| Method | Speed | Prerequisites | Use Case | Rollback |
+|--------|-------|---------------|----------|----------|
+| **Update Set XML** | ⚡⚡⚡ Fastest | ServiceNow UI access | First-time setup | Native rollback |
+| **GitHub Actions** | ⚡⚡ Fast | GitHub + Secrets | Automation, CI/CD | Re-run workflow |
+| **Shell Script** | ⚡⚡ Fast | CLI + Credentials | Local testing | Manual deletion |
+
+### Verification After Setup
+
+**Via ServiceNow UI:**
+
+```
+1. System Definition → Dictionary
+2. Filter: "Name" = one of the tables (e.g., cmdb_ci_network)
+3. Filter: "Column label" starts with "u_"
+4. Expected: 6-11 fields per table (total 63 fields)
+```
+
+**Via API:**
+
+```bash
+curl -X GET \
+  "${SERVICENOW_INSTANCE_URL}/api/now/table/sys_dictionary?sysparm_query=name=cmdb_ci_network^elementSTARTSWITHu_&sysparm_fields=element,column_label" \
+  -H "Authorization: Basic $(echo -n "${SERVICENOW_USERNAME}:${SERVICENOW_PASSWORD}" | base64)"
+```
+
+**Expected Tables & Field Counts:**
+
+- `cmdb_ci_network` - 8 fields (VPC)
+- `cmdb_ci_network_segment` - 8 fields (Subnets)
+- `cmdb_ci_firewall` - 6 fields (Security Groups)
+- `cmdb_ci_network_adapter` - 6 fields (NAT Gateways)
+- `cmdb_ci_database_instance` - 11 fields (Redis)
+- `cmdb_ci_app_server` - 8 fields (ECR)
+- `cmdb_ci_service_account` - 7 fields (IAM)
+- `u_eks_cluster` - 9 fields (EKS)
+
+**Total:** 63 custom fields
+
 ---
 
 ## Usage
