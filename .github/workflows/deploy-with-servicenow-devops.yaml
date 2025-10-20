@@ -46,16 +46,14 @@ jobs:
           # Change request details (JSON format)
           change-request: |
             {
-              "setCloseCode": "true",
-              "autoCloseChange": ${{ github.event.inputs.environment == 'dev' }},
+              "autoCloseChange": true,
               "attributes": {
-                "short_description": "Deploy Online Boutique microservices to ${{ github.event.inputs.environment }}",
-                "description": "Automated deployment of 11 microservices via GitHub Actions.\n\nApplication: Online Boutique\nEnvironment: ${{ github.event.inputs.environment }}\nCommit: ${{ github.sha }}\nRepository: ${{ github.repository }}\nTriggered by: ${{ github.actor }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                "implementation_plan": "1. Run security scans\n2. Deploy using Kustomize to namespace: microservices-${{ github.event.inputs.environment }}\n3. Wait for all deployments to become ready\n4. Verify pod health checks\n5. Update ServiceNow with deployment status",
-                "backout_plan": "kubectl rollout undo deployment/<service> -n microservices-${{ github.event.inputs.environment }}\nOR\nkubectl delete -k kustomize/overlays/${{ github.event.inputs.environment }}",
-                "test_plan": "1. Check all pods status: kubectl get pods -n microservices-${{ github.event.inputs.environment }}\n2. Verify service endpoints are accessible\n3. Run health checks on all services\n4. Monitor Istio metrics and logs",
-                "type": "normal",
-                "assignment_group": "Change Management"
+                "short_description": "Deploy Online Boutique to ${{ github.event.inputs.environment }}",
+                "description": "Automated deployment via GitHub Actions\n\nEnvironment: ${{ github.event.inputs.environment }}\nCommit: ${{ github.sha }}\nRepository: ${{ github.repository }}\nTriggered by: ${{ github.actor }}",
+                "implementation_plan": "Deploy using Kustomize to namespace microservices-${{ github.event.inputs.environment }}",
+                "backout_plan": "kubectl rollout undo deployment -n microservices-${{ github.event.inputs.environment }}",
+                "test_plan": "Verify all pods are running and healthy",
+                "type": "normal"
               }
             }
 
