@@ -43,19 +43,8 @@ jobs:
           context-github: ${{ toJSON(github) }}
           job-name: 'Create Change Request'
 
-          # Change request details (JSON format)
-          change-request: |
-            {
-              "autoCloseChange": true,
-              "attributes": {
-                "short_description": "Deploy Online Boutique to ${{ github.event.inputs.environment }}",
-                "description": "Automated deployment via GitHub Actions\n\nEnvironment: ${{ github.event.inputs.environment }}\nCommit: ${{ github.sha }}\nRepository: ${{ github.repository }}\nTriggered by: ${{ github.actor }}",
-                "implementation_plan": "Deploy using Kustomize to namespace microservices-${{ github.event.inputs.environment }}",
-                "backout_plan": "kubectl rollout undo deployment -n microservices-${{ github.event.inputs.environment }}",
-                "test_plan": "Verify all pods are running and healthy",
-                "type": "normal"
-              }
-            }
+          # Change request details (JSON format) - based on ServiceNow official examples
+          change-request: '{"setCloseCode":"true","autoCloseChange":true,"attributes":{"short_description":"Deploy Online Boutique microservices to ${{ github.event.inputs.environment }}","description":"Automated deployment via GitHub Actions. Repository: ${{ github.repository }}, Commit: ${{ github.sha }}, Triggered by: ${{ github.actor }}","implementation_plan":"1. Deploy using Kustomize overlay for ${{ github.event.inputs.environment }}\n2. Apply to namespace: microservices-${{ github.event.inputs.environment }}\n3. Wait for all deployments to become ready\n4. Verify pod health checks","backout_plan":"When deployment fails, rollback using: kubectl rollout undo deployment -n microservices-${{ github.event.inputs.environment }} OR kubectl delete -k kustomize/overlays/${{ github.event.inputs.environment }}","test_plan":"Testing if microservices were successfully deployed: kubectl get pods -n microservices-${{ github.event.inputs.environment }}, verify all pods Running, check health endpoints"}}'
 
           # Polling settings (check approval status)
           interval: '30'      # Check every 30 seconds
