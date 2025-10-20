@@ -121,10 +121,7 @@ resource "aws_ecr_repository_policy" "microservices" {
         Effect = "Allow"
         Principal = {
           AWS = [
-            module.eks.eks_managed_node_groups["system"].iam_role_arn,
-            module.eks.eks_managed_node_groups["dev"].iam_role_arn,
-            module.eks.eks_managed_node_groups["qa"].iam_role_arn,
-            module.eks.eks_managed_node_groups["prod"].iam_role_arn
+            module.eks.eks_managed_node_groups["all"].iam_role_arn
           ]
         }
         Action = [

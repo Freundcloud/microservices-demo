@@ -1,5 +1,25 @@
 name: Deploy with ServiceNow (Hybrid - REST API + Correlation)
 
+# 📖 WORKFLOW DESCRIPTION
+# This workflow demonstrates best practices for GitHub + ServiceNow integration:
+# ✅ REST API (works without IntegrationHub plugins)
+# ✅ Correlation IDs for DevOps workspace tracking
+# ✅ Environment-specific risk assessment (dev/qa/prod)
+# ✅ Multi-level approval workflow with smart polling
+# ✅ Automated rollback on failure
+# ✅ Comprehensive error handling with retry logic
+# ✅ Rich observability and metrics
+#
+# 🎯 Use this workflow when:
+# - IntegrationHub plugins are not available
+# - You need reliable, well-tested integration
+# - You want full control over the integration
+#
+# 📚 For more information, see:
+# - docs/GITHUB-SERVICENOW-INTEGRATION-GUIDE.md
+# - docs/GITHUB-SERVICENOW-BEST-PRACTICES.md
+# - docs/GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md
+
 on:
   workflow_dispatch:
     inputs:
@@ -57,7 +77,7 @@ jobs:
             echo "auto_close=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Change Request via REST API
+      - name: Create Change Request via REST API with Retry
         id: create-cr
         run: |
           ENV="${{ github.event.inputs.environment }}"
@@ -68,59 +88,151 @@ jobs:
           CORRELATION_ID="github-${{ github.repository }}-${{ github.run_id }}-${{ github.run_number }}"
 
           # Create change request payload with DevOps correlation fields
-          PAYLOAD=$(cat <<EOF
+          PAYLOAD=$(cat <<'EOF'
           {
-            "short_description": "Deploy Online Boutique to $ENV",
-            "description": "Automated deployment via GitHub Actions.\n\nApplication: Online Boutique\nEnvironment: $ENV\nCommit: ${{ github.sha }}\nRepository: ${{ github.repository }}\nTriggered by: ${{ github.actor }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "implementation_plan": "1. Run security scans\n2. Build and validate Kubernetes manifests\n3. Deploy to EKS cluster namespace: microservices-$ENV\n4. Verify all pods running\n5. Update ServiceNow CMDB",
-            "backout_plan": "kubectl rollout undo deployment -n microservices-$ENV\nOR\nkubectl delete -k kustomize/overlays/$ENV",
-            "test_plan": "1. Check all pods status: kubectl get pods -n microservices-$ENV\n2. Verify service endpoints\n3. Run health checks\n4. Monitor Istio metrics",
-            "risk": "${{ steps.settings.outputs.risk }}",
-            "priority": "${{ steps.settings.outputs.priority }}",
-            "assignment_group": "${{ steps.settings.outputs.assignment_group }}",
-            "state": "${{ steps.settings.outputs.state }}",
+            "short_description": "Deploy Online Boutique to ENV_PLACEHOLDER",
+            "description": "Automated deployment via GitHub Actions.\n\nApplication: Online Boutique\nEnvironment: ENV_PLACEHOLDER\nCommit: COMMIT_PLACEHOLDER\nRepository: REPO_PLACEHOLDER\nTriggered by: ACTOR_PLACEHOLDER\nRun: RUN_URL_PLACEHOLDER",
+            "implementation_plan": "1. Run security scans\n2. Build and validate Kubernetes manifests\n3. Deploy to EKS cluster namespace: microservices-ENV_PLACEHOLDER\n4. Verify all pods running\n5. Update ServiceNow CMDB",
+            "backout_plan": "kubectl rollout undo deployment -n microservices-ENV_PLACEHOLDER\nOR\nkubectl delete -k kustomize/overlays/ENV_PLACEHOLDER",
+            "test_plan": "1. Check all pods status: kubectl get pods -n microservices-ENV_PLACEHOLDER\n2. Verify service endpoints\n3. Run health checks\n4. Monitor Istio metrics",
+            "risk": "RISK_PLACEHOLDER",
+            "priority": "PRIORITY_PLACEHOLDER",
+            "assignment_group": "GROUP_PLACEHOLDER",
+            "state": "STATE_PLACEHOLDER",
             "type": "standard",
-            "requested_by": "${{ secrets.SERVICENOW_USERNAME }}",
-            "business_service": "$APP_SYS_ID",
-            "cmdb_ci": "$APP_SYS_ID",
+            "requested_by": "USER_PLACEHOLDER",
+            "business_service": "APP_SYS_ID_PLACEHOLDER",
+            "cmdb_ci": "APP_SYS_ID_PLACEHOLDER",
             "u_application": "Online Boutique",
-            "u_environment": "$ENV",
-            "correlation_id": "$CORRELATION_ID",
-            "correlation_display": "GitHub Actions Run #${{ github.run_number }}",
+            "u_environment": "ENV_PLACEHOLDER",
+            "correlation_id": "CORRELATION_ID_PLACEHOLDER",
+            "correlation_display": "GitHub Actions Run #RUN_NUM_PLACEHOLDER",
             "u_source": "GitHub Actions",
-            "work_notes": "Created by GitHub Actions workflow: ${{ github.workflow }}\nRun ID: ${{ github.run_id }}\nCommit: ${{ github.sha }}\nActor: ${{ github.actor }}"
+            "work_notes": "Created by GitHub Actions workflow: WORKFLOW_PLACEHOLDER\nRun ID: RUN_ID_PLACEHOLDER\nCommit: COMMIT_PLACEHOLDER\nActor: ACTOR_PLACEHOLDER"
           }
           EOF
           )
 
+          # Replace placeholders
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s/ENV_PLACEHOLDER/$ENV/g" | \
+            sed "s|COMMIT_PLACEHOLDER|${{ github.sha }}|g" | \
+            sed "s|REPO_PLACEHOLDER|${{ github.repository }}|g" | \
+            sed "s|ACTOR_PLACEHOLDER|${{ github.actor }}|g" | \
+            sed "s|RUN_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g" | \
+            sed "s/RISK_PLACEHOLDER/${{ steps.settings.outputs.risk }}/g" | \
+            sed "s/PRIORITY_PLACEHOLDER/${{ steps.settings.outputs.priority }}/g" | \
+            sed "s/GROUP_PLACEHOLDER/${{ steps.settings.outputs.assignment_group }}/g" | \
+            sed "s/STATE_PLACEHOLDER/${{ steps.settings.outputs.state }}/g" | \
+            sed "s/USER_PLACEHOLDER/${{ secrets.SERVICENOW_USERNAME }}/g" | \
+            sed "s/APP_SYS_ID_PLACEHOLDER/$APP_SYS_ID/g" | \
+            sed "s/CORRELATION_ID_PLACEHOLDER/$CORRELATION_ID/g" | \
+            sed "s/RUN_NUM_PLACEHOLDER/${{ github.run_number }}/g" | \
+            sed "s|WORKFLOW_PLACEHOLDER|${{ github.workflow }}|g" | \
+            sed "s|RUN_ID_PLACEHOLDER|${{ github.run_id }}|g")
+
           # Create Basic Auth
           BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
 
-          # Create change request
-          RESPONSE=$(curl -s -X POST \
-            -H "Authorization: Basic $BASIC_AUTH" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request")
+          # Retry logic with exponential backoff
+          MAX_RETRIES=3
+          RETRY_DELAY=5
+          ATTEMPT=1
 
-          # Extract change number and sys_id
-          CHANGE_NUMBER=$(echo "$RESPONSE" | jq -r '.result.number')
-          CHANGE_SYS_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id')
+          echo "🔄 Creating change request with retry logic..." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "$CHANGE_NUMBER" == "null" ] || [ -z "$CHANGE_NUMBER" ]; then
-            echo "Failed to create change request"
-            echo "$RESPONSE" | jq .
-            exit 1
-          fi
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "🔄 Attempt $ATTEMPT of $MAX_RETRIES..."
 
-          echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
-          echo "change_sys_id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
+            # Make API call and capture HTTP code
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request")
 
-          echo "✅ Change Request Created: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "**Number**: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "**Sys ID**: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
-          echo "**Correlation ID**: $CORRELATION_ID" >> $GITHUB_STEP_SUMMARY
-          echo "**View**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+            # Split response and HTTP code
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            # Success (201 Created)
+            if [ "$HTTP_CODE" == "201" ]; then
+              CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.number')
+              CHANGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+
+              if [ "$CHANGE_NUMBER" != "null" ] && [ -n "$CHANGE_NUMBER" ]; then
+                echo "✅ Success on attempt $ATTEMPT: $CHANGE_NUMBER"
+
+                # Set outputs
+                echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+                echo "change_sys_id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
+
+                # Create enhanced summary
+                echo "## ✅ Change Request Created Successfully" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+                echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+                echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+                echo "| **System ID** | \`$CHANGE_SYS_ID\` |" >> $GITHUB_STEP_SUMMARY
+                echo "| **Correlation ID** | \`$CORRELATION_ID\` |" >> $GITHUB_STEP_SUMMARY
+                echo "| **Environment** | \`$ENV\` |" >> $GITHUB_STEP_SUMMARY
+                echo "| **Risk Level** | $([ \"$ENV\" == \"dev\" ] && echo \"🟢 Low (3)\" || [ \"$ENV\" == \"qa\" ] && echo \"🟡 Medium (2)\" || echo \"🔴 High (1)\") |" >> $GITHUB_STEP_SUMMARY
+                echo "| **Attempts** | $ATTEMPT / $MAX_RETRIES |" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "🔗 **Quick Links**:" >> $GITHUB_STEP_SUMMARY
+                echo "- [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+                echo "- [DevOps Workspace](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home)" >> $GITHUB_STEP_SUMMARY
+
+                exit 0
+              fi
+            fi
+
+            # Retryable errors (5xx server errors)
+            if [[ "$HTTP_CODE" =~ ^5 ]]; then
+              echo "⚠️ Server error (HTTP $HTTP_CODE) on attempt $ATTEMPT"
+              echo "Response: $BODY" | jq . || echo "$BODY"
+
+              if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+                echo "⏳ Retrying in ${RETRY_DELAY} seconds..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))  # Exponential backoff: 5s, 10s, 20s
+                ATTEMPT=$((ATTEMPT + 1))
+                continue
+              fi
+            fi
+
+            # Non-retryable errors (4xx client errors)
+            if [[ "$HTTP_CODE" =~ ^4 ]]; then
+              echo "❌ Client error (HTTP $HTTP_CODE) - not retrying"
+              echo "Response: $BODY" | jq . || echo "$BODY"
+
+              echo "## ❌ Failed to Create Change Request" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Error**: HTTP $HTTP_CODE (Client Error)" >> $GITHUB_STEP_SUMMARY
+              echo "**Attempts**: $ATTEMPT / $MAX_RETRIES" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Response**:" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+              echo "$BODY" | jq . || echo "$BODY" >> $GITHUB_STEP_SUMMARY
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+
+            # Unexpected response
+            echo "❌ Unexpected response (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+
+          # All retries exhausted
+          echo "## ❌ Failed After $MAX_RETRIES Attempts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Last HTTP Code**: $HTTP_CODE" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Attempts**: $MAX_RETRIES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ ServiceNow API did not respond successfully after $MAX_RETRIES attempts with exponential backoff" >> $GITHUB_STEP_SUMMARY
+
+          exit 1
 
   # Job 2: Wait for Approval (QA and Prod only)
   wait-for-approval:
@@ -130,7 +242,7 @@ jobs:
     if: github.event.inputs.environment != 'dev'
 
     steps:
-      - name: Wait for ServiceNow approval
+      - name: Wait for ServiceNow approval with Smart Polling
         run: |
           CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
           CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
@@ -148,35 +260,138 @@ jobs:
 
           POLL_INTERVAL=30  # 30 seconds
           ELAPSED=0
+          WARNING_THRESHOLD=$((TIMEOUT * 80 / 100))  # 80% of timeout
+          WARNING_SHOWN=false
 
-          echo "⏸️  Waiting for approval on $CHANGE_NUMBER..." >> $GITHUB_STEP_SUMMARY
-          echo "**Change Request**: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment**: $ENV" >> $GITHUB_STEP_SUMMARY
-          echo "**Timeout**: $((TIMEOUT / 3600)) hours" >> $GITHUB_STEP_SUMMARY
+          # Initial summary
+          echo "## ⏸️  Waiting for ServiceNow Approval" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Approve in ServiceNow: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | \`$ENV\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Timeout** | $((TIMEOUT / 3600)) hours |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Poll Interval** | ${POLL_INTERVAL}s |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **Approve in ServiceNow**: [$CHANGE_NUMBER](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Helper function: Format seconds to HH:MM:SS
+          format_time() {
+            local seconds=$1
+            printf "%02d:%02d:%02d" $((seconds / 3600)) $(((seconds % 3600) / 60)) $((seconds % 60))
+          }
+
+          # Helper function: Generate progress bar
+          generate_progress_bar() {
+            local current=$1
+            local total=$2
+            local width=40
+            local percentage=$((current * 100 / total))
+            local filled=$((width * current / total))
+            local empty=$((width - filled))
+
+            printf "["
+            printf "%${filled}s" | tr ' ' '█'
+            printf "%${empty}s" | tr ' ' '░'
+            printf "] %3d%%" "$percentage"
+          }
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🕐 Polling for approval... (Press Ctrl+C to cancel)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            # Get change request state
-            RESPONSE=$(curl -s -H "Authorization: Basic $BASIC_AUTH" \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID?sysparm_fields=state,approval,approval_set")
+            # Get change request state with retry
+            MAX_RETRIES=3
+            RETRY_COUNT=0
+            POLL_SUCCESS=false
 
-            STATE=$(echo "$RESPONSE" | jq -r '.result.state')
-            APPROVAL=$(echo "$RESPONSE" | jq -r '.result.approval')
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              RESPONSE=$(curl -s -w "\n%{http_code}" -H "Authorization: Basic $BASIC_AUTH" \
+                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID?sysparm_fields=state,approval,approval_set" 2>/dev/null)
 
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] State: $STATE, Approval: $APPROVAL (Elapsed: ${ELAPSED}s / ${TIMEOUT}s)"
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | sed '$d')
+
+              if [ "$HTTP_CODE" == "200" ]; then
+                STATE=$(echo "$BODY" | jq -r '.result.state')
+                APPROVAL=$(echo "$BODY" | jq -r '.result.approval')
+                POLL_SUCCESS=true
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "⚠️  Poll failed (HTTP $HTTP_CODE), retry $RETRY_COUNT of $MAX_RETRIES..."
+                sleep 5
+              fi
+            done
+
+            if [ "$POLL_SUCCESS" = false ]; then
+              echo "❌ Failed to poll ServiceNow after $MAX_RETRIES attempts"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "❌ **Polling failed** - Could not reach ServiceNow API" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+
+            # Calculate progress
+            PERCENTAGE=$((ELAPSED * 100 / TIMEOUT))
+            PROGRESS_BAR=$(generate_progress_bar $ELAPSED $TIMEOUT)
+            TIME_ELAPSED=$(format_time $ELAPSED)
+            TIME_REMAINING=$(format_time $((TIMEOUT - ELAPSED)))
+
+            # Display progress
+            echo "⏱️  $TIME_ELAPSED elapsed | $TIME_REMAINING remaining | State: $STATE | Approval: $APPROVAL"
+            echo "   $PROGRESS_BAR"
 
             # Check if approved
             if [ "$APPROVAL" == "approved" ]; then
-              echo "✅ Change request approved!" >> $GITHUB_STEP_SUMMARY
-              echo "**Approved at**: $(date)" >> $GITHUB_STEP_SUMMARY
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "✅ CHANGE REQUEST APPROVED!"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+              echo "## ✅ Change Request Approved" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| **Approved At** | $(date '+%Y-%m-%d %H:%M:%S %Z') |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Time Waited** | $TIME_ELAPSED |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Final State** | \`$STATE\` |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🚀 **Ready to deploy** to \`$ENV\` environment" >> $GITHUB_STEP_SUMMARY
               exit 0
             fi
 
             # Check if rejected
             if [ "$APPROVAL" == "rejected" ]; then
-              echo "❌ Change request rejected!" >> $GITHUB_STEP_SUMMARY
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "❌ CHANGE REQUEST REJECTED!"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+              echo "## ❌ Change Request Rejected" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| **Rejected At** | $(date '+%Y-%m-%d %H:%M:%S %Z') |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Time Waited** | $TIME_ELAPSED |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **Deployment blocked** - Change request rejected in ServiceNow" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
               exit 1
+            fi
+
+            # Warning at 80% timeout
+            if [ $ELAPSED -ge $WARNING_THRESHOLD ] && [ "$WARNING_SHOWN" = false ]; then
+              echo ""
+              echo "⚠️  WARNING: 80% of approval timeout reached!"
+              echo ""
+              echo "⚠️ **Warning**: 80% of timeout reached" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              WARNING_SHOWN=true
             fi
 
             # Wait before next poll
@@ -185,7 +400,23 @@ jobs:
           done
 
           # Timeout reached
-          echo "❌ Approval timeout reached ($((TIMEOUT / 3600)) hours)" >> $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "❌ APPROVAL TIMEOUT REACHED"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "## ❌ Approval Timeout" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Timeout** | $((TIMEOUT / 3600)) hours |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Final State** | \`$STATE\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Final Approval** | \`$APPROVAL\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Deployment blocked** - Approval timeout reached without approval or rejection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
           exit 1
 
   # Job 3: Pre-Deployment Checks
@@ -304,9 +535,10 @@ jobs:
         if: success()
         run: |
           CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
+          CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
           BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
 
-          PAYLOAD=$(cat <<EOF
+          PAYLOAD=$(cat <<'EOF'
           {
             "state": "3",
             "close_code": "successful",
@@ -316,14 +548,88 @@ jobs:
           EOF
           )
 
-          curl -s -X PUT \
-            -H "Authorization: Basic $BASIC_AUTH" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" \
-            > /dev/null
+          # Update with retry logic
+          MAX_RETRIES=3
+          RETRY_DELAY=5
+          ATTEMPT=1
 
-          echo "✅ Change Request updated: Successful" >> $GITHUB_STEP_SUMMARY
+          echo "📝 Updating change request to 'Successful' state..."
+
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "🔄 Update attempt $ATTEMPT of $MAX_RETRIES..."
+
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" 2>/dev/null)
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            # Success (200 OK)
+            if [ "$HTTP_CODE" == "200" ]; then
+              UPDATED_STATE=$(echo "$BODY" | jq -r '.result.state')
+              UPDATED_CLOSE_CODE=$(echo "$BODY" | jq -r '.result.close_code')
+
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "✅ CHANGE REQUEST CLOSED AS SUCCESSFUL"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+              echo "## ✅ Change Request Closed - Successful" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **State** | Closed (\`$UPDATED_STATE\`) |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Close Code** | \`$UPDATED_CLOSE_CODE\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Environment** | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Updated At** | $(date '+%Y-%m-%d %H:%M:%S %Z') |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+
+            # Retryable errors (5xx)
+            if [[ "$HTTP_CODE" =~ ^5 ]]; then
+              echo "⚠️  Server error (HTTP $HTTP_CODE) - retrying in ${RETRY_DELAY}s..."
+              if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                ATTEMPT=$((ATTEMPT + 1))
+                continue
+              fi
+            fi
+
+            # Non-retryable errors (4xx) or max retries reached
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "⚠️  WARNING: Failed to update change request (HTTP $HTTP_CODE)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "## ⚠️ Warning: Change Update Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Deployment succeeded but change request update failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **HTTP Status** | \`$HTTP_CODE\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Attempts** | $ATTEMPT of $MAX_RETRIES |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Manual closure required** in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Error Details:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            echo "$BODY" | jq '.' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+            # Don't fail the workflow - deployment succeeded
+            exit 0
+          done
 
   # Job 5: Rollback on Failure
   rollback:
@@ -363,9 +669,10 @@ jobs:
       - name: Update ServiceNow Change Request - Failed
         run: |
           CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
+          CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
           BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
 
-          PAYLOAD=$(cat <<EOF
+          PAYLOAD=$(cat <<'EOF'
           {
             "state": "4",
             "close_code": "unsuccessful",
@@ -375,11 +682,86 @@ jobs:
           EOF
           )
 
-          curl -s -X PUT \
-            -H "Authorization: Basic $BASIC_AUTH" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" \
-            > /dev/null
+          # Update with retry logic
+          MAX_RETRIES=3
+          RETRY_DELAY=5
+          ATTEMPT=1
 
-          echo "❌ Change Request updated: Failed" >> $GITHUB_STEP_SUMMARY
+          echo "📝 Updating change request to 'Failed' state..."
+
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "🔄 Update attempt $ATTEMPT of $MAX_RETRIES..."
+
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" 2>/dev/null)
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            # Success (200 OK)
+            if [ "$HTTP_CODE" == "200" ]; then
+              UPDATED_STATE=$(echo "$BODY" | jq -r '.result.state')
+              UPDATED_CLOSE_CODE=$(echo "$BODY" | jq -r '.result.close_code')
+
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "❌ CHANGE REQUEST CLOSED AS FAILED"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+              echo "## ❌ Change Request Closed - Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **State** | Closed (\`$UPDATED_STATE\`) |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Close Code** | \`$UPDATED_CLOSE_CODE\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Environment** | \`${{ github.event.inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Rollback** | Completed |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Updated At** | $(date '+%Y-%m-%d %H:%M:%S %Z') |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+
+            # Retryable errors (5xx)
+            if [[ "$HTTP_CODE" =~ ^5 ]]; then
+              echo "⚠️  Server error (HTTP $HTTP_CODE) - retrying in ${RETRY_DELAY}s..."
+              if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+                ATTEMPT=$((ATTEMPT + 1))
+                continue
+              fi
+            fi
+
+            # Non-retryable errors (4xx) or max retries reached
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "⚠️  WARNING: Failed to update change request (HTTP $HTTP_CODE)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "## ⚠️ Warning: Change Update Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Rollback succeeded but change request update failed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **HTTP Status** | \`$HTTP_CODE\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Attempts** | $ATTEMPT of $MAX_RETRIES |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Manual closure required** in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Error Details:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            echo "$BODY" | jq '.' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+            # Don't fail the workflow - rollback was successful
+            exit 0
+          done

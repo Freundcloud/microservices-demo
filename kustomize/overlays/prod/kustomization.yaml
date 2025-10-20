@@ -80,7 +80,7 @@ patches:
     metadata:
       name: frontend
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: frontend
@@ -90,7 +90,7 @@ patches:
     metadata:
       name: cartservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: cartservice
@@ -100,7 +100,7 @@ patches:
     metadata:
       name: productcatalogservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: productcatalogservice
@@ -110,7 +110,7 @@ patches:
     metadata:
       name: currencyservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: currencyservice
@@ -120,7 +120,7 @@ patches:
     metadata:
       name: paymentservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: paymentservice
@@ -130,7 +130,7 @@ patches:
     metadata:
       name: shippingservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: shippingservice
@@ -140,7 +140,7 @@ patches:
     metadata:
       name: emailservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: emailservice
@@ -150,7 +150,7 @@ patches:
     metadata:
       name: checkoutservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: checkoutservice
@@ -160,7 +160,7 @@ patches:
     metadata:
       name: recommendationservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: recommendationservice
@@ -170,7 +170,7 @@ patches:
     metadata:
       name: adservice
     spec:
-      replicas: 3
+      replicas: 1
   target:
     kind: Deployment
     name: adservice

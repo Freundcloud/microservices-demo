@@ -107,129 +107,43 @@ module "eks" {
   }
 
   eks_managed_node_groups = {
-    # System Node Group - Small instances for cluster add-ons (CoreDNS, EBS CSI, etc.)
-    # No taints to allow system pods to schedule
-    system = {
-      name = "${var.cluster_name}-sys"
+    # ULTRA-MINIMAL DEMO CONFIGURATION
+    # Single node group runs EVERYTHING: system pods, Istio (minimal), and all workloads (dev/qa/prod)
+    # Cost optimization: 1x t3.large = ~$61/month (vs ~$305/month with 4 node groups)
+    # Total cluster cost: ~$134/month (EC2 + EKS control plane)
+    # Savings: 80% reduction from original configuration!
+    #
+    # Capacity: 2 vCPU, 8 GB RAM - TIGHT but workable with optimizations:
+    #   - System: CoreDNS (2), EBS CSI (3), metrics-server (1) = 6 pods (~1.5 GB)
+    #   - Istio: istiod (1), ingress-gateway (1) ONLY = 2 pods (~1.5 GB)
+    #   - NOTE: Istio observability addons (Grafana, Prometheus, Jaeger, Kiali) DISABLED to save RAM
+    #   - Workloads: 10 services × 3 envs × 1 replica = 30 pods (~5 GB with sidecars)
+    #   - Total: ~38 pods, ~8 GB RAM (at capacity limit)
+    #
+    # Alternative: Use t3.xlarge (4 vCPU, 16 GB) for $61/month more if stability issues occur
+    all = {
+      name = "${var.cluster_name}-all"
 
-      min_size     = 2
-      max_size     = 3
-      desired_size = 2
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
 
-      instance_types = ["t3.xlarge"] # 4 vCPU, 16 GB RAM - for system pods and Istio
+      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - absolute minimum for demo
       capacity_type  = "ON_DEMAND"
 
       labels = {
-        role     = "system"
-        workload = "cluster-addons"
+        role     = "all-in-one"
+        workload = "shared"
       }
 
-      # No taints - allow system pods to schedule freely
+      # No taints - allow all pods to schedule on this single node
 
       tags = merge(
         var.tags,
         {
-          Name        = "${var.cluster_name}-sys"
-          Environment = "system"
-        }
-      )
-    }
-
-    # Development Node Group - Small instances for dev workloads (1 replica per service)
-    dev = {
-      name = "${var.cluster_name}-dev"
-
-      min_size     = 2
-      max_size     = 4
-      desired_size = 2
-
-      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM
-      capacity_type  = "ON_DEMAND"
-
-      labels = {
-        environment = "dev"
-        workload    = "microservices-dev"
-      }
-
-      taints = [
-        {
-          key    = "environment"
-          value  = "dev"
-          effect = "NO_SCHEDULE"
-        }
-      ]
-
-      tags = merge(
-        var.tags,
-        {
-          Name        = "${var.cluster_name}-dev"
-          Environment = "dev"
-        }
-      )
-    }
-
-    # QA Node Group - Medium instances for qa workloads (2 replicas per service)
-    qa = {
-      name = "${var.cluster_name}-qa"
-
-      min_size     = 2
-      max_size     = 4
-      desired_size = 2
-
-      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - same as dev
-      capacity_type  = "ON_DEMAND"
-
-      labels = {
-        environment = "qa"
-        workload    = "microservices-qa"
-      }
-
-      taints = [
-        {
-          key    = "environment"
-          value  = "qa"
-          effect = "NO_SCHEDULE"
-        }
-      ]
-
-      tags = merge(
-        var.tags,
-        {
-          Name        = "${var.cluster_name}-qa"
-          Environment = "qa"
-        }
-      )
-    }
-
-    # Production Node Group - Same as dev/qa for cost savings in demo
-    prod = {
-      name = "${var.cluster_name}-prod"
-
-      min_size     = 2
-      max_size     = 4
-      desired_size = 2
-
-      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - same as dev/qa
-      capacity_type  = "ON_DEMAND"
-
-      labels = {
-        environment = "prod"
-        workload    = "microservices-prod"
-      }
-
-      taints = [
-        {
-          key    = "environment"
-          value  = "prod"
-          effect = "NO_SCHEDULE"
-        }
-      ]
-
-      tags = merge(
-        var.tags,
-        {
-          Name        = "${var.cluster_name}-prod"
-          Environment = "prod"
+          Name        = "${var.cluster_name}-all"
+          Environment = "shared"
+          CostCenter  = "demo-minimal"
         }
       )
     }

@@ -159,58 +159,72 @@ just clean-all                # Clean Docker and Terraform artifacts
 
 ## Architecture Overview
 
-## Single-Cluster Architecture
+## Ultra-Minimal Demo Architecture 💰
 
-**This project uses ONE EKS cluster with THREE dedicated node groups** instead of three separate clusters.
+**This project uses a SINGLE EKS cluster with ONE shared node** to minimize costs for demo purposes.
+
+### Cost Optimization
+- **Current Cost**: ~$134/month (80% reduction from original $378/month)
+- **Savings**: ~$244/month ($2,928/year)
+- **Configuration**: Ultra-minimal for demo/development only
+- **See**: [COST-OPTIMIZATION.md](COST-OPTIMIZATION.md) for complete details
 
 ### Cluster Configuration
 - **Cluster Name**: `microservices`
 - **Region**: eu-west-2 (London, UK)
 - **Availability Zones**: eu-west-2a, eu-west-2b, eu-west-2c
 
-### Node Groups
-1. **System Node Group**
-   - Instance: t3.xlarge (4 vCPU, 16 GB RAM)
-   - Min/Max/Desired: 2/3/2
-   - Labels: `role=system`, `workload=cluster-addons`
-   - Taints: None (allows system pods to schedule)
-   - Purpose: Cluster infrastructure (CoreDNS, Istio, EBS CSI, ALB Controller)
-
-2. **Dev Node Group**
-   - Instance: t3.xlarge (4 vCPU, 16 GB RAM)
-   - Min/Max/Desired: 2/4/2
-   - Labels: `environment=dev`, `workload=microservices-dev`
-   - Taints: `environment=dev:NoSchedule`
-
-3. **QA Node Group**
-   - Instance: t3.2xlarge (8 vCPU, 32 GB RAM)
-   - Min/Max/Desired: 3/6/3
-   - Labels: `environment=qa`, `workload=microservices-qa`
-   - Taints: `environment=qa:NoSchedule`
-
-4. **Prod Node Group**
-   - Instance: m5.4xlarge (16 vCPU, 64 GB RAM)
-   - Min/Max/Desired: 5/10/5
-   - Labels: `environment=prod`, `workload=microservices-prod`
-   - Taints: `environment=prod:NoSchedule`
+### Node Group (Ultra-Minimal)
+**Single "all-in-one" Node Group**:
+- **Instance**: 1x t3.large (2 vCPU, 8 GB RAM)
+- **Min/Max/Desired**: 1/2/1
+- **Labels**: `role=all-in-one`, `workload=shared`
+- **Taints**: None (all pods can schedule)
+- **Purpose**: Runs EVERYTHING on single node
+  - System pods (CoreDNS, EBS CSI, metrics-server)
+  - Istio control plane (istiod + ingress gateway only)
+  - All workloads (dev/qa/prod @ 1 replica each)
+- **Capacity**: ~38 pods total (~85-90% capacity)
 
 ### Namespaces
-- `microservices-dev` → Runs on dev node group (1 replica per service)
-- `microservices-qa` → Runs on qa node group (2 replicas per service)
-- `microservices-prod` → Runs on prod node group (3 replicas per service)
+- `microservices-dev` → 1 replica per service (10 pods)
+- `microservices-qa` → 1 replica per service (10 pods)
+- `microservices-prod` → 1 replica per service (10 pods)
 
-### Node Isolation
-- **Node taints** prevent pods from other environments scheduling on dedicated nodes
-- **Node selectors** ensure pods target the correct node group
-- **Tolerations** allow environment pods to schedule on their tainted nodes
-- **Node affinity** provides required scheduling rules
+### Istio Configuration
+**Minimal Istio** (saves ~2GB RAM):
+- ✅ **Enabled**: istiod (control plane) + ingress gateway
+- ✅ **Enabled**: mTLS, traffic routing, service mesh core features
+- ❌ **Disabled**: Observability addons (Grafana, Prometheus, Jaeger, Kiali)
+- **Reason**: RAM conservation on single small node
 
-### Cost Benefits
-- **Before**: 3 clusters = ~$669/month
-- **After**: 1 cluster = ~$573/month
-- **Savings**: ~$96/month (14% reduction)
+To enable observability dashboards:
+```bash
+# Edit terraform-aws/variables.tf
+enable_istio_addons = true
 
-**See**: [SINGLE-CLUSTER-MIGRATION.md](SINGLE-CLUSTER-MIGRATION.md) for complete details.
+# Apply changes
+just tf-apply
+```
+
+### Limitations (Demo Only)
+⚠️ This configuration is optimized for **cost savings** and is suitable for:
+- ✅ Demos and presentations
+- ✅ Development and testing
+- ✅ CI/CD pipeline validation
+- ✅ ServiceNow integration demos
+
+**NOT suitable for**:
+- ❌ Production workloads
+- ❌ High availability requirements
+- ❌ Load testing at scale
+- ❌ Long-term stable environments
+
+### Alternative Configurations
+See [COST-OPTIMIZATION.md](COST-OPTIMIZATION.md) for:
+- **Option B (Balanced)**: 1x t3.xlarge with full Istio observability ($195/mo)
+- **Option C (Safer Minimal)**: 2 nodes with redundancy ($256/mo)
+- **Production Setup**: Multi-node groups with HA (see SINGLE-CLUSTER-MIGRATION.md)
 
 
 ### Core Components
@@ -248,8 +262,8 @@ microservices-demo/
 │   ├── components/             # Reusable components (Istio, load generator)
 │   └── overlays/               # Environment-specific configs
 │       ├── dev/               # Development (1 replica, minimal resources)
-│       ├── qa/                # QA/Testing (2 replicas, load testing)
-│       └── prod/              # Production (3 replicas, HA, no load generator)
+│       ├── qa/                # QA/Testing (1 replica, cost-optimized)
+│       └── prod/              # Production (1 replica, cost-optimized)
 ├── istio-manifests/             # Istio Gateway and VirtualService configs
 │   ├── frontend-gateway.yaml   # External traffic entry point
 │   └── frontend.yaml            # Internal routing

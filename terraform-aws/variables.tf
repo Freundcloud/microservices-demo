@@ -128,7 +128,7 @@ variable "istio_version" {
 }
 
 variable "enable_istio_addons" {
-  description = "Enable Istio observability addons (Kiali, Prometheus, Jaeger, Grafana)"
+  description = "Enable Istio observability addons (Kiali, Prometheus, Jaeger, Grafana) - DISABLED by default for cost savings (~2GB RAM)"
   type        = bool
-  default     = true
+  default     = false
 }
