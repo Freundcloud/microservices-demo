@@ -1,434 +1,271 @@
 # Documentation Index
 
-Welcome to the Online Boutique AWS Deployment documentation. This guide will help you deploy, configure, and manage the microservices demo application on AWS EKS.
+> Complete documentation for the Microservices Demo project
 
-## Quick Start
+**New to this project?** Start with **[DEMO-OVERVIEW.md](../DEMO-OVERVIEW.md)** to understand what this demo does.
 
-**New to this project?** Start here:
-1. [AWS Deployment Guide](README-AWS.md) - Complete guide for deploying to AWS
-2. [AWS Setup](setup/AWS-SETUP.md) - Get your AWS credentials configured
-3. [GitHub Actions Setup](setup/GITHUB-ACTIONS-SETUP.md) - Configure CI/CD automation
+## Quick Start Guides
 
-## Documentation Structure
+### For Developers
+- **[Onboarding Guide](ONBOARDING.md)** - Complete setup for new developers (30 minutes)
+  - AWS credentials configuration
+  - Terraform infrastructure deployment
+  - Kubernetes cluster setup
+  - First deployment
 
-### 📋 Setup Guides
+### For DevOps Engineers
+- **[AWS Setup](setup/AWS-SETUP.md)** - AWS account and credentials
+- **[GitHub Actions Setup](setup/GITHUB-ACTIONS-SETUP.md)** - CI/CD configuration
+- **[Security Scanning](setup/SECURITY-SCANNING.md)** - Configure security tools
 
-Essential guides for getting started:
+### For ServiceNow Integration
+- **[ServiceNow Integration](servicenow-integration/SERVICENOW-INTEGRATION.md)** - Complete guide
+  - Service account setup (5 min)
+  - GitHub secrets configuration (2 min)
+  - CMDB table creation (10 min)
+  - Testing the integration (5 min)
 
-- **[AWS Setup](setup/AWS-SETUP.md)**
-  - AWS account creation
-  - IAM user and permissions setup
-  - AWS CLI configuration
-  - Access key management
+## Documentation by Category
 
-- **[GitHub Actions Setup](setup/GITHUB-ACTIONS-SETUP.md)**
-  - GitHub repository configuration
-  - GitHub Secrets setup
-  - Workflow triggers and usage
-  - Manual workflow execution
+### 🏗️ Architecture
 
-- **[Security Scanning Setup](setup/SECURITY-SCANNING.md)**
-  - Comprehensive security tooling
-  - SAST, container scanning, secret detection
-  - GitHub Security integration
-  - Viewing and handling security alerts
-
-- **[ServiceNow Integration Summary](SERVICENOW-INTEGRATION-SUMMARY.md)**
-  - Quick overview of ServiceNow integration
-  - Key changes required
-  - Deployment workflow changes
-  - Quick start guide
-  - 4-week implementation timeline
-
-- **[ServiceNow Integration Complete Plan](SERVICENOW-INTEGRATION-PLAN.md)**
-  - Detailed project plan
-  - Change management automation
-  - Security scan integration (5 tools)
-  - AWS EKS CMDB discovery
-  - Complete workflow configurations
-  - Troubleshooting guide
-
-### 🏗️ Architecture Documentation
-
-Understanding the system design:
-
-- **[Repository Structure](architecture/REPOSITORY-STRUCTURE.md)**
-  - Complete directory guide
-  - Source code organization
-  - Protocol Buffers (protos/)
+**Understanding the System**:
+- **[Repository Structure](architecture/REPOSITORY-STRUCTURE.md)** - Complete codebase guide
+  - Directory organization
+  - Source code layout
+  - Protocol Buffers
   - Kubernetes manifests
-  - Release artifacts
-  - Development workflow
+  - Terraform structure
 
-- **[Istio Service Mesh](architecture/ISTIO-DEPLOYMENT.md)**
-  - Istio installation and configuration
+- **[Istio Service Mesh](architecture/ISTIO-DEPLOYMENT.md)** - Service mesh configuration
+  - Istio installation
   - mTLS security
   - Traffic management
-  - Observability stack (Kiali, Prometheus, Jaeger, Grafana)
-  - Troubleshooting Istio issues
+  - Observability (Kiali, Grafana, Jaeger)
+  - Troubleshooting
 
-- **[Product Purpose](architecture/purpose.md)**
-  - Project goals and objectives
-  - Target audience
-  - Use cases
+### 💻 Development
 
-- **[Product Requirements](architecture/product-requirements.md)**
-  - Functional requirements
-  - Non-functional requirements
-  - Service specifications
-
-### 💻 Development Guides
-
-For developers working on the codebase:
-
-- **[Development Guide](development/development-guide.md)**
+**Working with the Code**:
+- **[Development Guide](development/development-guide.md)** - Daily development tasks
   - Local development setup
   - Building and testing services
   - Debugging techniques
-  - Development best practices
+  - Making changes to services
 
-- **[Adding New Microservices](development/adding-new-microservice.md)**
-  - Step-by-step guide for new services
-  - Kubernetes manifest templates
-  - Protocol Buffer integration
+- **[Adding New Microservices](development/adding-new-microservice.md)** - Extending the application
+  - Service creation template
+  - Kubernetes integration
+  - gRPC/Protocol Buffers
   - CI/CD integration
 
 ### 🚀 Deployment
 
-- **[Complete AWS Deployment Guide](README-AWS.md)**
-  - Prerequisites and requirements
-  - Step-by-step deployment
-  - Multi-environment setup (dev, qa, prod)
+**Getting to Production**:
+- **[Complete AWS Deployment](README-AWS.md)** - Full deployment guide
+  - Infrastructure setup
+  - Multi-environment deployment (dev/qa/prod)
   - Cost estimation
   - Troubleshooting
 
-### 🔐 Security
+- **[Terraform Backend](TERRAFORM-BACKEND-GUIDE.md)** - Remote state configuration
+  - S3 backend setup
+  - State locking with DynamoDB
+  - Team collaboration
 
-- **[Security Scanning](setup/SECURITY-SCANNING.md)**
-  - CodeQL (SAST)
-  - Trivy (Container scanning)
+### 🔒 Security
+
+**Security Tooling**:
+- **[Security Scanning Setup](setup/SECURITY-SCANNING.md)** - Complete security pipeline
+  - CodeQL (SAST for 5 languages)
+  - Trivy (Container + SBOM)
   - Gitleaks (Secret detection)
-  - Semgrep, Checkov, tfsec
-  - OWASP Dependency Check
+  - Semgrep, Checkov, tfsec (IaC security)
   - GitHub Security integration
+
+- **[Security Evidence](SECURITY-EVIDENCE-GUIDE.md)** - Evidence generation for compliance
+  - SARIF format exports
+  - ServiceNow attachment
+  - Compliance reporting
 
 ### 🏢 ServiceNow Integration
 
-**📚 [Complete ServiceNow Documentation Index](SERVICENOW-INDEX.md)** ⭐ **START HERE**
+**Change Management & CMDB**:
+- **[ServiceNow Integration Guide](servicenow-integration/SERVICENOW-INTEGRATION.md)** ⭐ **START HERE**
+  - Quick setup (15 minutes)
+  - Two integration approaches (Table API vs DevOps Change)
+  - Available workflows
+  - Environment-specific approvals
+  - CMDB automation
+  - Testing and troubleshooting
 
-Complete documentation index with all ServiceNow guides organized by topic and use case.
-
-#### Quick Start (30 minutes total)
-1. **[DevOps Change Workspace Access](SERVICENOW-DEVOPS-CHANGE-WORKSPACE-ACCESS.md)** (15 min)
-   - ✅ DevOps Change Velocity v6.1.0 installed
-   - Access modern workspace
-   - Connect GitHub Actions
-   - View DORA metrics
-
-2. **[Application Setup Quick Start](SERVICENOW-APPLICATION-QUICKSTART.md)** (10 min)
-   - Create "Online Boutique" application
-   - Map service dependencies
-   - DevOps workspace visibility
-
-3. **[Navigation URLs](SERVICENOW-NAVIGATION-URLS.md)** 🔖 (Bookmark)
-   - All ServiceNow URLs
-   - Quick reference table
-
-#### Integration Components
-- ✅ **DevOps Change Velocity** - Modern workspace, DORA metrics, CI/CD integration
-- ✅ **Security Scanning** - 8 tools integrated (CodeQL, Trivy, Gitleaks, Semgrep, etc.)
-- ✅ **EKS Discovery** - Automated cluster, node, and service discovery
-- ✅ **Application Association** - "Online Boutique" with 11 microservices mapped
-- ⏳ **Change Management** - Automated change requests (approval workflow needs fix)
-
-#### Key Documentation
-
-**⭐ START HERE**:
-- **[🎯 Implementation Summary & Demo Script](SERVICENOW-DEVOPS-IMPLEMENTATION-SUMMARY.md)** - **READY FOR DEMO** - Complete overview, metrics, demo flow
-
-**Setup & Configuration**:
-- **[🚀 DevOps Integration Setup Guide](SERVICENOW-DEVOPS-SETUP-GUIDE.md)** - Complete 30-minute setup for work item visibility
-- **[DevOps Work Items Solution](SERVICENOW-DEVOPS-WORK-ITEMS-SOLUTION.md)** - Why work items weren't visible and how to fix
-- **[DevOps Change Velocity Overview](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)** - Plugin features and capabilities
-- **[DevOps Change Velocity Setup](SERVICENOW-DEVOPS-CHANGE-VELOCITY-SETUP.md)** 🔧 - Fix missing DevOps workspace visibility
-- **[Security Scanning Design](SERVICENOW-SECURITY-SCANNING.md)** - 8-tool security integration architecture
-- **[Work Item Association Guide](GITHUB-SERVICENOW-WORK-ITEM-ASSOCIATION.md)** ⭐ - Link GitHub commits/PRs to ServiceNow changes
-- **[Approval Criteria & Risk Assessment](GITHUB-SERVICENOW-APPROVAL-CRITERIA.md)** ⭐ - What approvers need to know
-- **[SOC 2 & ISO 27001 Compliance Gap Analysis](COMPLIANCE-GAP-ANALYSIS.md)** 🔒 - Compliance requirements & gaps
-- **[Compliance Implementation Summary](COMPLIANCE-IMPLEMENTATION-SUMMARY.md)** ✅ - What's been implemented (95% complete)
-- **[Approval Workflow Guide](SERVICENOW-APPROVALS.md)** - Multi-level approval configuration
-- **[Change Request States](SERVICENOW-CHANGE-REQUEST-STATES.md)** - Troubleshooting change lifecycle
-- **[Workflow Fix](SERVICENOW-WORKFLOW-FIX.md)** - Known approval request issue
-
-**📖 See [SERVICENOW-INDEX.md](SERVICENOW-INDEX.md) for complete documentation organized by topic**
-- **[Migration Summary](SERVICENOW-MIGRATION-SUMMARY.md)**
-  - Implementation history
-  - Key decisions
-  - Lessons learned
-- **[Zurich Compatibility](SERVICENOW-ZURICH-COMPATIBILITY.md)**
-  - Version-specific notes
-  - Compatibility issues
-  - Workarounds
-
-### 🔧 Workflow Troubleshooting
-
-- **[OWASP Dependency-Check Troubleshooting](workflows/TROUBLESHOOTING-DEPENDENCY-CHECK.md)**
-  - Fixing Maven Central connectivity issues
-  - Handling missing node_modules errors
-  - Configuring OSS Index authentication
-  - Alternative dependency scanning approaches
-  - Language-specific scanners (npm audit, govulncheck, pip-audit)
-  - Performance optimization and best practices
-
-- **[ServiceNow CMDB Discovery Troubleshooting](workflows/TROUBLESHOOTING-SERVICENOW-CMDB.md)**
-  - Fixing shell heredoc syntax errors
-  - Resolving ServiceNow API authentication issues
-  - Handling JSON payload construction safely
-  - Debugging rate limiting and permission errors
-  - Best practices for CMDB updates
-  - Data validation and verification
-
-### 🌐 Service Mesh
-
-- **[Istio Deployment](architecture/ISTIO-DEPLOYMENT.md)**
-  - Istio architecture overview
-  - Installation with Terraform
-  - Traffic management examples
-  - Observability dashboards
-  - Security policies
-  - Cost optimization
+**Additional ServiceNow Docs**:
+- **[Quick Start](SERVICENOW-QUICK-START.md)** - 5-minute minimal setup
+- **[Application Setup](SERVICENOW-APPLICATION-SETUP.md)** - Register "Online Boutique" app
+- **[DevOps Change Velocity](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)** - Modern change management
+- **[Best Practices](GITHUB-SERVICENOW-BEST-PRACTICES.md)** - Integration patterns
+- **[Developer Onboarding](GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md)** - Team setup
 
 ### 📊 Operations
 
-Operational guides coming soon:
+**Running in Production**:
+- **[Cost Optimization](../COST-OPTIMIZATION.md)** - Scaling and pricing
+  - Ultra-minimal config (~$134/month)
+  - Balanced config (~$195/month)
+  - Production config (~$442/month)
+  - Node sizing recommendations
 
-- Monitoring and alerting
-- Incident response
-- Backup and recovery
-- Scaling strategies
-- Cost optimization
-- Performance tuning
+- **Monitoring** (via Istio dashboards):
+  - Kiali: `just istio-kiali` (service topology)
+  - Grafana: `just istio-grafana` (metrics)
+  - Jaeger: `just istio-jaeger` (tracing)
+  - Prometheus: `just istio-prometheus` (raw metrics)
 
-## Key Features
+### 🔧 Release Management
 
-### Infrastructure as Code (Terraform)
+**Version Control & Releases**:
+- **[Release Process](RELEASE-PROCESS.md)** - How to cut releases
+- **[Release Automation](RELEASE-AUTOMATION.md)** - Automated release workflows
 
-All infrastructure is defined in [terraform-aws/](../terraform-aws/):
+## Technology Stack
 
-- **VPC**: Multi-AZ networking with public/private subnets
-- **EKS**: Managed Kubernetes with autoscaling
-- **ElastiCache**: Redis for session storage
-- **ECR**: Container registry with vulnerability scanning
-- **Istio**: Service mesh with mTLS
-- **IAM**: IRSA for secure AWS access
+### Infrastructure
+- **Cloud**: AWS (VPC, EKS, ElastiCache, ECR)
+- **IaC**: Terraform 1.5+
+- **Kubernetes**: Amazon EKS 1.28+
+- **Service Mesh**: Istio 1.x
 
-**Terraform Documentation:**
-- [Terraform README](../terraform-aws/README.md)
-- [Terraform Tests](../terraform-aws/tests/)
-- Environment configs: [dev](../terraform-aws/environments/dev.tfvars), [qa](../terraform-aws/environments/qa.tfvars), [prod](../terraform-aws/environments/prod.tfvars)
+### Application
+- **Languages**: Go, Python, Java, Node.js, C#
+- **Communication**: gRPC (Protocol Buffers)
+- **Caching**: Redis (ElastiCache)
+- **Observability**: Prometheus, Grafana, Jaeger, Kiali
 
-### CI/CD Pipeline (GitHub Actions)
+### CI/CD
+- **Platform**: GitHub Actions
+- **Security**: CodeQL, Trivy, Gitleaks, Semgrep, Checkov, tfsec
+- **Change Management**: ServiceNow DevOps Change Velocity
 
-All workflows are in [.github/workflows/](../.github/workflows/):
+## Project Structure
 
-- **[terraform-validate.yaml](../.github/workflows/terraform-validate.yaml)**: Multi-environment Terraform validation and testing
-- **[terraform-plan.yaml](../.github/workflows/terraform-plan.yaml)**: Infrastructure change preview on PRs
-- **[terraform-apply.yaml](../.github/workflows/terraform-apply.yaml)**: Automated infrastructure deployment
-- **[build-and-push-images.yaml](../.github/workflows/build-and-push-images.yaml)**: Container builds with security scanning
-- **[security-scan.yaml](../.github/workflows/security-scan.yaml)**: Comprehensive security scanning
-- **[deploy-application.yaml](../.github/workflows/deploy-application.yaml)**: Application deployment to EKS
-
-### Microservices Architecture
-
-12 microservices in different languages:
-
-| Service | Language | Purpose |
-|---------|----------|---------|
-| [frontend](../src/frontend) | Go | Web UI |
-| [cartservice](../src/cartservice) | C# | Shopping cart |
-| [productcatalogservice](../src/productcatalogservice) | Go | Product inventory |
-| [currencyservice](../src/currencyservice) | Node.js | Currency conversion |
-| [paymentservice](../src/paymentservice) | Node.js | Payment processing |
-| [shippingservice](../src/shippingservice) | Go | Shipping calculations |
-| [emailservice](../src/emailservice) | Python | Email notifications |
-| [checkoutservice](../src/checkoutservice) | Go | Order orchestration |
-| [recommendationservice](../src/recommendationservice) | Python | Product recommendations |
-| [adservice](../src/adservice) | Java | Advertisement serving |
-| [loadgenerator](../src/loadgenerator) | Python | Load testing |
-| [shoppingassistantservice](../src/shoppingassistantservice) | Java | AI shopping assistant |
-
-## Multi-Environment Support
-
-The project supports three environments with different configurations:
-
-### Development Environment
-- **Cluster**: microservices-dev
-- **Nodes**: 2-3 × t3.medium
-- **VPC**: 10.0.0.0/16
-- **Istio**: Enabled (no addons)
-- **Redis**: cache.t3.micro
-- **Cost**: ~$150/month
-
-### QA Environment
-- **Cluster**: microservices-qa
-- **Nodes**: 3-5 × t3.medium
-- **VPC**: 10.1.0.0/16
-- **Istio**: Enabled (with observability)
-- **Redis**: cache.t3.small
-- **Cost**: ~$200/month
-
-### Production Environment
-- **Cluster**: microservices-prod
-- **Nodes**: 5-10 × t3.large/xlarge
-- **VPC**: 10.2.0.0/16
-- **Istio**: Enabled (full stack)
-- **Redis**: cache.t3.medium (multi-node)
-- **Cost**: ~$500/month
-
-**Deployment:**
-```bash
-# Deploy specific environment
-cd terraform-aws
-terraform apply -var-file="environments/dev.tfvars"
-terraform apply -var-file="environments/qa.tfvars"
-terraform apply -var-file="environments/prod.tfvars"
+```
+microservices-demo/
+├── DEMO-OVERVIEW.md          # Start here - project overview
+├── CLAUDE.md                  # Claude Code assistant instructions
+├── justfile                   # 50+ automation commands
+├── kustomize/                 # Multi-environment K8s configs
+│   ├── base/                  # Shared manifests
+│   ├── components/            # Reusable components
+│   └── overlays/              # Environment overrides
+│       ├── dev/
+│       ├── qa/
+│       └── prod/
+├── src/                       # 12 microservice applications
+├── terraform-aws/             # Infrastructure as Code
+│   ├── environments/          # Per-environment configs
+│   └── tests/                 # Terraform tests
+├── .github/workflows/         # CI/CD pipelines
+└── docs/                      # This documentation
+    ├── ONBOARDING.md         # New developer setup
+    ├── setup/                 # Setup guides
+    ├── architecture/          # System design
+    ├── development/           # Developer guides
+    └── servicenow-integration/ # ServiceNow docs
 ```
 
-## Common Tasks
+## Common Commands
 
-### Deploy to AWS
-
+### Infrastructure
 ```bash
-# 1. Configure AWS credentials
-source .envrc
-
-# 2. Deploy infrastructure (choose environment)
-cd terraform-aws
-terraform init
-terraform apply -var-file="environments/prod.tfvars"
-
-# 3. Configure kubectl
-aws eks update-kubeconfig --region eu-west-2 --name microservices-prod
-
-# 4. Deploy application
-kubectl apply -f release/kubernetes-manifests.yaml
-kubectl apply -f istio-manifests/
+just tf-init                   # Initialize Terraform
+just tf-plan                   # Preview changes
+just tf-apply                  # Deploy infrastructure
 ```
 
-### Access Observability Dashboards
-
+### Kubernetes
 ```bash
-# Kiali (Service mesh visualization)
-kubectl port-forward svc/kiali-server -n istio-system 20001:20001
-# Open: http://localhost:20001
-
-# Grafana (Metrics dashboards)
-kubectl port-forward svc/grafana -n istio-system 3000:80
-# Open: http://localhost:3000
-
-# Jaeger (Distributed tracing)
-kubectl port-forward svc/jaeger-query -n istio-system 16686:16686
-# Open: http://localhost:16686
+just k8s-config                # Configure kubectl
+kubectl apply -k overlays/dev  # Deploy to dev
+kubectl get pods -n microservices-dev
 ```
 
-### Run Security Scans Locally
-
+### Observability
 ```bash
-# Container scanning with Trivy
-trivy image <image-name>:latest
-
-# Infrastructure scanning
-cd terraform-aws
-tfsec .
-checkov -d .
-
-# Secret detection
-gitleaks detect --source . -v
+just istio-kiali               # Service mesh topology
+just istio-grafana             # Metrics dashboards
+just cluster-status            # Complete overview
 ```
 
-### Add a New Microservice
+### ServiceNow
+```bash
+gh workflow run deploy-with-servicenow-basic.yaml -f environment=dev
+gh workflow run aws-infrastructure-discovery.yaml
+```
 
-See [Adding New Microservices](development/adding-new-microservice.md) for complete guide.
-
-Basic steps:
-1. Create service code in `src/<service-name>/`
-2. Add Dockerfile
-3. Create Kubernetes manifests in `kubernetes-manifests/<service-name>.yaml`
-4. Add Protocol Buffers in `protos/demo.proto` (if needed)
-5. Create ECR repository in `terraform-aws/ecr.tf`
-6. Update release manifest
+**Full command reference**: Run `just` to see all commands
 
 ## Troubleshooting
 
-### Common Issues
+### Quick Fixes
 
-**Pods not starting:**
+**Pods not starting**:
 ```bash
-kubectl get pods -n default
-kubectl describe pod <pod-name> -n default
-kubectl logs <pod-name> -n default
+kubectl get pods -n microservices-dev
+kubectl describe pod <pod-name> -n microservices-dev
+kubectl logs <pod-name> -n microservices-dev
 ```
 
-**Istio issues:**
+**Istio issues**:
 ```bash
-istioctl analyze -n default
-istioctl proxy-status
-kubectl get gateway,virtualservice -n default
+just istio-analyze             # Check configuration
+istioctl proxy-status          # Check proxy status
 ```
 
-**Terraform errors:**
+**Terraform errors**:
 ```bash
-terraform -chdir=terraform-aws validate
-terraform -chdir=terraform-aws fmt -check
-terraform -chdir=terraform-aws test
+just tf-validate               # Validate syntax
+just tf-test                   # Run tests
 ```
 
-### Getting Help
+### Detailed Troubleshooting
 
-1. Check the [troubleshooting section](README-AWS.md#troubleshooting) in the AWS deployment guide
-2. Review [Repository Structure](architecture/REPOSITORY-STRUCTURE.md#troubleshooting)
-3. Check [Istio troubleshooting](architecture/ISTIO-DEPLOYMENT.md#troubleshooting)
-4. Search existing GitHub issues
-5. Open a new issue with:
-   - Description of the problem
+- **[AWS Deployment Guide - Troubleshooting](README-AWS.md#troubleshooting)**
+- **[Istio Troubleshooting](architecture/ISTIO-DEPLOYMENT.md#troubleshooting)**
+- **[ServiceNow Integration Issues](servicenow-integration/SERVICENOW-INTEGRATION.md#common-issues)**
+
+## Getting Help
+
+1. **Check documentation** in this folder first
+2. **Search** existing GitHub issues
+3. **Ask in discussions** (GitHub Discussions)
+4. **Open an issue** with:
+   - Problem description
    - Steps to reproduce
    - Logs and error messages
    - Environment details
 
+## Documentation Archive
+
+Historical and detailed implementation documentation has been moved to `docs/_archive/`:
+- Troubleshooting guides
+- Implementation details
+- Compliance analyses
+- Antipattern guides
+
+These are kept for reference but not needed for daily use.
+
 ## Contributing
 
-Contributions are welcome! When contributing:
-
-1. Read the [Development Guide](development/development-guide.md)
-2. Follow existing code patterns
-3. Run security scans before submitting PR
-4. Update documentation as needed
-5. Add tests for new features
-
-## Additional Resources
-
-### Official Documentation
-- [Amazon EKS Documentation](https://docs.aws.amazon.com/eks/)
-- [Istio Documentation](https://istio.io/latest/docs/)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
-
-### AWS Resources
-- [EKS Best Practices Guide](https://aws.github.io/aws-eks-best-practices/)
-- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
-- [VPC CNI Plugin](https://docs.aws.amazon.com/eks/latest/userguide/pod-networking.html)
-
-### Service Mesh Resources
-- [Istio on AWS](https://aws.github.io/aws-eks-best-practices/networking/service-mesh/istio/)
-- [Kiali Documentation](https://kiali.io/docs/)
-- [Jaeger Documentation](https://www.jaegertracing.io/docs/)
+See **[Development Guide](development/development-guide.md)** for contribution guidelines.
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see individual files for details.
-
-Original Google Cloud version: [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo)
+Apache License 2.0 - Based on [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo)
 
 ---
 
-**Questions or feedback?** Open an issue on GitHub!
+**Quick Links**:
+- **[Project Overview](../DEMO-OVERVIEW.md)** - Understand the demo
+- **[Onboarding](ONBOARDING.md)** - Get started in 30 minutes
+- **[ServiceNow Integration](servicenow-integration/SERVICENOW-INTEGRATION.md)** - Change management setup
+- **[Cost Optimization](../COST-OPTIMIZATION.md)** - Scaling options
