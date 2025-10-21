@@ -30,19 +30,39 @@ locals {
   ]
 }
 
+# KMS key for ECR encryption
+resource "aws_kms_key" "ecr" {
+  description             = "KMS key for ECR repository encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.cluster_name}-ecr-key"
+    }
+  )
+}
+
+resource "aws_kms_alias" "ecr" {
+  name          = "alias/${var.cluster_name}-ecr"
+  target_key_id = aws_kms_key.ecr.key_id
+}
+
 # ECR Repositories for all microservices
 resource "aws_ecr_repository" "microservices" {
   for_each = toset(local.microservices)
 
   name                 = each.value
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"  # CKV_AWS_51: Ensure ECR Image Tags are immutable
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
   encryption_configuration {
-    encryption_type = "AES256"
+    encryption_type = "KMS"  # CKV_AWS_136: Ensure ECR repositories are encrypted using KMS
+    kms_key         = aws_kms_key.ecr.arn
   }
 
   tags = merge(
@@ -158,12 +178,32 @@ resource "aws_ecr_repository_policy" "microservices" {
 # Data source for current AWS account
 data "aws_caller_identity" "current" {}
 
+# KMS key for CloudWatch Logs encryption
+resource "aws_kms_key" "cloudwatch" {
+  description             = "KMS key for CloudWatch Logs encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.cluster_name}-cloudwatch-key"
+    }
+  )
+}
+
+resource "aws_kms_alias" "cloudwatch" {
+  name          = "alias/${var.cluster_name}-cloudwatch"
+  target_key_id = aws_kms_key.cloudwatch.key_id
+}
+
 # CloudWatch Log Group for ECR (optional - for image scan results)
 resource "aws_cloudwatch_log_group" "ecr_scan_results" {
   for_each = toset(local.microservices)
 
   name              = "/aws/ecr/${each.value}/scan-results"
-  retention_in_days = 30
+  retention_in_days = 365  # CKV_AWS_338: Ensure CloudWatch log groups retain logs for at least 1 year
+  kms_key_id        = aws_kms_key.cloudwatch.arn  # CKV_AWS_158: Ensure CloudWatch Log Group is encrypted by KMS
 
   tags = merge(
     var.tags,
@@ -195,9 +235,29 @@ resource "aws_cloudwatch_event_rule" "ecr_scan_findings" {
   tags = var.tags
 }
 
+# KMS key for SNS encryption
+resource "aws_kms_key" "sns" {
+  description             = "KMS key for SNS topic encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.cluster_name}-sns-key"
+    }
+  )
+}
+
+resource "aws_kms_alias" "sns" {
+  name          = "alias/${var.cluster_name}-sns"
+  target_key_id = aws_kms_key.sns.key_id
+}
+
 # SNS topic for security notifications (optional)
 resource "aws_sns_topic" "ecr_scan_alerts" {
-  name = "${var.cluster_name}-ecr-scan-alerts"
+  name              = "${var.cluster_name}-ecr-scan-alerts"
+  kms_master_key_id = aws_kms_key.sns.id  # CKV_AWS_26: Ensure all data stored in the SNS topic is encrypted
 
   tags = merge(
     var.tags,

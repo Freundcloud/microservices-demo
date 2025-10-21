@@ -102,6 +102,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
   }
 }
 
+# KMS key for DynamoDB encryption
+resource "aws_kms_key" "dynamodb" {
+  description             = "KMS key for DynamoDB table encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  tags = {
+    Name        = "Terraform State Lock Table KMS Key"
+    Environment = "shared"
+  }
+}
+
+resource "aws_kms_alias" "dynamodb" {
+  name          = "alias/terraform-state-dynamodb"
+  target_key_id = aws_kms_key.dynamodb.key_id
+}
+
 # DynamoDB table for state locking
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = var.dynamodb_table_name
@@ -111,6 +128,12 @@ resource "aws_dynamodb_table" "terraform_locks" {
   attribute {
     name = "LockID"
     type = "S"
+  }
+
+  # CKV_AWS_119: Ensure DynamoDB Tables are encrypted using a KMS Customer Managed CMK
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.dynamodb.arn
   }
 
   point_in_time_recovery {

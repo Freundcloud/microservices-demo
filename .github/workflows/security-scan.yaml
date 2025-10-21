@@ -56,7 +56,13 @@ jobs:
         run: |
           # Build adservice (Java with Gradle)
           cd src/adservice
-          ./gradlew build -x test
+          chmod +x gradlew
+          ./gradlew build -x test --no-daemon
+
+          # Build shopping assistant service
+          cd ../shoppingassistantservice
+          chmod +x gradlew
+          ./gradlew build -x test --no-daemon
         continue-on-error: true
 
       - name: Perform CodeQL Analysis
