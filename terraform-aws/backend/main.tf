@@ -39,6 +39,9 @@ provider "aws" {
   }
 }
 
+# Data source for current AWS account
+data "aws_caller_identity" "current" {}
+
 # S3 bucket for Terraform state
 resource "aws_s3_bucket" "terraform_state" {
   bucket = var.state_bucket_name
@@ -107,6 +110,35 @@ resource "aws_kms_key" "dynamodb" {
   description             = "KMS key for DynamoDB table encryption"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow DynamoDB to use the key"
+        Effect = "Allow"
+        Principal = {
+          Service = "dynamodb.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:CreateGrant",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 
   tags = {
     Name        = "Terraform State Lock Table KMS Key"
