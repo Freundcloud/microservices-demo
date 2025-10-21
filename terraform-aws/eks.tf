@@ -27,6 +27,29 @@ module "eks" {
   # Enable IRSA (IAM Roles for Service Accounts)
   enable_irsa = true
 
+  # CRITICAL: Grant cluster admin access to the IAM principal creating the cluster
+  # This prevents kubectl authentication failures in Terraform provisioners
+  # Without this, helm/kubectl commands in null_resource provisioners will fail with:
+  # "the server has asked for the client to provide credentials"
+  enable_cluster_creator_admin_permissions = true
+
+  # Access entries for additional IAM principals (optional)
+  # Uncomment and configure if you need to grant access to specific users/roles
+  # access_entries = {
+  #   admin = {
+  #     principal_arn     = "arn:aws:iam::ACCOUNT_ID:user/USERNAME"
+  #     kubernetes_groups = []
+  #     policy_associations = {
+  #       cluster_admin = {
+  #         policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  #         access_scope = {
+  #           type = "cluster"
+  #         }
+  #       }
+  #     }
+  #   }
+  # }
+
   # Cluster add-ons
   cluster_addons = {
     coredns = {
