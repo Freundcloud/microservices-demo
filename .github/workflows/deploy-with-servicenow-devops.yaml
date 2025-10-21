@@ -24,11 +24,127 @@ jobs:
     uses: ./.github/workflows/security-scan.yaml
     secrets: inherit
 
-  # Job 2: Create ServiceNow Change Request using DevOps Change Action
+  # Job 2: Register Build Artifacts in ServiceNow DevOps
+  register-artifacts:
+    name: Register Artifacts
+    runs-on: ubuntu-latest
+    needs: security-scans
+    if: always()  # Run even if security scans have warnings
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Register Docker Images as Artifacts
+        uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
+        with:
+          # Authentication (token-based)
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
+          # GitHub context (required for pipeline tracking)
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Register Artifacts'
+
+          # Artifacts to register (all 12 microservices)
+          # Format: [{"name":"service-name","version":"build-number","semanticVersion":"major.minor.patch","repositoryName":"owner/repo"}]
+          artifacts: |
+            [
+              {
+                "name": "online-boutique-frontend",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-cartservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-productcatalogservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-currencyservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-paymentservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-shippingservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-emailservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-checkoutservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-recommendationservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-adservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-loadgenerator",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              },
+              {
+                "name": "online-boutique-shoppingassistantservice",
+                "version": "1.0.${{ github.run_number }}",
+                "semanticVersion": "1.0.${{ github.run_number }}",
+                "repositoryName": "${{ github.repository }}"
+              }
+            ]
+
+      - name: Artifact Registration Summary
+        if: always()
+        run: |
+          echo "## 📦 Artifacts Registered in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| online-boutique (all services) | 1.0.${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services Registered**: 12 microservices" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View in ServiceNow DevOps Insights](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/insights-home)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Create ServiceNow Change Request using DevOps Change Action
   create-change-request:
     name: Create Change Request
     runs-on: ubuntu-latest
-    needs: security-scans
+    needs: [security-scans, register-artifacts]
     outputs:
       change_request_number: ${{ steps.create-change.outputs.change-request-number }}
       change_request_sys_id: ${{ steps.create-change.outputs.change-request-sys-id }}
@@ -82,7 +198,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**DevOps Workspace**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home" >> $GITHUB_STEP_SUMMARY
 
-  # Job 3: Upload Security Evidence to ServiceNow
+  # Job 4: Upload Security Evidence to ServiceNow
   upload-security-evidence:
     name: Upload Security Evidence
     runs-on: ubuntu-latest
@@ -235,7 +351,7 @@ jobs:
           echo "⚠️ Evidence files uploaded but work note update failed" >> $GITHUB_STEP_SUMMARY
           exit 0  # Don't fail the job - evidence was uploaded
 
-  # Job 4: Pre-Deployment Checks (runs after change is approved)
+  # Job 5: Pre-Deployment Checks (runs after change is approved)
   pre-deployment-checks:
     name: Pre-Deployment Checks
     runs-on: ubuntu-latest
@@ -275,7 +391,7 @@ jobs:
           echo "✅ All pre-deployment checks passed" >> $GITHUB_STEP_SUMMARY
           echo "Ready to deploy to **${{ github.event.inputs.environment }}**" >> $GITHUB_STEP_SUMMARY
 
-  # Job 5: Deploy Application
+  # Job 6: Deploy Application
   deploy:
     name: Deploy to ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
@@ -368,7 +484,7 @@ jobs:
           echo "⚠️ Change number not available from DevOps API, skipping update" >> $GITHUB_STEP_SUMMARY
           echo "Deployment succeeded but change request update failed" >> $GITHUB_STEP_SUMMARY
 
-  # Job 6: Rollback on Failure
+  # Job 7: Rollback on Failure
   rollback:
     name: Rollback Deployment
     runs-on: ubuntu-latest
