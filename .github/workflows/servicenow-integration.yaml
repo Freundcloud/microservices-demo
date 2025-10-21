@@ -52,7 +52,8 @@ jobs:
       - name: Register Docker Images as Artifacts
         uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
@@ -125,7 +126,8 @@ jobs:
         id: create-change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
@@ -293,7 +295,8 @@ jobs:
         uses: ServiceNow/servicenow-devops-security-result@v3.1.0
         continue-on-error: true
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
