@@ -129,7 +129,7 @@ jobs:
           echo "## 🎫 Creating Change Request in ServiceNow" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Prepare change request payload
+          # yamllint disable-line rule:line-length
           PAYLOAD='{"short_description":"Deploy Online Boutique to ENV_PLACEHOLDER","description":"Automated deployment via GitHub Actions.\n\nRepo: REPO_PLACEHOLDER\nEnv: ENV_PLACEHOLDER\nCommit: COMMIT_PLACEHOLDER\nTriggered by: ACTOR_PLACEHOLDER\nWorkflow: WORKFLOW_URL_PLACEHOLDER\n\nSecurity: SECURITY_STATUS_PLACEHOLDER\nFindings: SECURITY_FINDINGS_PLACEHOLDER","implementation_plan":"1. Deploy using Kustomize\n2. Apply to namespace: microservices-ENV_PLACEHOLDER\n3. Wait for deployments (timeout: 10min)\n4. Verify health checks\n5. Test frontend endpoint","backout_plan":"1. kubectl rollout undo deployment --all -n microservices-ENV_PLACEHOLDER\nOR\n2. kubectl delete -k kustomize/overlays/ENV_PLACEHOLDER\n3. Redeploy previous version\n4. Verify rollback","test_plan":"1. Verify pods running in microservices-ENV_PLACEHOLDER\n2. Get ingress gateway URL\n3. Test frontend endpoint (HTTP 200)\n4. Check Istio mesh connectivity\n5. Verify health endpoints","risk":"RISK_PLACEHOLDER","correlation_id":"WORKFLOW_RUN_ID_PLACEHOLDER","u_github_repo":"REPO_PLACEHOLDER","u_github_commit":"COMMIT_PLACEHOLDER"}'
 
           # Replace placeholders with actual values
