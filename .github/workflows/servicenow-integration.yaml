@@ -137,7 +137,17 @@ jobs:
               "autoCloseChange": true,
               "attributes": {
                 "short_description": "Deploy Online Boutique microservices to ${{ inputs.environment }}",
-                "description": "Automated deployment via GitHub Actions Master Pipeline.\n\nRepository: ${{ github.repository }}\nEnvironment: ${{ inputs.environment }}\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\nWorkflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nSecurity Scan Status: ${{ inputs.security_scan_status }}\nFindings: ${{ inputs.security_findings }}",
+                "description": >-
+                  Automated deployment via GitHub Actions Master Pipeline.
+
+                  Repository: ${{ github.repository }}
+                  Environment: ${{ inputs.environment }}
+                  Commit: ${{ github.sha }}
+                  Triggered by: ${{ github.actor }}
+                  Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+                  Security Scan Status: ${{ inputs.security_scan_status }}
+                  Findings: ${{ inputs.security_findings }},
                 "implementation_plan": "1. Deploy using Kustomize overlay for ${{ inputs.environment }}\n2. Apply to namespace: microservices-${{ inputs.environment }}\n3. Wait for all deployments to become ready (timeout: 10 minutes)\n4. Verify pod health checks and readiness probes\n5. Test frontend endpoint accessibility",
                 "backout_plan": "When deployment fails:\n1. kubectl rollout undo deployment --all -n microservices-${{ inputs.environment }}\nOR\n2. kubectl delete -k kustomize/overlays/${{ inputs.environment }}\n3. Redeploy previous known-good version\n4. Verify rollback success via pod status",
                 "test_plan": "Post-deployment verification:\n1. kubectl get pods -n microservices-${{ inputs.environment }} (verify all Running)\n2. kubectl get svc -n istio-system istio-ingressgateway (get LoadBalancer URL)\n3. curl -f http://<FRONTEND_URL>/ (verify HTTP 200)\n4. Check Istio service mesh connectivity\n5. Verify all microservice health endpoints",
