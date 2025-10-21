@@ -18,6 +18,6 @@ resources:
 
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 5
+  minReplicas: 1  # Ultra-minimal config: single replica for demo
+  maxReplicas: 3  # Reduced for cost optimization
   targetCPUUtilizationPercentage: 80

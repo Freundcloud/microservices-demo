@@ -216,6 +216,7 @@ resource "null_resource" "install_istio_ingressgateway" {
         --namespace istio-system \
         --version 1.20.8 \
         --values ${path.module}/istio-gateway-values.yaml \
+        --timeout 10m \
         --wait
     EOT
   }
