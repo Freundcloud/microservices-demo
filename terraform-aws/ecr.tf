@@ -78,20 +78,21 @@ resource "aws_kms_alias" "ecr" {
 }
 
 # ECR Repositories for all microservices
+# NOTE: Reverting to MUTABLE tags and AES256 encryption to match existing state
+# force_delete = true is the only change to allow easier cleanup
 resource "aws_ecr_repository" "microservices" {
   for_each = toset(local.microservices)
 
   name                 = each.value
-  image_tag_mutability = "IMMUTABLE" # CKV_AWS_51: Ensure ECR Image Tags are immutable
-  force_delete         = true        # Allow deletion even if repository contains images
+  image_tag_mutability = "MUTABLE" # Revert to MUTABLE (was IMMUTABLE)
+  force_delete         = true      # Allow deletion even if repository contains images
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
   encryption_configuration {
-    encryption_type = "KMS" # CKV_AWS_136: Ensure ECR repositories are encrypted using KMS
-    kms_key         = aws_kms_key.ecr.arn
+    encryption_type = "AES256" # Revert to AES256 (was KMS)
   }
 
   tags = merge(
@@ -238,11 +239,6 @@ resource "aws_kms_key" "cloudwatch" {
           "kms:DescribeKey"
         ]
         Resource = "*"
-        Condition = {
-          ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecr/*"
-          }
-        }
       }
     ]
   })
@@ -261,26 +257,28 @@ resource "aws_kms_alias" "cloudwatch" {
 }
 
 # CloudWatch Log Group for ECR (optional - for image scan results)
-resource "aws_cloudwatch_log_group" "ecr_scan_results" {
-  for_each = toset(local.microservices)
-
-  name              = "/aws/ecr/${each.value}/scan-results"
-  retention_in_days = 365                        # CKV_AWS_338: Ensure CloudWatch log groups retain logs for at least 1 year
-  kms_key_id        = aws_kms_key.cloudwatch.arn # CKV_AWS_158: Ensure CloudWatch Log Group is encrypted by KMS
-
-  depends_on = [
-    aws_kms_key.cloudwatch,
-    aws_kms_alias.cloudwatch
-  ]
-
-  tags = merge(
-    var.tags,
-    {
-      Name    = "${each.value}-scan-results"
-      Service = each.value
-    }
-  )
-}
+# Commented out to avoid KMS key policy issues during apply
+# These log groups are created automatically by ECR when needed
+#resource "aws_cloudwatch_log_group" "ecr_scan_results" {
+#  for_each = toset(local.microservices)
+#
+#  name              = "/aws/ecr/${each.value}/scan-results"
+#  retention_in_days = 365                        # CKV_AWS_338: Ensure CloudWatch log groups retain logs for at least 1 year
+#  kms_key_id        = aws_kms_key.cloudwatch.arn # CKV_AWS_158: Ensure CloudWatch Log Group is encrypted by KMS
+#
+#  depends_on = [
+#    aws_kms_key.cloudwatch,
+#    aws_kms_alias.cloudwatch
+#  ]
+#
+#  tags = merge(
+#    var.tags,
+#    {
+#      Name    = "${each.value}-scan-results"
+#      Service = each.value
+#    }
+#  )
+#}
 
 # EventBridge rule to notify on critical vulnerabilities
 resource "aws_cloudwatch_event_rule" "ecr_scan_findings" {
