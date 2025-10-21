@@ -84,7 +84,9 @@ jobs:
       - name: Set Build Matrix
         id: set-matrix
         run: |
-          if [ "${{ inputs.services }}" == "all" ]; then
+          SERVICES_INPUT='${{ inputs.services }}'
+
+          if [ "$SERVICES_INPUT" == "all" ]; then
             # Build all services that changed
             CHANGED=$(echo '${{ steps.filter.outputs.changes }}' | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
@@ -96,14 +98,20 @@ jobs:
               echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
             fi
-          elif [ "${{ inputs.services }}" == "none" ]; then
+          elif [ "$SERVICES_INPUT" == "none" ]; then
             # Build nothing
             echo 'matrix=[]' >> $GITHUB_OUTPUT
             echo 'has_services=false' >> $GITHUB_OUTPUT
           else
             # Build specific services provided as JSON array
-            echo "matrix=${{ inputs.services }}" >> $GITHUB_OUTPUT
-            echo 'has_services=true' >> $GITHUB_OUTPUT
+            # Validate it's valid JSON first
+            if echo "$SERVICES_INPUT" | jq empty 2>/dev/null; then
+              echo "matrix=$SERVICES_INPUT" >> $GITHUB_OUTPUT
+              echo 'has_services=true' >> $GITHUB_OUTPUT
+            else
+              echo "Error: Invalid JSON in services input"
+              exit 1
+            fi
           fi
 
           # Display what we're building
@@ -111,7 +119,7 @@ jobs:
           echo "### 🔨 Services to Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
-          echo "$MATRIX" | jq . >> $GITHUB_STEP_SUMMARY
+          echo "$MATRIX" | jq '.' >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   # Build, scan, and push Docker images
