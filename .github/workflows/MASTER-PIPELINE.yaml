@@ -406,13 +406,20 @@ jobs:
           echo "## 🔄 Updating Change Request $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Prepare update payload
-          UPDATE_PAYLOAD='{"close_code":"CLOSE_CODE_PLACEHOLDER","close_notes":"CLOSE_NOTES_PLACEHOLDER","state":"STATE_PLACEHOLDER"}'
+          # Prepare update payload using jq for proper JSON encoding
+          CLOSE_CODE="${{ steps.status.outputs.final_status }}"
+          STATE="${{ steps.status.outputs.state }}"
+          NOTES="${{ steps.status.outputs.notes }}"
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT="${{ github.sha }}"
 
-          # Replace placeholders
-          UPDATE_PAYLOAD=$(echo "$UPDATE_PAYLOAD" | sed "s|CLOSE_CODE_PLACEHOLDER|${{ steps.status.outputs.final_status }}|g")
-          UPDATE_PAYLOAD=$(echo "$UPDATE_PAYLOAD" | sed "s|CLOSE_NOTES_PLACEHOLDER|${{ steps.status.outputs.notes }}\\n\\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\\nCommit: ${{ github.sha }}|g")
-          UPDATE_PAYLOAD=$(echo "$UPDATE_PAYLOAD" | sed "s|STATE_PLACEHOLDER|${{ steps.status.outputs.state }}|g")
+          CLOSE_NOTES=$(printf "%s\n\nWorkflow: %s\nCommit: %s" "$NOTES" "$WORKFLOW_URL" "$COMMIT")
+
+          UPDATE_PAYLOAD=$(jq -n \
+            --arg close_code "$CLOSE_CODE" \
+            --arg close_notes "$CLOSE_NOTES" \
+            --arg state "$STATE" \
+            '{close_code: $close_code, close_notes: $close_notes, state: $state}')
 
           echo "Updating change request in ServiceNow..."
 
