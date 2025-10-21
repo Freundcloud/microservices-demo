@@ -600,12 +600,7 @@ jobs:
 
           # Prepare evidence payload
           # yamllint disable rule:line-length
-          EVIDENCE=$(cat <<'EOF'
-{
-  "work_notes": "Deployment Evidence Collection\n\n=== EKS Cluster Evidence ===\nCluster Version: CLUSTER_VERSION_PLACEHOLDER\nCluster Status: CLUSTER_STATUS_PLACEHOLDER\nDeployments: DEPLOYMENT_COUNT_PLACEHOLDER\nTotal Pods: POD_COUNT_PLACEHOLDER\nRunning Pods: RUNNING_PODS_PLACEHOLDER\n\n=== Infrastructure Evidence ===\nTotal Terraform Resources: TOTAL_RESOURCES_PLACEHOLDER\n\n=== Workflow Details ===\nRun: WORKFLOW_URL_PLACEHOLDER\nCommit: COMMIT_SHA_PLACEHOLDER\nActor: ACTOR_PLACEHOLDER\nTimestamp: TIMESTAMP_PLACEHOLDER"
-}
-EOF
-          )
+          EVIDENCE='{"work_notes":"Deployment Evidence Collection\n\n=== EKS Cluster Evidence ===\nCluster Version: CLUSTER_VERSION_PLACEHOLDER\nCluster Status: CLUSTER_STATUS_PLACEHOLDER\nDeployments: DEPLOYMENT_COUNT_PLACEHOLDER\nTotal Pods: POD_COUNT_PLACEHOLDER\nRunning Pods: RUNNING_PODS_PLACEHOLDER\n\n=== Infrastructure Evidence ===\nTotal Terraform Resources: TOTAL_RESOURCES_PLACEHOLDER\n\n=== Workflow Details ===\nRun: WORKFLOW_URL_PLACEHOLDER\nCommit: COMMIT_SHA_PLACEHOLDER\nActor: ACTOR_PLACEHOLDER\nTimestamp: TIMESTAMP_PLACEHOLDER"}'
           # yamllint enable rule:line-length
 
           # Replace placeholders with actual values
