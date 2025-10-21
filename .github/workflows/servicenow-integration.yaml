@@ -269,25 +269,26 @@ jobs:
       - name: Add Work Note with Security Summary
         run: |
           CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
-          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          STATUS="${{ inputs.security_scan_status }}"
+          FINDINGS="${{ inputs.security_findings }}"
+          WORKFLOW="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          PAYLOAD=$(jq -n \
-            --arg status "${{ inputs.security_scan_status }}" \
-            --arg findings "${{ inputs.security_findings }}" \
-            --arg workflow "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{
-              work_notes: "🔒 SECURITY SCAN EVIDENCE UPLOADED\n\n" +
-                "Security Scan Status: \($status)\n" +
-                (if $status == "PASSED" then "✅ All security scans passed - Safe to proceed"
-                 elif $status == "FAILED" then "⚠️ REVIEW REQUIRED: \($findings) findings detected"
-                 else "ℹ️ Security scans completed - review attached evidence" end) +
-                "\n\nEvidence: SARIF results + summary report\n" +
-                "Workflow: \($workflow)\n" +
-                "Compliance: SOC 2 CC7.1 security controls"
-            }')
+          # Build status message based on scan results
+          if [ "$STATUS" == "PASSED" ]; then
+            STATUS_MSG="✅ All security scans passed - Safe to proceed"
+          elif [ "$STATUS" == "FAILED" ]; then
+            STATUS_MSG="⚠️ REVIEW REQUIRED: $FINDINGS findings detected"
+          else
+            STATUS_MSG="ℹ️ Security scans completed - review attached evidence"
+          fi
 
-          curl -s -H "Authorization: Basic $BASIC_AUTH" \
-            -H "Content-Type: application/json" \
+          # Create work note payload
+          WORK_NOTE="🔒 SECURITY SCAN EVIDENCE UPLOADED\n\nSecurity Scan Status: $STATUS\n$STATUS_MSG\n\nEvidence: SARIF results + summary report\nWorkflow: $WORKFLOW\nCompliance: SOC 2 CC7.1 security controls"
+          PAYLOAD=$(jq -n --arg note "$WORK_NOTE" '{work_notes: $note}')
+
+          curl -s -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
             -d "$PAYLOAD" \
             "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" > /dev/null
 
