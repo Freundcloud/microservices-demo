@@ -600,26 +600,25 @@ jobs:
 
           # Prepare evidence payload
           # yamllint disable rule:line-length
-          EVIDENCE=$(cat <<EOF
-          {
-            "work_notes": "Deployment Evidence Collection\n\n\
-=== EKS Cluster Evidence ===\n\
-Cluster Version: ${{ steps.eks-evidence.outputs.cluster_version }}\n\
-Cluster Status: ${{ steps.eks-evidence.outputs.cluster_status }}\n\
-Deployments: ${{ steps.eks-evidence.outputs.deployment_count }}\n\
-Total Pods: ${{ steps.eks-evidence.outputs.pod_count }}\n\
-Running Pods: ${{ steps.eks-evidence.outputs.running_pods }}\n\n\
-=== Infrastructure Evidence ===\n\
-Total Terraform Resources: ${{ steps.terraform-evidence.outputs.total_resources }}\n\n\
-=== Workflow Details ===\n\
-Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\
-Commit: ${{ github.sha }}\n\
-Actor: ${{ github.actor }}\n\
-Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          }
-          EOF
+          EVIDENCE=$(cat <<'EOF'
+{
+  "work_notes": "Deployment Evidence Collection\n\n=== EKS Cluster Evidence ===\nCluster Version: CLUSTER_VERSION_PLACEHOLDER\nCluster Status: CLUSTER_STATUS_PLACEHOLDER\nDeployments: DEPLOYMENT_COUNT_PLACEHOLDER\nTotal Pods: POD_COUNT_PLACEHOLDER\nRunning Pods: RUNNING_PODS_PLACEHOLDER\n\n=== Infrastructure Evidence ===\nTotal Terraform Resources: TOTAL_RESOURCES_PLACEHOLDER\n\n=== Workflow Details ===\nRun: WORKFLOW_URL_PLACEHOLDER\nCommit: COMMIT_SHA_PLACEHOLDER\nActor: ACTOR_PLACEHOLDER\nTimestamp: TIMESTAMP_PLACEHOLDER"
+}
+EOF
           )
           # yamllint enable rule:line-length
+
+          # Replace placeholders with actual values
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|CLUSTER_VERSION_PLACEHOLDER|${{ steps.eks-evidence.outputs.cluster_version }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|CLUSTER_STATUS_PLACEHOLDER|${{ steps.eks-evidence.outputs.cluster_status }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|DEPLOYMENT_COUNT_PLACEHOLDER|${{ steps.eks-evidence.outputs.deployment_count }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|POD_COUNT_PLACEHOLDER|${{ steps.eks-evidence.outputs.pod_count }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|RUNNING_PODS_PLACEHOLDER|${{ steps.eks-evidence.outputs.running_pods }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|TOTAL_RESOURCES_PLACEHOLDER|${{ steps.terraform-evidence.outputs.total_resources }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|WORKFLOW_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|COMMIT_SHA_PLACEHOLDER|${{ github.sha }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|ACTOR_PLACEHOLDER|${{ github.actor }}|g")
+          EVIDENCE=$(echo "$EVIDENCE" | sed "s|TIMESTAMP_PLACEHOLDER|$(date -u '+%Y-%m-%d %H:%M:%S UTC')|g")
 
           # Update change request with evidence using REST API
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
