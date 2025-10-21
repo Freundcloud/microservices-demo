@@ -22,7 +22,8 @@ resource "null_resource" "install_alb_controller" {
   triggers = {
     cluster_version = module.eks.cluster_version
     role_arn        = aws_iam_role.aws_load_balancer_controller[0].arn
-    always_run      = timestamp()
+    # Removed always_run to prevent unnecessary re-installations on every terraform apply
+    # Helm upgrade --install is idempotent and will only update if changes are detected
   }
 
   provisioner "local-exec" {
@@ -66,7 +67,7 @@ resource "null_resource" "install_metrics_server" {
 
   triggers = {
     cluster_version = module.eks.cluster_version
-    always_run      = timestamp()
+    # Removed always_run to prevent unnecessary re-installations on every terraform apply
   }
 
   provisioner "local-exec" {
@@ -97,7 +98,7 @@ resource "null_resource" "install_cluster_autoscaler" {
   triggers = {
     cluster_version = module.eks.cluster_version
     role_arn        = aws_iam_role.cluster_autoscaler[0].arn
-    always_run      = timestamp()
+    # Removed always_run to prevent unnecessary re-installations on every terraform apply
   }
 
   provisioner "local-exec" {
@@ -135,7 +136,7 @@ resource "null_resource" "install_istio_base" {
   triggers = {
     cluster_version = module.eks.cluster_version
     istio_version   = var.istio_version
-    always_run      = timestamp()
+    # Removed always_run to prevent unnecessary re-installations on every terraform apply
   }
 
   provisioner "local-exec" {
@@ -167,7 +168,7 @@ resource "null_resource" "install_istiod" {
   triggers = {
     cluster_version = module.eks.cluster_version
     istio_version   = var.istio_version
-    always_run      = timestamp()
+    # Removed always_run to prevent unnecessary re-installations on every terraform apply
   }
 
   provisioner "local-exec" {
@@ -199,7 +200,7 @@ resource "null_resource" "install_istio_ingressgateway" {
   triggers = {
     cluster_version = module.eks.cluster_version
     istio_version   = var.istio_version
-    always_run      = timestamp()
+    # Removed always_run to prevent unnecessary re-installations on every terraform apply
   }
 
   provisioner "local-exec" {
@@ -230,7 +231,7 @@ resource "null_resource" "create_redis_resources" {
 
   triggers = {
     redis_endpoint = aws_elasticache_cluster.redis[0].cache_nodes[0].address
-    always_run     = timestamp()
+    # Removed always_run to prevent unnecessary re-creation of Redis resources on every terraform apply
   }
 
   provisioner "local-exec" {
