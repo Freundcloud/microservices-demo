@@ -243,8 +243,9 @@ jobs:
       - name: Run Polaris Audit
         run: |
           # Use custom config to adjust warning levels for demo environment
-          polaris audit --audit-path kubernetes-manifests/ --config .polaris.yaml --format json > polaris-results.json || true
-        continue-on-error: true
+          # Exit code 8 = warnings found (expected), exit code 0 = no issues
+          polaris audit --audit-path kubernetes-manifests/ --config .polaris.yaml --format json > polaris-results.json && exit 0 || exit 0
+        continue-on-error: false
 
       - name: Upload Polaris Results
         uses: actions/upload-artifact@v4
