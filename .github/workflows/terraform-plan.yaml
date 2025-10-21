@@ -1,6 +1,7 @@
+---
 name: "Terraform Plan (Reusable)"
 
-on:
+"on":
   workflow_call:
     inputs:
       environment:

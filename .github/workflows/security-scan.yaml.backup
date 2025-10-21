@@ -1,4 +1,3 @@
-# yamllint disable rule:line-length
 name: "Security Scanning"
 
 on:
@@ -71,6 +70,25 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
+      - name: Register CodeQL Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'CodeQL Analysis (${{ matrix.language }})'
+          security-result-attributes: >
+            {
+              "scanner": "CodeQL",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-codeql-${{ matrix.language }}",
+              "securityToolId": "codeql-${{ matrix.language }}"
+            }
+
   # Dependency scanning with Dependabot
   dependency-review:
     name: Dependency Review
@@ -127,6 +145,25 @@ jobs:
           sarif_file: semgrep-results.sarif
           category: semgrep
 
+      - name: Register Semgrep Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Semgrep SAST'
+          security-result-attributes: >
+            {
+              "scanner": "Semgrep",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-semgrep",
+              "securityToolId": "semgrep"
+            }
+
   # Container scanning with Trivy
   trivy-fs-scan:
     name: Trivy Filesystem Scan
@@ -151,6 +188,25 @@ jobs:
         with:
           sarif_file: 'trivy-fs-results.sarif'
           category: trivy-filesystem
+
+      - name: Register Trivy Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Trivy Filesystem Scan'
+          security-result-attributes: >
+            {
+              "scanner": "Trivy",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-trivy",
+              "securityToolId": "trivy"
+            }
 
   # License compliance check
   license-check:
@@ -220,6 +276,44 @@ jobs:
           category: tfsec-terraform
         continue-on-error: true
 
+      - name: Register Checkov Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'IaC Security Scan (Checkov)'
+          security-result-attributes: >
+            {
+              "scanner": "Checkov",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-checkov",
+              "securityToolId": "checkov"
+            }
+
+      - name: Register tfsec Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'IaC Security Scan (tfsec)'
+          security-result-attributes: >
+            {
+              "scanner": "tfsec",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-tfsec",
+              "securityToolId": "tfsec"
+            }
+
   # Kubernetes manifest scanning
   k8s-manifest-scan:
     name: Kubernetes Manifest Scan
@@ -255,6 +349,44 @@ jobs:
           name: polaris-results
           path: polaris-results.json
 
+      - name: Register Polaris Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Kubernetes Manifest Scan (Polaris)'
+          security-result-attributes: >
+            {
+              "scanner": "Polaris",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-polaris",
+              "securityToolId": "polaris"
+            }
+
+      - name: Register Kubesec Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Kubernetes Manifest Scan (Kubesec)'
+          security-result-attributes: >
+            {
+              "scanner": "Kubesec",
+              "scannerVersion": "v2",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-kubesec",
+              "securityToolId": "kubesec"
+            }
+
   # OWASP Dependency Check
   owasp-dependency-check:
     name: OWASP Dependency Check
@@ -278,6 +410,25 @@ jobs:
         with:
           sarif_file: dependency-check-report/dependency-check-report.sarif
           category: owasp-dependency-check
+
+      - name: Register OWASP Dependency Check Security Results in ServiceNow
+        if: always()
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'OWASP Dependency Check'
+          security-result-attributes: >
+            {
+              "scanner": "OWASP Dependency Check",
+              "scannerVersion": "latest",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-owasp-dependency-check",
+              "securityToolId": "owasp-dependency-check"
+            }
 
   # Security summary with detailed evidence generation
   security-summary:

@@ -1,6 +1,7 @@
+---
 name: EKS Cluster Discovery to ServiceNow
 
-on:
+"on":
   schedule:
     - cron: '0 */6 * * *'  # Every 6 hours
   workflow_dispatch:  # Manual trigger

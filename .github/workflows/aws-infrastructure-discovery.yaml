@@ -1,3 +1,4 @@
+---
 name: AWS Infrastructure Discovery (Terraform State)
 
 # 📖 WORKFLOW DESCRIPTION
@@ -26,7 +27,7 @@ name: AWS Infrastructure Discovery (Terraform State)
 #
 # 📚 Documentation: docs/AWS-INFRASTRUCTURE-DISCOVERY-GUIDE.md
 
-on:
+"on":
   schedule:
     - cron: '0 6 * * *'  # Daily at 6 AM UTC (infrastructure changes less frequently than runtime)
   workflow_dispatch:  # Manual trigger
