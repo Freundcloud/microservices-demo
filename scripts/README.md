@@ -260,10 +260,22 @@ https://calitiiltddemo3.service-now.com/api/sn_devops/v2/devops/tool/softwarequa
 
 #### View Results in ServiceNow
 
-1. Navigate to **ServiceNow DevOps** → **Security** → **Scan Results**
-2. Filter by repository: `Freundcloud/microservices-demo`
-3. View findings by scanner type (SAST, Container Security, IaC Security, SCA)
-4. Security results automatically attached to change requests
+**Correct Navigation Path** (ServiceNow Velocity DevOps):
+1. Navigate to **DevOps** → **Change** → **Tools**
+2. Find your GitHub tool: **GitHub Demo**
+3. Click on the tool to open details
+4. Select the **Security** tab (tab index 6)
+5. View security scan summaries and findings
+
+**Alternative Path**:
+- Direct URL: `https://YOUR_INSTANCE.service-now.com/now/devops-change/record/sn_devops_tool/TOOL_ID/params/selected-tab-index/6`
+- Replace `TOOL_ID` with: `2fe9c38bc36c72d0e1bbf0cb050131cc`
+
+**Note**: Security results will appear after:
+- GitHub Actions workflows complete security scans
+- SARIF results are uploaded to GitHub Security
+- GitHub webhook sends security events to ServiceNow
+- ServiceNow DevOps processes the webhook data
 
 #### Re-running Registration
 
