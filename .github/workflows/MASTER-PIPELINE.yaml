@@ -599,12 +599,27 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Prepare evidence payload
+          # yamllint disable rule:line-length
           EVIDENCE=$(cat <<EOF
           {
-            "work_notes": "Deployment Evidence Collection\n\n=== EKS Cluster Evidence ===\nCluster Version: ${{ steps.eks-evidence.outputs.cluster_version }}\nCluster Status: ${{ steps.eks-evidence.outputs.cluster_status }}\nDeployments: ${{ steps.eks-evidence.outputs.deployment_count }}\nTotal Pods: ${{ steps.eks-evidence.outputs.pod_count }}\nRunning Pods: ${{ steps.eks-evidence.outputs.running_pods }}\n\n=== Infrastructure Evidence ===\nTotal Terraform Resources: ${{ steps.terraform-evidence.outputs.total_resources }}\n\n=== Workflow Details ===\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\nCommit: ${{ github.sha }}\nActor: ${{ github.actor }}\nTimestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            "work_notes": "Deployment Evidence Collection\n\n\
+=== EKS Cluster Evidence ===\n\
+Cluster Version: ${{ steps.eks-evidence.outputs.cluster_version }}\n\
+Cluster Status: ${{ steps.eks-evidence.outputs.cluster_status }}\n\
+Deployments: ${{ steps.eks-evidence.outputs.deployment_count }}\n\
+Total Pods: ${{ steps.eks-evidence.outputs.pod_count }}\n\
+Running Pods: ${{ steps.eks-evidence.outputs.running_pods }}\n\n\
+=== Infrastructure Evidence ===\n\
+Total Terraform Resources: ${{ steps.terraform-evidence.outputs.total_resources }}\n\n\
+=== Workflow Details ===\n\
+Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\
+Commit: ${{ github.sha }}\n\
+Actor: ${{ github.actor }}\n\
+Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           }
           EOF
           )
+          # yamllint enable rule:line-length
 
           # Update change request with evidence using REST API
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
