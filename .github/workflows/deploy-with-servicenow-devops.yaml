@@ -352,11 +352,60 @@ jobs:
           echo "⚠️ Evidence files uploaded but work note update failed" >> $GITHUB_STEP_SUMMARY
           exit 0  # Don't fail the job - evidence was uploaded
 
+  # Job 4.5: Register Security Scan Results in ServiceNow DevOps
+  register-security-results:
+    name: Register Security Results
+    runs-on: ubuntu-latest
+    needs: [security-scans, create-change-request]
+    if: always() && needs.create-change-request.outputs.change_request_sys_id != ''
+
+    strategy:
+      fail-fast: false
+      matrix:
+        scanner:
+          - {name: "CodeQL-Python", id: "codeql-python", version: "latest"}
+          - {name: "CodeQL-JavaScript", id: "codeql-javascript", version: "latest"}
+          - {name: "CodeQL-Go", id: "codeql-go", version: "latest"}
+          - {name: "CodeQL-Java", id: "codeql-java", version: "latest"}
+          - {name: "CodeQL-CSharp", id: "codeql-csharp", version: "latest"}
+          - {name: "Semgrep", id: "semgrep", version: "latest"}
+          - {name: "Trivy", id: "trivy", version: "latest"}
+          - {name: "Checkov", id: "checkov", version: "latest"}
+          - {name: "tfsec", id: "tfsec", version: "latest"}
+          - {name: "Polaris", id: "polaris", version: "latest"}
+          - {name: "Kubesec", id: "kubesec", version: "latest"}
+          - {name: "OWASP-Dependency-Check", id: "owasp-dependency-check", version: "latest"}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Register ${{ matrix.scanner.name }} Security Results in ServiceNow
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        continue-on-error: true
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Register Security Results (${{ matrix.scanner.name }})'
+          security-result-attributes: >
+            {
+              "scanner": "${{ matrix.scanner.name }}",
+              "scannerVersion": "${{ matrix.scanner.version }}",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository_id }}",
+              "scanId": "${{ github.run_id }}-${{ matrix.scanner.id }}",
+              "securityToolId": "${{ matrix.scanner.id }}",
+              "changeRequestNumber": "${{ needs.create-change-request.outputs.change_request_number }}",
+              "changeRequestSysId": "${{ needs.create-change-request.outputs.change_request_sys_id }}"
+            }
+
   # Job 5: Pre-Deployment Checks (runs after change is approved)
   pre-deployment-checks:
     name: Pre-Deployment Checks
     runs-on: ubuntu-latest
-    needs: [create-change-request, upload-security-evidence]
+    needs: [create-change-request, upload-security-evidence, register-security-results]
 
     steps:
       - name: Checkout code
