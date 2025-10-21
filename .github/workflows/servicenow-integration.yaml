@@ -247,7 +247,8 @@ jobs:
           fi
 
           # Upload SARIF files
-          for sarif_file in security-scan-evidence/*.sarif 2>/dev/null; do
+          shopt -s nullglob  # Prevent errors if no .sarif files exist
+          for sarif_file in security-scan-evidence/*.sarif; do
             if [ -f "$sarif_file" ]; then
               curl -s -w "\n%{http_code}" \
                 -H "Authorization: Basic $BASIC_AUTH" \
@@ -259,6 +260,7 @@ jobs:
               UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
             fi
           done
+          shopt -u nullglob  # Restore default behavior
 
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✅ UPLOADED $UPLOADED_COUNT FILES TO SERVICENOW"
