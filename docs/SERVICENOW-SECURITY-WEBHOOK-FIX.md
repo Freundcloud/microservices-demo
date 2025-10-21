@@ -44,40 +44,53 @@ Other ServiceNow DevOps endpoints **don't require authentication**:
 
 ## Solution Options
 
-### Option 1: Configure ServiceNow GitHub Tool (RECOMMENDED)
+### Option 1: Use ServiceNow GitHub App Integration (RECOMMENDED)
 
-**Steps for ServiceNow Admin**:
+**This is the cleanest solution** - ServiceNow's GitHub App handles authentication automatically.
 
-1. Navigate to **DevOps** → **Change** → **Tools**
-2. Find and click on **GitHub Demo** tool
-3. Click the **Edit** or **Configure** button (three-dot menu)
-4. Look for webhook or API authentication settings
-5. Check if there's an option to:
-   - Allow unauthenticated webhook requests for security events
-   - Configure token-based authentication for webhooks
-   - Enable GitHub signature verification (instead of Basic Auth)
-
-**Note**: The exact UI options depend on your ServiceNow DevOps plugin version. The goal is to configure the tool to accept GitHub webhook payloads for the `/softwarequality` endpoint without requiring Basic Authentication headers.
-
-### Option 2: Use ServiceNow GitHub App Integration (PREFERRED)
-
-Instead of manual webhooks, use ServiceNow's native GitHub App:
+**Steps**:
 
 1. **In ServiceNow**:
    - Navigate to **DevOps** → **Change** → **Tools** → **GitHub Demo**
-   - Click **Reconfigure** or **Setup GitHub App**
-   - Follow wizard to install GitHub App
+   - Look for **GitHub App** or **Reconfigure** option
+   - Follow the wizard to set up GitHub App integration
 
-2. **In GitHub**:
-   - Organization Settings → GitHub Apps
-   - Install ServiceNow DevOps app
-   - Grant permissions for Security events
+2. **In GitHub** (Organization Settings):
+   - Go to **Settings** → **GitHub Apps**
+   - Install the ServiceNow DevOps app
+   - Grant permissions for:
+     - Code scanning alerts
+     - Dependabot alerts
+     - Secret scanning alerts
 
 3. **Benefits**:
-   - ✅ Handles authentication automatically
+   - ✅ No webhook authentication issues
+   - ✅ ServiceNow GitHub App uses proper OAuth tokens
    - ✅ Supports all event types including security
-   - ✅ Better security (GitHub App tokens vs webhooks)
-   - ✅ Automatic configuration
+   - ✅ Recommended by ServiceNow for production use
+
+**Note**: After setting up the GitHub App, you can delete the manual webhook (ID: 576481667) as it will no longer be needed.
+
+### Option 2: Modify ServiceNow API Endpoint Configuration (Advanced)
+
+**This requires ServiceNow platform admin access** and is more complex than Option 1.
+
+The `/softwarequality` endpoint is configured to require Basic Authentication. To change this:
+
+1. **Requires**: ServiceNow platform administrator role
+2. **Not available in UI** - requires backend configuration
+3. **Best approach**: Open ServiceNow support case
+
+**If you have platform admin access**, you could theoretically:
+- Modify the REST API ACL rules for the endpoint
+- Configure the endpoint to accept GitHub webhook signature verification
+- Add GitHub webhook IP ranges to an allowlist
+
+**However**, this is not recommended because:
+- ❌ Requires deep ServiceNow platform knowledge
+- ❌ Could affect other integrations
+- ❌ Not officially supported by ServiceNow
+- ✅ **Option 1 (GitHub App) is the supported approach**
 
 ### Option 3: Contact ServiceNow Support
 
