@@ -23,23 +23,13 @@ skip-check:
 # Soft fail mode - report findings but don't fail builds
 soft-fail: true
 
-# Output formats
-output:
-  - cli
-  - sarif
+# Framework settings - scan only Terraform for now
+framework: terraform
 
-# Framework settings
-framework:
-  - terraform
-  - kubernetes
-
-# Exclude specific directories from scanning
-exclude-paths:
+# Skip paths (use skip-path not exclude-paths)
+skip-path:
   - .git
   - .github
   - node_modules
   - venv
   - __pycache__
-
-# Log level
-log-level: INFO
