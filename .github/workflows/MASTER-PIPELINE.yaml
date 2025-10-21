@@ -140,7 +140,7 @@ jobs:
     name: "🔒 Security Scanning"
     needs: pipeline-init
     if: ${{ !inputs.skip_security }}
-    uses: ./.github/workflows/_reusable/security-scan.yaml
+    uses: ./.github/workflows/security-scan.yaml
     secrets: inherit
 
   # ============================================================================
@@ -165,7 +165,7 @@ jobs:
             terraform:
               - 'terraform-aws/**'
               - '.github/workflows/MASTER-PIPELINE.yaml'
-              - '.github/workflows/_reusable/terraform-*.yaml'
+              - '.github/workflows/terraform-*.yaml'
 
   terraform-plan:
     name: "📊 Terraform Plan"
@@ -173,7 +173,7 @@ jobs:
     if: |
       needs.detect-terraform-changes.outputs.terraform_changed == 'true' &&
       !inputs.skip_terraform
-    uses: ./.github/workflows/_reusable/terraform-plan.yaml
+    uses: ./.github/workflows/terraform-plan.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
@@ -186,7 +186,7 @@ jobs:
       !inputs.skip_terraform &&
       github.ref == 'refs/heads/main' &&
       github.event_name != 'pull_request'
-    uses: ./.github/workflows/_reusable/terraform-apply.yaml
+    uses: ./.github/workflows/terraform-apply.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
@@ -246,7 +246,7 @@ jobs:
     if: |
       needs.detect-service-changes.outputs.has_changes == 'true' ||
       inputs.force_build_all
-    uses: ./.github/workflows/_reusable/build-images.yaml
+    uses: ./.github/workflows/build-images.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
@@ -264,7 +264,7 @@ jobs:
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       !inputs.skip_deploy &&
       github.event_name != 'pull_request'
-    uses: ./.github/workflows/_reusable/servicenow-integration.yaml
+    uses: ./.github/workflows/servicenow-integration.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
@@ -284,7 +284,7 @@ jobs:
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       !inputs.skip_deploy &&
       (needs.create-change-request.result == 'success' || needs.create-change-request.result == 'skipped')
-    uses: ./.github/workflows/_reusable/deploy-environment.yaml
+    uses: ./.github/workflows/deploy-environment.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
