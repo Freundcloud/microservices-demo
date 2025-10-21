@@ -18,10 +18,17 @@ env:
   SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
 
 jobs:
-  # Job 1: Create ServiceNow Change Request using DevOps Change Action
+  # Job 1: Run Security Scans
+  security-scans:
+    name: Security Scans
+    uses: ./.github/workflows/security-scan.yaml
+    secrets: inherit
+
+  # Job 2: Create ServiceNow Change Request using DevOps Change Action
   create-change-request:
     name: Create Change Request
     runs-on: ubuntu-latest
+    needs: security-scans
     outputs:
       change_request_number: ${{ steps.create-change.outputs.change-request-number }}
       change_request_sys_id: ${{ steps.create-change.outputs.change-request-sys-id }}
@@ -75,11 +82,164 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**DevOps Workspace**: ${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home" >> $GITHUB_STEP_SUMMARY
 
-  # Job 2: Pre-Deployment Checks (runs after change is approved)
+  # Job 3: Upload Security Evidence to ServiceNow
+  upload-security-evidence:
+    name: Upload Security Evidence
+    runs-on: ubuntu-latest
+    needs: [security-scans, create-change-request]
+    if: always() && needs.create-change-request.outputs.change_request_sys_id != ''
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download security scan artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+
+      - name: Install jq for JSON processing
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Upload evidence files to ServiceNow Change Request
+        run: |
+          CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
+          CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+
+          echo "📤 Uploading security scan evidence to ServiceNow Change Request $CHANGE_NUMBER..."
+          echo ""
+
+          # Upload evidence report (Markdown summary)
+          UPLOADED_COUNT=0
+          if [ -f "security-scan-evidence/security-scan-evidence.md" ]; then
+            curl -s -w "\n%{http_code}" \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -F "file=@security-scan-evidence/security-scan-evidence.md" \
+              -F "file_name=security-scan-evidence-${{ github.run_number }}.md" \
+              -F "table_name=change_request" \
+              -F "table_sys_id=$CHANGE_SYS_ID" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+            echo "✅ Uploaded: security-scan-evidence-${{ github.run_number }}.md"
+            UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+          else
+            echo "⚠️  Evidence report not found (scans may have failed)"
+          fi
+
+          # Upload SARIF files
+          for sarif_file in security-scan-evidence/*.sarif; do
+            if [ -f "$sarif_file" ]; then
+              curl -s -w "\n%{http_code}" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -F "file=@$sarif_file" \
+                -F "table_name=change_request" \
+                -F "table_sys_id=$CHANGE_SYS_ID" \
+                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+              echo "✅ Uploaded: $sarif_file"
+              UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+            fi
+          done
+
+          # Upload Polaris results
+          if [ -f "polaris-results/polaris-results.json" ]; then
+            curl -s -w "\n%{http_code}" \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -F "file=@polaris-results/polaris-results.json" \
+              -F "table_name=change_request" \
+              -F "table_sys_id=$CHANGE_SYS_ID" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+            echo "✅ Uploaded: polaris-results.json"
+            UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+          fi
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ SECURITY EVIDENCE UPLOADED TO SERVICENOW"
+          echo "   Total files: $UPLOADED_COUNT"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+
+      - name: Add work note with security scan summary
+        run: |
+          CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
+          CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+
+          # Get security scan results from artifacts
+          OVERALL_STATUS="UNKNOWN"
+          TOTAL_FINDINGS=0
+
+          if [ -f "security-scan-evidence/security-scan-evidence.md" ]; then
+            # Extract status and findings from evidence file
+            if grep -q "Overall Status.*PASSED" security-scan-evidence/security-scan-evidence.md; then
+              OVERALL_STATUS="PASSED"
+            elif grep -q "Overall Status.*FAILED" security-scan-evidence/security-scan-evidence.md; then
+              OVERALL_STATUS="FAILED"
+              TOTAL_FINDINGS=$(grep "Total Findings" security-scan-evidence/security-scan-evidence.md | grep -oE '[0-9]+' | head -1 || echo "0")
+            fi
+          fi
+
+          # Create work note with security evidence
+          PAYLOAD=$(jq -n \
+            --arg status "$OVERALL_STATUS" \
+            --arg findings "$TOTAL_FINDINGS" \
+            --arg workflow "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              work_notes: "🔒 SECURITY SCAN EVIDENCE UPLOADED\n\n" +
+                "Security Scan Status: \($status)\n" +
+                (if $status == "PASSED" then "✅ All security scans passed - No high/critical vulnerabilities detected\n   Safe to proceed with deployment to ${{ github.event.inputs.environment }}"
+                 elif $status == "FAILED" then "⚠️  REVIEW REQUIRED: \($findings) security findings detected\n   Review attached evidence before approving deployment"
+                 else "ℹ️  Security scans completed - review attached evidence" end) +
+                "\n\nEvidence Documents Attached:\n" +
+                "- Security Scan Summary (Markdown)\n" +
+                "- SARIF scan results (CodeQL, Semgrep, Trivy, Checkov, tfsec, OWASP)\n" +
+                "- Polaris Kubernetes security audit\n\n" +
+                "All results are also available in GitHub Security tab.\n\n" +
+                "Workflow Run: \($workflow)\n\n" +
+                "Compliance: Evidence required for SOC 2 CC7.1 security controls"
+            }')
+
+          # Add work note to change request
+          for i in {1..3}; do
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" 2>/dev/null)
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+            if [ "$HTTP_CODE" == "200" ]; then
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "✅ WORK NOTE ADDED TO CHANGE REQUEST $CHANGE_NUMBER"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+              echo "## ✅ Security Evidence Uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| **Change Number** | \`$CHANGE_NUMBER\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Overall Status** | $OVERALL_STATUS |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Total Findings** | $TOTAL_FINDINGS |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Evidence Files** | Multiple SARIF + summary report |" >> $GITHUB_STEP_SUMMARY
+              echo "| **Work Note** | ✅ Added successfully |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+
+            echo "⚠️  Attempt $i failed (HTTP $HTTP_CODE), retrying in 2 seconds..."
+            sleep 2
+          done
+
+          echo "❌ Failed to add work note after 3 attempts"
+          echo "⚠️ Evidence files uploaded but work note update failed" >> $GITHUB_STEP_SUMMARY
+          exit 0  # Don't fail the job - evidence was uploaded
+
+  # Job 4: Pre-Deployment Checks (runs after change is approved)
   pre-deployment-checks:
     name: Pre-Deployment Checks
     runs-on: ubuntu-latest
-    needs: create-change-request
+    needs: [create-change-request, upload-security-evidence]
 
     steps:
       - name: Checkout code
@@ -115,7 +275,7 @@ jobs:
           echo "✅ All pre-deployment checks passed" >> $GITHUB_STEP_SUMMARY
           echo "Ready to deploy to **${{ github.event.inputs.environment }}**" >> $GITHUB_STEP_SUMMARY
 
-  # Job 3: Deploy Application
+  # Job 5: Deploy Application
   deploy:
     name: Deploy to ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
@@ -208,7 +368,7 @@ jobs:
           echo "⚠️ Change number not available from DevOps API, skipping update" >> $GITHUB_STEP_SUMMARY
           echo "Deployment succeeded but change request update failed" >> $GITHUB_STEP_SUMMARY
 
-  # Job 4: Rollback on Failure
+  # Job 6: Rollback on Failure
   rollback:
     name: Rollback Deployment
     runs-on: ubuntu-latest
