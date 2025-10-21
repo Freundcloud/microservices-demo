@@ -283,7 +283,7 @@ jobs:
     steps:
       - name: Register ${{ matrix.scanner.name }} Results
         uses: ServiceNow/servicenow-devops-security-result@v3.1.0
-        continue-on-error: true
+        # Removed continue-on-error to expose real API failures for troubleshooting
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}

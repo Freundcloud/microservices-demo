@@ -261,10 +261,18 @@ jobs:
   create-change-request:
     name: "📋 ServiceNow Change Management"
     needs: [pipeline-init, security-scans, build-and-push]
+    # CRITICAL: Run even if Terraform fails! ServiceNow integration should proceed
+    # as long as security scans and image builds succeeded. This ensures:
+    # 1. Security tools are registered in ServiceNow (with change context)
+    # 2. Change requests are created even for failed infrastructure deployments
+    # 3. Audit trail is complete regardless of deployment outcome
     if: |
+      always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       !inputs.skip_deploy &&
-      github.event_name != 'pull_request'
+      github.event_name != 'pull_request' &&
+      (needs.security-scans.result == 'success' || needs.security-scans.result == 'skipped') &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
     uses: ./.github/workflows/servicenow-integration.yaml
     secrets: inherit
     with:
