@@ -1,0 +1,286 @@
+name: "ServiceNow DevOps Integration (Reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment being deployed (dev/qa/prod)'
+        required: true
+        type: string
+      change_type:
+        description: 'Type of change (normal/standard/emergency)'
+        required: false
+        type: string
+        default: 'normal'
+      security_scan_status:
+        description: 'Overall security scan status (PASSED/FAILED/UNKNOWN)'
+        required: false
+        type: string
+        default: 'UNKNOWN'
+      security_findings:
+        description: 'Number of security findings'
+        required: false
+        type: string
+        default: '0'
+    outputs:
+      change_request_number:
+        description: "ServiceNow change request number"
+        value: ${{ jobs.create-change-request.outputs.change_request_number }}
+      change_request_sys_id:
+        description: "ServiceNow change request sys_id"
+        value: ${{ jobs.create-change-request.outputs.change_request_sys_id }}
+      change_status:
+        description: "Change request status"
+        value: ${{ jobs.create-change-request.outputs.change_status }}
+
+permissions:
+  contents: read
+
+env:
+  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+
+jobs:
+  # Job 1: Register Build Artifacts in ServiceNow DevOps
+  register-artifacts:
+    name: Register Artifacts in ServiceNow
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Register Docker Images as Artifacts
+        uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Register Artifacts in ServiceNow'
+          artifacts: |
+            [
+              {"name": "online-boutique-frontend", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-cartservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-productcatalogservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-currencyservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-paymentservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-shippingservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-emailservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-checkoutservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-recommendationservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-adservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-loadgenerator", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"},
+              {"name": "online-boutique-shoppingassistantservice", "version": "1.0.${{ github.run_number }}", "semanticVersion": "1.0.${{ github.run_number }}", "repositoryName": "${{ github.repository }}"}
+            ]
+
+      - name: Artifact Registration Summary
+        if: always()
+        run: |
+          echo "## 📦 Artifacts Registered in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| online-boutique (12 services) | 1.0.${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View in ServiceNow DevOps](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/insights-home)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 2: Create ServiceNow Change Request
+  create-change-request:
+    name: Create ServiceNow Change Request
+    runs-on: ubuntu-latest
+    needs: register-artifacts
+    outputs:
+      change_request_number: ${{ steps.create-change.outputs.change-request-number }}
+      change_request_sys_id: ${{ steps.create-change.outputs.change-request-sys-id }}
+      change_status: ${{ steps.create-change.outcome }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine Change Risk Level
+        id: risk
+        run: |
+          # Set risk level based on environment
+          case "${{ inputs.environment }}" in
+            dev)
+              echo "risk=low" >> $GITHUB_OUTPUT
+              echo "timeout=1800" >> $GITHUB_OUTPUT  # 30 minutes
+              ;;
+            qa)
+              echo "risk=moderate" >> $GITHUB_OUTPUT
+              echo "timeout=3600" >> $GITHUB_OUTPUT  # 1 hour
+              ;;
+            prod)
+              echo "risk=high" >> $GITHUB_OUTPUT
+              echo "timeout=7200" >> $GITHUB_OUTPUT  # 2 hours
+              ;;
+            *)
+              echo "risk=moderate" >> $GITHUB_OUTPUT
+              echo "timeout=3600" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Create Change Request via ServiceNow DevOps
+        id: create-change
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Create ServiceNow Change Request'
+          change-request: '{"changeModel":{"sys_id":"e55d0bfec343101035ae3f52c1d3ae49"},"setCloseCode":"true","autoCloseChange":true,"attributes":{"short_description":"Deploy Online Boutique microservices to ${{ inputs.environment }}","description":"Automated deployment via GitHub Actions Master Pipeline.\n\nRepository: ${{ github.repository }}\nEnvironment: ${{ inputs.environment }}\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\nWorkflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nSecurity Scan Status: ${{ inputs.security_scan_status }}\nFindings: ${{ inputs.security_findings }}","implementation_plan":"1. Deploy using Kustomize overlay for ${{ inputs.environment }}\n2. Apply to namespace: microservices-${{ inputs.environment }}\n3. Wait for all deployments to become ready (timeout: 10 minutes)\n4. Verify pod health checks and readiness probes\n5. Test frontend endpoint accessibility","backout_plan":"When deployment fails:\n1. kubectl rollout undo deployment --all -n microservices-${{ inputs.environment }}\nOR\n2. kubectl delete -k kustomize/overlays/${{ inputs.environment }}\n3. Redeploy previous known-good version\n4. Verify rollback success via pod status","test_plan":"Post-deployment verification:\n1. kubectl get pods -n microservices-${{ inputs.environment }} (verify all Running)\n2. kubectl get svc -n istio-system istio-ingressgateway (get LoadBalancer URL)\n3. curl -f http://<FRONTEND_URL>/ (verify HTTP 200)\n4. Check Istio service mesh connectivity\n5. Verify all microservice health endpoints","risk":"${{ steps.risk.outputs.risk }}"}}'
+          interval: '30'
+          timeout: '${{ steps.risk.outputs.timeout }}'
+
+      - name: Validate Change Request Creation
+        run: |
+          CHANGE_NUMBER="${{ steps.create-change.outputs.change-request-number }}"
+          CHANGE_SYS_ID="${{ steps.create-change.outputs.change-request-sys-id }}"
+
+          if [ -z "$CHANGE_NUMBER" ] || [ "$CHANGE_NUMBER" == "" ]; then
+            echo "❌ ERROR: Change request number not returned" >> $GITHUB_STEP_SUMMARY
+            echo "ServiceNow DevOps Change API call failed." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "## ✅ Change Request Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Number | **$CHANGE_NUMBER** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sys ID | \`$CHANGE_SYS_ID\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | **${{ inputs.environment }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Risk Level | ${{ steps.risk.outputs.risk }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [DevOps Workspace](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Upload Security Evidence to Change Request
+  upload-security-evidence:
+    name: Upload Security Evidence
+    runs-on: ubuntu-latest
+    needs: create-change-request
+    if: always() && needs.create-change-request.outputs.change_request_sys_id != ''
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download security scan artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+
+      - name: Install jq for JSON processing
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Upload Security Evidence Files
+        run: |
+          CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
+          CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+
+          echo "📤 Uploading security evidence to Change Request $CHANGE_NUMBER..."
+
+          UPLOADED_COUNT=0
+
+          # Upload security evidence report
+          if [ -f "security-scan-evidence/security-scan-evidence.md" ]; then
+            curl -s -w "\n%{http_code}" \
+              -H "Authorization: Basic $BASIC_AUTH" \
+              -F "file=@security-scan-evidence/security-scan-evidence.md" \
+              -F "file_name=security-scan-evidence-${{ github.run_number }}.md" \
+              -F "table_name=change_request" \
+              -F "table_sys_id=$CHANGE_SYS_ID" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+            echo "✅ Uploaded: security-scan-evidence.md"
+            UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+          fi
+
+          # Upload SARIF files
+          for sarif_file in security-scan-evidence/*.sarif 2>/dev/null; do
+            if [ -f "$sarif_file" ]; then
+              curl -s -w "\n%{http_code}" \
+                -H "Authorization: Basic $BASIC_AUTH" \
+                -F "file=@$sarif_file" \
+                -F "table_name=change_request" \
+                -F "table_sys_id=$CHANGE_SYS_ID" \
+                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+              echo "✅ Uploaded: $(basename $sarif_file)"
+              UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+            fi
+          done
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ UPLOADED $UPLOADED_COUNT FILES TO SERVICENOW"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Add Work Note with Security Summary
+        run: |
+          CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
+          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+
+          PAYLOAD=$(jq -n \
+            --arg status "${{ inputs.security_scan_status }}" \
+            --arg findings "${{ inputs.security_findings }}" \
+            --arg workflow "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              work_notes: "🔒 SECURITY SCAN EVIDENCE UPLOADED\n\n" +
+                "Security Scan Status: \($status)\n" +
+                (if $status == "PASSED" then "✅ All security scans passed - Safe to proceed"
+                 elif $status == "FAILED" then "⚠️ REVIEW REQUIRED: \($findings) findings detected"
+                 else "ℹ️ Security scans completed - review attached evidence" end) +
+                "\n\nEvidence: SARIF results + summary report\n" +
+                "Workflow: \($workflow)\n" +
+                "Compliance: SOC 2 CC7.1 security controls"
+            }')
+
+          curl -s -H "Authorization: Basic $BASIC_AUTH" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" > /dev/null
+
+          echo "✅ Work note added to change request" >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Register Security Scan Results
+  register-security-results:
+    name: Register Security Results
+    runs-on: ubuntu-latest
+    needs: create-change-request
+    if: always() && needs.create-change-request.outputs.change_request_sys_id != ''
+
+    strategy:
+      fail-fast: false
+      matrix:
+        scanner:
+          - {name: "CodeQL-Python", id: "codeql-python"}
+          - {name: "CodeQL-JavaScript", id: "codeql-javascript"}
+          - {name: "CodeQL-Go", id: "codeql-go"}
+          - {name: "CodeQL-Java", id: "codeql-java"}
+          - {name: "CodeQL-CSharp", id: "codeql-csharp"}
+          - {name: "Semgrep", id: "semgrep"}
+          - {name: "Trivy", id: "trivy"}
+          - {name: "Checkov", id: "checkov"}
+          - {name: "tfsec", id: "tfsec"}
+          - {name: "Polaris", id: "polaris"}
+
+    steps:
+      - name: Register ${{ matrix.scanner.name }} Results
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        continue-on-error: true
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Register Security Results (${{ matrix.scanner.name }})'
+          security-result-attributes: >
+            {
+              "scanner": "${{ matrix.scanner.name }}",
+              "projectName": "${{ github.repository }}",
+              "scanId": "${{ github.run_id }}-${{ matrix.scanner.id }}",
+              "securityToolId": "${{ matrix.scanner.id }}",
+              "changeRequestNumber": "${{ needs.create-change-request.outputs.change_request_number }}",
+              "changeRequestSysId": "${{ needs.create-change-request.outputs.change_request_sys_id }}"
+            }

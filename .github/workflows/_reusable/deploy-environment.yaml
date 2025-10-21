@@ -1,0 +1,272 @@
+name: "Deploy to Environment (Reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to deploy to (dev/qa/prod)'
+        required: true
+        type: string
+      change_request_sys_id:
+        description: 'ServiceNow change request sys_id (optional)'
+        required: false
+        type: string
+        default: ''
+      wait_for_ready:
+        description: 'Wait for all deployments to be ready'
+        required: false
+        type: boolean
+        default: true
+      timeout_minutes:
+        description: 'Timeout for deployment readiness (minutes)'
+        required: false
+        type: number
+        default: 10
+    outputs:
+      deployment_status:
+        description: "Status of deployment (success/failure)"
+        value: ${{ jobs.deploy.outputs.status }}
+      running_pods:
+        description: "Number of running pods"
+        value: ${{ jobs.deploy.outputs.running_pods }}
+      total_pods:
+        description: "Total number of pods"
+        value: ${{ jobs.deploy.outputs.total_pods }}
+      frontend_url:
+        description: "Frontend application URL"
+        value: ${{ jobs.deploy.outputs.frontend_url }}
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  CLUSTER_NAME: microservices
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      status: ${{ steps.deployment-status.outputs.status }}
+      running_pods: ${{ steps.health-check.outputs.running_pods }}
+      total_pods: ${{ steps.health-check.outputs.total_pods }}
+      frontend_url: ${{ steps.get-url.outputs.url }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          kubectl version --client
+          kubectl cluster-info
+
+      - name: Verify Cluster Access
+        run: |
+          echo "### 🔌 Cluster Connection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster**: \`${{ env.CLUSTER_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Region**: \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get nodes >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Ensure Namespace Exists
+        run: |
+          NAMESPACE="microservices-${{ inputs.environment }}"
+          echo "Checking namespace: $NAMESPACE"
+
+          if ! kubectl get namespace $NAMESPACE 2>/dev/null; then
+            echo "⚠️ Namespace $NAMESPACE does not exist, creating..."
+            kubectl create namespace $NAMESPACE
+            kubectl label namespace $NAMESPACE istio-injection=enabled --overwrite
+            echo "✅ Namespace created and labeled for Istio injection"
+
+            echo "### 🆕 Namespace Created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Created namespace \`$NAMESPACE\` with Istio injection enabled" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Namespace $NAMESPACE exists"
+            # Ensure Istio injection label is set
+            kubectl label namespace $NAMESPACE istio-injection=enabled --overwrite
+          fi
+
+      - name: Preview Kustomize Configuration
+        id: preview
+        run: |
+          echo "### 📋 Deployment Preview" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>View Kustomize Configuration for ${{ inputs.environment }}</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`yaml" >> $GITHUB_STEP_SUMMARY
+          kubectl kustomize kustomize/overlays/${{ inputs.environment }} | head -100 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Deploy with Kustomize
+        id: deploy
+        run: |
+          ENV="${{ inputs.environment }}"
+          echo "🚀 Deploying to environment: $ENV"
+          echo ""
+
+          # Apply Kustomize overlay
+          kubectl apply -k kustomize/overlays/$ENV
+
+          NAMESPACE="microservices-$ENV"
+          echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+
+          echo "✅ Kustomize configuration applied to namespace: $NAMESPACE"
+
+      - name: Wait for Deployments to be Ready
+        if: inputs.wait_for_ready
+        run: |
+          NAMESPACE="${{ env.NAMESPACE }}"
+          TIMEOUT="${{ inputs.timeout_minutes }}m"
+          echo "⏳ Waiting for deployments in namespace: $NAMESPACE (timeout: $TIMEOUT)"
+          echo ""
+
+          # List of core services (excluding loadgenerator in prod)
+          SERVICES="frontend cartservice productcatalogservice currencyservice paymentservice shippingservice emailservice checkoutservice recommendationservice adservice"
+
+          # Add loadgenerator for non-prod environments
+          if [ "${{ inputs.environment }}" != "prod" ]; then
+            SERVICES="$SERVICES loadgenerator"
+          fi
+
+          # Wait for each deployment
+          FAILED_SERVICES=""
+          for service in $SERVICES; do
+            echo "⏳ Waiting for $service..."
+            if ! kubectl rollout status deployment/$service -n $NAMESPACE --timeout=$TIMEOUT 2>/dev/null; then
+              echo "⚠️ $service rollout timed out or failed"
+              FAILED_SERVICES="$FAILED_SERVICES $service"
+            else
+              echo "✅ $service is ready"
+            fi
+          done
+
+          if [ -n "$FAILED_SERVICES" ]; then
+            echo "### ⚠️ Warning: Some Services Failed to Deploy" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following services did not become ready within $TIMEOUT:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "$FAILED_SERVICES" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            # Don't fail the deployment - just warn
+          fi
+
+      - name: Verify Deployment Health
+        id: health-check
+        run: |
+          NAMESPACE="${{ env.NAMESPACE }}"
+
+          echo "### 🏥 Deployment Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get pod status
+          kubectl get pods -n $NAMESPACE
+
+          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE -o json | jq '[.items[] | select(.status.phase=="Running")] | length')
+          TOTAL_PODS=$(kubectl get pods -n $NAMESPACE -o json | jq '.items | length')
+
+          echo "running_pods=$RUNNING_PODS" >> $GITHUB_OUTPUT
+          echo "total_pods=$TOTAL_PODS" >> $GITHUB_OUTPUT
+
+          echo "**Namespace**: \`$NAMESPACE\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Running Pods**: $RUNNING_PODS / $TOTAL_PODS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ $RUNNING_PODS -lt $TOTAL_PODS ]; then
+            echo "⚠️ **Status**: Not all pods are running" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details>" >> $GITHUB_STEP_SUMMARY
+            echo "<summary>View Pod Details</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            kubectl get pods -n $NAMESPACE -o wide >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Status**: All pods are running successfully" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Get Frontend URL
+        id: get-url
+        run: |
+          # Get Istio Ingress Gateway URL
+          FRONTEND_URL=$(kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "⚠️ Frontend URL not available yet (LoadBalancer still provisioning)"
+            echo "url=pending" >> $GITHUB_OUTPUT
+          else
+            echo "url=http://$FRONTEND_URL" >> $GITHUB_OUTPUT
+            echo "### 🌐 Application URL" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Frontend**: [http://$FRONTEND_URL](http://$FRONTEND_URL)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> Note: DNS propagation may take a few minutes" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Display Resource Quotas
+        run: |
+          NAMESPACE="${{ env.NAMESPACE }}"
+
+          echo "### 📊 Resource Quotas" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>View Resource Quotas for ${{ inputs.environment }}</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl describe resourcequota -n $NAMESPACE 2>/dev/null || echo "No resource quotas configured" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set Deployment Status
+        id: deployment-status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | **${{ inputs.environment }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Namespace | \`${{ env.NAMESPACE }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.deployment-status.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Running Pods | ${{ steps.health-check.outputs.running_pods }} / ${{ steps.health-check.outputs.total_pods }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.get-url.outputs.url }}" != "pending" ]; then
+            echo "| Frontend URL | ${{ steps.get-url.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "${{ inputs.change_request_sys_id }}" ]; then
+            echo "| Change Request | [${{ inputs.change_request_sys_id }}](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ inputs.change_request_sys_id }}) |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "| Trigger | ${{ github.event_name }} by @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY

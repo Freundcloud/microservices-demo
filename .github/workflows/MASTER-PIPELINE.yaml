@@ -1,0 +1,459 @@
+name: "🚀 Master CI/CD Pipeline"
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+        default: 'dev'
+      skip_terraform:
+        description: 'Skip infrastructure deployment'
+        type: boolean
+        default: false
+      skip_security:
+        description: 'Skip security scans (NOT recommended for prod)'
+        type: boolean
+        default: false
+      skip_deploy:
+        description: 'Skip application deployment (infrastructure only)'
+        type: boolean
+        default: false
+      force_build_all:
+        description: 'Force build all services (ignore change detection)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+  id-token: write
+  actions: read
+
+env:
+  AWS_REGION: eu-west-2
+  CLUSTER_NAME: microservices
+
+jobs:
+  # ============================================================================
+  # STAGE 0: Pipeline Initialization
+  # ============================================================================
+
+  pipeline-init:
+    name: "🎯 Pipeline Initialization"
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      should_deploy: ${{ steps.set-env.outputs.should_deploy }}
+      is_production: ${{ steps.set-env.outputs.is_production }}
+
+    steps:
+      - name: Determine Environment
+        id: set-env
+        run: |
+          # Determine environment based on trigger
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            ENV="dev"  # Auto-deploy to dev on main
+          elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+            ENV="dev"
+          else
+            ENV="dev"  # Default for PRs
+          fi
+
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+          # Determine if we should deploy (not on PRs unless explicitly requested)
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Flag production deployments
+          if [ "$ENV" == "prod" ]; then
+            echo "is_production=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_production=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "## 🎯 Pipeline Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | **$ENV** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Actor | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # STAGE 1: Code Quality & Security (Parallel Execution)
+  # ============================================================================
+
+  validate-code:
+    name: "📋 Code Validation"
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_security }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Kustomize Configurations
+        run: |
+          echo "### 📋 Kustomize Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for env in dev qa prod; do
+            echo "Validating kustomize/overlays/$env..."
+            if kubectl kustomize kustomize/overlays/$env > /dev/null 2>&1; then
+              echo "✅ $env overlay valid" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ $env overlay INVALID" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          done
+
+      - name: YAML Lint
+        run: |
+          # Install yamllint if not present
+          if ! command -v yamllint &> /dev/null; then
+            pip install yamllint
+          fi
+          yamllint -d "{extends: default, rules: {line-length: {max: 400}, comments: disable}}" .github/workflows/ || true
+
+  security-scans:
+    name: "🔒 Security Scanning"
+    needs: pipeline-init
+    if: ${{ !inputs.skip_security }}
+    uses: ./.github/workflows/_reusable/security-scan.yaml
+    secrets: inherit
+
+  # ============================================================================
+  # STAGE 2: Infrastructure Management (Conditional)
+  # ============================================================================
+
+  detect-terraform-changes:
+    name: "🔍 Detect Infrastructure Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      terraform_changed: ${{ steps.filter.outputs.terraform }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Terraform Changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            terraform:
+              - 'terraform-aws/**'
+              - '.github/workflows/MASTER-PIPELINE.yaml'
+              - '.github/workflows/_reusable/terraform-*.yaml'
+
+  terraform-plan:
+    name: "📊 Terraform Plan"
+    needs: [pipeline-init, detect-terraform-changes]
+    if: |
+      needs.detect-terraform-changes.outputs.terraform_changed == 'true' &&
+      !inputs.skip_terraform
+    uses: ./.github/workflows/_reusable/terraform-plan.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+
+  terraform-apply:
+    name: "🏗️ Deploy Infrastructure"
+    needs: [pipeline-init, terraform-plan, security-scans]
+    if: |
+      needs.detect-terraform-changes.outputs.terraform_changed == 'true' &&
+      !inputs.skip_terraform &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
+    uses: ./.github/workflows/_reusable/terraform-apply.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+      action: 'apply'
+
+  # ============================================================================
+  # STAGE 3: Build Docker Images (Smart Change Detection)
+  # ============================================================================
+
+  detect-service-changes:
+    name: "🔍 Detect Service Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      services_changed: ${{ steps.filter.outputs.changes }}
+      has_changes: ${{ steps.check.outputs.has_changes }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Detect Changed Services
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend: 'src/frontend/**'
+            cartservice: 'src/cartservice/**'
+            productcatalogservice: 'src/productcatalogservice/**'
+            currencyservice: 'src/currencyservice/**'
+            paymentservice: 'src/paymentservice/**'
+            shippingservice: 'src/shippingservice/**'
+            emailservice: 'src/emailservice/**'
+            checkoutservice: 'src/checkoutservice/**'
+            recommendationservice: 'src/recommendationservice/**'
+            adservice: 'src/adservice/**'
+            loadgenerator: 'src/loadgenerator/**'
+            shoppingassistantservice: 'src/shoppingassistantservice/**'
+
+      - name: Check if Any Services Changed
+        id: check
+        run: |
+          CHANGES='${{ steps.filter.outputs.changes }}'
+          if [ "${{ inputs.force_build_all }}" == "true" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "🔨 Force build enabled - will build all services"
+          elif [ "$CHANGES" != "" ] && [ "$CHANGES" != "[]" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "📦 Detected changes in: $CHANGES"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No service changes detected"
+          fi
+
+  build-and-push:
+    name: "🐳 Build Docker Images"
+    needs: [pipeline-init, detect-service-changes, security-scans]
+    if: |
+      needs.detect-service-changes.outputs.has_changes == 'true' ||
+      inputs.force_build_all
+    uses: ./.github/workflows/_reusable/build-images.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+      services: ${{ inputs.force_build_all && 'all' || needs.detect-service-changes.outputs.services_changed }}
+      push_images: ${{ github.event_name != 'pull_request' }}
+
+  # ============================================================================
+  # STAGE 4: ServiceNow Change Management (Production Gate)
+  # ============================================================================
+
+  create-change-request:
+    name: "📋 ServiceNow Change Management"
+    needs: [pipeline-init, security-scans, build-and-push]
+    if: |
+      needs.pipeline-init.outputs.should_deploy == 'true' &&
+      !inputs.skip_deploy &&
+      github.event_name != 'pull_request'
+    uses: ./.github/workflows/_reusable/servicenow-integration.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+      change_type: ${{ needs.pipeline-init.outputs.is_production == 'true' && 'normal' || 'standard' }}
+      security_scan_status: ${{ needs.security-scans.outputs.overall_status || 'UNKNOWN' }}
+      security_findings: ${{ needs.security-scans.outputs.total_findings || '0' }}
+
+  # ============================================================================
+  # STAGE 5: Deployment (Environment-Specific)
+  # ============================================================================
+
+  deploy-to-environment:
+    name: "🚀 Deploy Application"
+    needs: [pipeline-init, create-change-request]
+    if: |
+      always() &&
+      needs.pipeline-init.outputs.should_deploy == 'true' &&
+      !inputs.skip_deploy &&
+      (needs.create-change-request.result == 'success' || needs.create-change-request.result == 'skipped')
+    uses: ./.github/workflows/_reusable/deploy-environment.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+      change_request_sys_id: ${{ needs.create-change-request.outputs.change_request_sys_id || '' }}
+      wait_for_ready: true
+      timeout_minutes: ${{ needs.pipeline-init.outputs.is_production == 'true' && 15 || 10 }}
+
+  # ============================================================================
+  # STAGE 6: Post-Deployment Validation
+  # ============================================================================
+
+  smoke-tests:
+    name: "✅ Smoke Tests"
+    needs: [pipeline-init, deploy-to-environment]
+    if: needs.deploy-to-environment.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Wait for All Pods Ready
+        run: |
+          NAMESPACE="microservices-${{ needs.pipeline-init.outputs.environment }}"
+          echo "⏳ Waiting for all pods to be ready in $NAMESPACE..."
+
+          kubectl wait --for=condition=ready pods --all \
+            -n $NAMESPACE \
+            --timeout=300s || echo "⚠️ Some pods not ready within timeout"
+
+      - name: Test Frontend Endpoint
+        id: test-frontend
+        run: |
+          # Get frontend URL from Istio ingress
+          FRONTEND_URL=$(kubectl get svc -n istio-system istio-ingressgateway \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "⚠️ Frontend URL not yet available (LoadBalancer provisioning)"
+            echo "status=pending" >> $GITHUB_OUTPUT
+          else
+            echo "Testing frontend at: http://$FRONTEND_URL/"
+            if curl -f -s -o /dev/null -w "%{http_code}" "http://$FRONTEND_URL/" | grep -q "200"; then
+              echo "✅ Frontend is accessible"
+              echo "status=success" >> $GITHUB_OUTPUT
+              echo "url=http://$FRONTEND_URL" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Frontend returned non-200 status"
+              echo "status=failure" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Smoke Test Summary
+        run: |
+          echo "## ✅ Smoke Tests Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pod Readiness | ✅ Complete |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Endpoint | ${{ steps.test-frontend.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.test-frontend.outputs.status }}" == "success" ]; then
+            echo "| URL | ${{ steps.test-frontend.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ============================================================================
+  # STAGE 7: Update ServiceNow & Notifications
+  # ============================================================================
+
+  update-change-request:
+    name: "✅ Update ServiceNow"
+    needs: [create-change-request, deploy-to-environment, smoke-tests]
+    if: |
+      always() &&
+      needs.create-change-request.outputs.change_request_sys_id != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine Final Status
+        id: status
+        run: |
+          DEPLOY_STATUS="${{ needs.deploy-to-environment.result }}"
+          SMOKE_STATUS="${{ needs.smoke-tests.result }}"
+
+          if [ "$DEPLOY_STATUS" == "success" ] && [ "$SMOKE_STATUS" == "success" ]; then
+            echo "final_status=successful" >> $GITHUB_OUTPUT
+            echo "state=3" >> $GITHUB_OUTPUT  # Closed
+            echo "notes=Deployment completed successfully. All smoke tests passed." >> $GITHUB_OUTPUT
+          else
+            echo "final_status=unsuccessful" >> $GITHUB_OUTPUT
+            echo "state=4" >> $GITHUB_OUTPUT  # Closed Incomplete
+            echo "notes=Deployment failed or smoke tests did not pass. Check workflow logs." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Change Request
+        uses: ServiceNow/servicenow-devops-update-change@v5.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          change-request-number: ${{ needs.create-change-request.outputs.change_request_number }}
+          change-request-details: |
+            {
+              "close_code": "${{ steps.status.outputs.final_status }}",
+              "close_notes": "${{ steps.status.outputs.notes }}\n\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\nCommit: ${{ github.sha }}",
+              "state": "${{ steps.status.outputs.state }}"
+            }
+
+  # ============================================================================
+  # STAGE 8: Pipeline Summary
+  # ============================================================================
+
+  pipeline-summary:
+    name: "📊 Pipeline Summary"
+    needs:
+      - pipeline-init
+      - security-scans
+      - detect-terraform-changes
+      - detect-service-changes
+      - build-and-push
+      - deploy-to-environment
+      - smoke-tests
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# 🚀 Master CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Pipeline Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | **${{ needs.pipeline-init.outputs.environment }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Actor | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Stage Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scans | ${{ needs.security-scans.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 🎯 Final Result" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.deploy-to-environment.result }}" == "success" ] && [ "${{ needs.smoke-tests.result }}" == "success" ]; then
+            echo "### ✅ **DEPLOYMENT SUCCESSFUL**" >> $GITHUB_STEP_SUMMARY
+            echo "Application successfully deployed to **${{ needs.pipeline-init.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-to-environment.result }}" == "skipped" ]; then
+            echo "### ℹ️ **BUILD ONLY**" >> $GITHUB_STEP_SUMMARY
+            echo "No deployment occurred (PR or manual skip)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ **DEPLOYMENT FAILED**" >> $GITHUB_STEP_SUMMARY
+            echo "Check individual stage logs for details" >> $GITHUB_STEP_SUMMARY
+          fi

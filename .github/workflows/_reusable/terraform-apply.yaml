@@ -1,0 +1,168 @@
+name: "Terraform Apply (Reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to deploy (dev/qa/prod)'
+        required: true
+        type: string
+      action:
+        description: 'Terraform action (apply/destroy)'
+        required: false
+        type: string
+        default: 'apply'
+      tf_version:
+        description: 'Terraform version'
+        required: false
+        type: string
+        default: '1.5.0'
+    outputs:
+      cluster_name:
+        description: "EKS cluster name"
+        value: ${{ jobs.terraform-apply.outputs.cluster_name }}
+      cluster_endpoint:
+        description: "EKS cluster endpoint"
+        value: ${{ jobs.terraform-apply.outputs.cluster_endpoint }}
+      region:
+        description: "AWS region"
+        value: ${{ jobs.terraform-apply.outputs.region }}
+      apply_outcome:
+        description: "Outcome of terraform apply"
+        value: ${{ jobs.terraform-apply.outputs.apply_outcome }}
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+
+jobs:
+  terraform-apply:
+    name: Terraform ${{ inputs.action }} (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      cluster_name: ${{ steps.eks-info.outputs.cluster_name }}
+      cluster_endpoint: ${{ steps.eks-info.outputs.cluster_endpoint }}
+      region: ${{ steps.eks-info.outputs.region }}
+      apply_outcome: ${{ steps.apply.outcome || steps.destroy.outcome }}
+
+    defaults:
+      run:
+        working-directory: terraform-aws
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false  # Disable wrapper to get clean outputs
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          if [ -f "environments/${{ inputs.environment }}.tfvars" ]; then
+            terraform plan -out=tfplan -input=false -var-file=environments/${{ inputs.environment }}.tfvars
+          else
+            terraform plan -out=tfplan -input=false
+          fi
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        id: apply
+        run: terraform apply -auto-approve -input=false tfplan
+
+      - name: Terraform Destroy
+        if: inputs.action == 'destroy'
+        id: destroy
+        run: |
+          if [ -f "environments/${{ inputs.environment }}.tfvars" ]; then
+            terraform destroy -auto-approve -input=false -var-file=environments/${{ inputs.environment }}.tfvars
+          else
+            terraform destroy -auto-approve -input=false
+          fi
+
+      - name: Get EKS Cluster Info
+        if: steps.apply.outcome == 'success'
+        id: eks-info
+        run: |
+          echo "cluster_name=$(terraform output -raw cluster_name 2>/dev/null || echo 'microservices')" >> $GITHUB_OUTPUT
+          echo "cluster_endpoint=$(terraform output -raw cluster_endpoint 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+          echo "region=$(terraform output -raw region 2>/dev/null || echo 'eu-west-2')" >> $GITHUB_OUTPUT
+
+      - name: Update kubeconfig
+        if: steps.apply.outcome == 'success'
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ steps.eks-info.outputs.region }} \
+            --name ${{ steps.eks-info.outputs.cluster_name }}
+
+      - name: Verify EKS Access
+        if: steps.apply.outcome == 'success'
+        run: |
+          kubectl get nodes
+          kubectl get namespaces
+
+      - name: Create Summary
+        if: always()
+        run: |
+          echo "## Terraform Deployment Summary (${{ inputs.environment }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Format Check | ${{ steps.fmt.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Init | ${{ steps.init.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validate | ${{ steps.validate.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Plan | ${{ steps.plan.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.action }}" == "apply" ]; then
+            echo "| Apply | ${{ steps.apply.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Destroy | ${{ steps.destroy.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.apply.outcome }}" == "success" ]; then
+            echo "### 🎉 Infrastructure Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Cluster Information**:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: \`${{ steps.eks-info.outputs.cluster_name }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Region**: \`${{ steps.eks-info.outputs.region }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Endpoint**: \`${{ steps.eks-info.outputs.cluster_endpoint }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "# Configure kubectl" >> $GITHUB_STEP_SUMMARY
+            echo "aws eks update-kubeconfig --region ${{ steps.eks-info.outputs.region }} --name ${{ steps.eks-info.outputs.cluster_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "# Deploy application" >> $GITHUB_STEP_SUMMARY
+            echo "kubectl apply -k kustomize/overlays/${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.destroy.outcome }}" == "success" ]; then
+            echo "### ⚠️ Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All resources for **${{ inputs.environment }}** have been removed." >> $GITHUB_STEP_SUMMARY
+          fi

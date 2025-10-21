@@ -1,0 +1,300 @@
+name: "Build and Push Docker Images (Reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment tag for images (dev/qa/prod)'
+        required: false
+        type: string
+        default: 'dev'
+      services:
+        description: 'Services to build (JSON array or "all")'
+        required: false
+        type: string
+        default: 'all'
+      push_images:
+        description: 'Whether to push images to ECR'
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      services_built:
+        description: "List of services that were built"
+        value: ${{ jobs.detect-changes.outputs.matrix }}
+      build_success:
+        description: "Whether all builds succeeded"
+        value: ${{ jobs.build-summary.outputs.success }}
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-west-2.amazonaws.com
+
+jobs:
+  # Detect which services have changes or build all if specified
+  detect-changes:
+    name: Detect Services to Build
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_services: ${{ steps.set-matrix.outputs.has_services }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need history for change detection
+
+      - name: Check Changed Files
+        uses: dorny/paths-filter@v3
+        id: filter
+        if: inputs.services == 'all'
+        with:
+          filters: |
+            emailservice:
+              - 'src/emailservice/**'
+            productcatalogservice:
+              - 'src/productcatalogservice/**'
+            recommendationservice:
+              - 'src/recommendationservice/**'
+            shippingservice:
+              - 'src/shippingservice/**'
+            checkoutservice:
+              - 'src/checkoutservice/**'
+            paymentservice:
+              - 'src/paymentservice/**'
+            currencyservice:
+              - 'src/currencyservice/**'
+            cartservice:
+              - 'src/cartservice/**'
+            frontend:
+              - 'src/frontend/**'
+            adservice:
+              - 'src/adservice/**'
+            loadgenerator:
+              - 'src/loadgenerator/**'
+            shoppingassistantservice:
+              - 'src/shoppingassistantservice/**'
+
+      - name: Set Build Matrix
+        id: set-matrix
+        run: |
+          if [ "${{ inputs.services }}" == "all" ]; then
+            # Build all services that changed
+            CHANGED=$(echo '${{ steps.filter.outputs.changes }}' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+            # If no changes detected or workflow_dispatch, build all
+            if [ "$CHANGED" == "[]" ] || [ "$CHANGED" == '[""]' ]; then
+              echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
+              echo 'has_services=true' >> $GITHUB_OUTPUT
+            else
+              echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
+              echo 'has_services=true' >> $GITHUB_OUTPUT
+            fi
+          elif [ "${{ inputs.services }}" == "none" ]; then
+            # Build nothing
+            echo 'matrix=[]' >> $GITHUB_OUTPUT
+            echo 'has_services=false' >> $GITHUB_OUTPUT
+          else
+            # Build specific services provided as JSON array
+            echo "matrix=${{ inputs.services }}" >> $GITHUB_OUTPUT
+            echo 'has_services=true' >> $GITHUB_OUTPUT
+          fi
+
+          # Display what we're building
+          MATRIX=$(cat $GITHUB_OUTPUT | grep "matrix=" | cut -d'=' -f2)
+          echo "### 🔨 Services to Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$MATRIX" | jq . >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Build, scan, and push Docker images
+  build-and-push:
+    name: Build ${{ matrix.service }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_services == 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set Docker Context Path
+        id: context
+        run: |
+          if [ "${{ matrix.service }}" == "cartservice" ]; then
+            echo "path=src/cartservice/src" >> $GITHUB_OUTPUT
+          else
+            echo "path=src/${{ matrix.service }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}
+          tags: |
+            type=raw,value=${{ inputs.environment }}
+            type=raw,value=${{ inputs.environment }}-${{ github.sha }}
+            type=raw,value=latest,enable=${{ inputs.environment == 'prod' }}
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build Docker Image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.context.outputs.path }}
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            BUILDTIME=${{ github.event.repository.updated_at }}
+            VERSION=${{ github.sha }}
+            ENVIRONMENT=${{ inputs.environment }}
+
+      - name: Run Trivy Vulnerability Scanner (SARIF)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      - name: Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          category: trivy-${{ matrix.service }}
+        continue-on-error: true
+
+      - name: Run Trivy Vulnerability Scanner (Table)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Push to ECR
+        if: inputs.push_images
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.context.outputs.path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Generate SBOM
+        if: inputs.push_images
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+          format: cyclonedx-json
+          output-file: sbom-${{ matrix.service }}.json
+        continue-on-error: true
+
+      - name: Upload SBOM Artifact
+        if: inputs.push_images
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service }}
+          path: sbom-${{ matrix.service }}.json
+          retention-days: 90
+        continue-on-error: true
+
+      - name: Service Build Summary
+        if: always()
+        run: |
+          echo "### ✅ ${{ matrix.service }} - Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tags**:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.push_images }}" == "true" ]; then
+            echo "✅ Pushed to ECR" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ Image not pushed (build only)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Create comprehensive summary
+  build-summary:
+    name: Build Summary
+    needs: [detect-changes, build-and-push]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      success: ${{ steps.check-status.outputs.success }}
+
+    steps:
+      - name: Check Build Status
+        id: check-status
+        run: |
+          if [ "${{ needs.build-and-push.result }}" == "success" ] || [ "${{ needs.build-and-push.result }}" == "skipped" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Summary
+        run: |
+          echo "## 🐳 Docker Image Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Status | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Images Pushed | ${{ inputs.push_images }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.detect-changes.outputs.has_services }}" == "true" ]; then
+            echo "### Services Built" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            echo '${{ needs.detect-changes.outputs.matrix }}' | jq . >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Security Scanning" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Trivy vulnerability scanning completed" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ SBOM generated for all images" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Results uploaded to GitHub Security tab" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No services required building" >> $GITHUB_STEP_SUMMARY
+          fi

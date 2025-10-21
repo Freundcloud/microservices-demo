@@ -1,0 +1,128 @@
+name: "Terraform Plan (Reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to plan for (dev/qa/prod)'
+        required: true
+        type: string
+      tf_version:
+        description: 'Terraform version'
+        required: false
+        type: string
+        default: '1.5.0'
+    outputs:
+      plan_outcome:
+        description: "Outcome of terraform plan (success/failure)"
+        value: ${{ jobs.terraform-plan.outputs.plan_outcome }}
+      plan_stdout:
+        description: "Terraform plan output"
+        value: ${{ jobs.terraform-plan.outputs.plan_stdout }}
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    outputs:
+      plan_outcome: ${{ steps.plan.outcome }}
+      plan_stdout: ${{ steps.plan.outputs.stdout }}
+
+    defaults:
+      run:
+        working-directory: terraform-aws
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          if [ -f "environments/${{ inputs.environment }}.tfvars" ]; then
+            terraform plan -no-color -input=false -var-file=environments/${{ inputs.environment }}.tfvars
+          else
+            terraform plan -no-color -input=false
+          fi
+        continue-on-error: true
+
+      - name: Update Pull Request (if applicable)
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Plan for **${{ inputs.environment }}** 🏗️
+
+            #### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Environment: \`${{ inputs.environment }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Create Step Summary
+        if: always()
+        run: |
+          echo "## Terraform Plan Results (${{ inputs.environment }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Format | ${{ steps.fmt.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Init | ${{ steps.init.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validate | ${{ steps.validate.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Plan | ${{ steps.plan.outcome }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
