@@ -1,6 +1,7 @@
+---
 name: Setup ServiceNow CMDB for AWS Discovery
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       dry_run:

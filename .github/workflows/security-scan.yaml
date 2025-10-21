@@ -1,6 +1,7 @@
+---
 name: "Security Scanning (Reusable)"
 
-on:
+"on":
   workflow_call:  # Primary trigger for reusable workflow
     outputs:
       evidence_generated:
