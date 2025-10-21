@@ -82,14 +82,15 @@ resource "aws_ecr_repository" "microservices" {
   for_each = toset(local.microservices)
 
   name                 = each.value
-  image_tag_mutability = "IMMUTABLE"  # CKV_AWS_51: Ensure ECR Image Tags are immutable
+  image_tag_mutability = "IMMUTABLE" # CKV_AWS_51: Ensure ECR Image Tags are immutable
+  force_delete         = true        # Allow deletion even if repository contains images
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
   encryption_configuration {
-    encryption_type = "KMS"  # CKV_AWS_136: Ensure ECR repositories are encrypted using KMS
+    encryption_type = "KMS" # CKV_AWS_136: Ensure ECR repositories are encrypted using KMS
     kms_key         = aws_kms_key.ecr.arn
   }
 
@@ -264,8 +265,13 @@ resource "aws_cloudwatch_log_group" "ecr_scan_results" {
   for_each = toset(local.microservices)
 
   name              = "/aws/ecr/${each.value}/scan-results"
-  retention_in_days = 365  # CKV_AWS_338: Ensure CloudWatch log groups retain logs for at least 1 year
-  kms_key_id        = aws_kms_key.cloudwatch.arn  # CKV_AWS_158: Ensure CloudWatch Log Group is encrypted by KMS
+  retention_in_days = 365                        # CKV_AWS_338: Ensure CloudWatch log groups retain logs for at least 1 year
+  kms_key_id        = aws_kms_key.cloudwatch.arn # CKV_AWS_158: Ensure CloudWatch Log Group is encrypted by KMS
+
+  depends_on = [
+    aws_kms_key.cloudwatch,
+    aws_kms_alias.cloudwatch
+  ]
 
   tags = merge(
     var.tags,
@@ -358,7 +364,7 @@ resource "aws_kms_alias" "sns" {
 # SNS topic for security notifications (optional)
 resource "aws_sns_topic" "ecr_scan_alerts" {
   name              = "${var.cluster_name}-ecr-scan-alerts"
-  kms_master_key_id = aws_kms_key.sns.id  # CKV_AWS_26: Ensure all data stored in the SNS topic is encrypted
+  kms_master_key_id = aws_kms_key.sns.id # CKV_AWS_26: Ensure all data stored in the SNS topic is encrypted
 
   tags = merge(
     var.tags,

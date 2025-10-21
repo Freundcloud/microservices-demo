@@ -205,25 +205,14 @@ jobs:
         uses: aquasecurity/tfsec-action@v1.0.0
         with:
           working_directory: terraform-aws/
-          format: sarif
           soft_fail: true
         continue-on-error: true
 
-      - name: Save tfsec Results
-        run: |
-          if [ -f terraform-aws/results.sarif ]; then
-            mv terraform-aws/results.sarif tfsec-results.sarif
-          else
-            echo "No tfsec results file found, creating empty SARIF"
-            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[]}' > tfsec-results.sarif
-          fi
-        continue-on-error: true
-
-      - name: Upload tfsec Results
+      - name: Upload tfsec Results to Security Tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('tfsec-results.sarif') != ''
+        if: always()
         with:
-          sarif_file: tfsec-results.sarif
+          sarif_file: results.sarif
           category: tfsec-terraform
         continue-on-error: true
 
