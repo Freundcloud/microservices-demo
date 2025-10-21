@@ -123,28 +123,73 @@ jobs:
               ;;
           esac
 
-      - name: Create Change Request using ServiceNow GitHub Action
+      - name: Create Change Request via ServiceNow REST API
         id: create-change
-        uses: ServiceNow/servicenow-devops-change@v6.1.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'Create ServiceNow Change Request'
-          change-request: |
-            {
-              "setCloseCode": true,
-              "attributes": {
-                "short_description": "Deploy Online Boutique to ${{ inputs.environment }}",
-                "description": "Automated deployment via GitHub Actions.\n\nRepo: ${{ github.repository }}\nEnv: ${{ inputs.environment }}\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nSecurity: ${{ inputs.security_scan_status }}\nFindings: ${{ inputs.security_findings }}",
-                "implementation_plan": "1. Deploy using Kustomize\n2. Apply to namespace: microservices-${{ inputs.environment }}\n3. Wait for deployments (timeout: 10min)\n4. Verify health checks\n5. Test frontend endpoint",
-                "backout_plan": "1. kubectl rollout undo deployment --all -n microservices-${{ inputs.environment }}\nOR\n2. kubectl delete -k kustomize/overlays/${{ inputs.environment }}\n3. Redeploy previous version\n4. Verify rollback",
-                "test_plan": "1. Verify pods running in microservices-${{ inputs.environment }}\n2. Get ingress gateway URL\n3. Test frontend endpoint (HTTP 200)\n4. Check Istio mesh connectivity\n5. Verify health endpoints",
-                "risk": "${{ steps.risk.outputs.risk }}"
-              }
-            }
+        run: |
+          echo "## 🎫 Creating Change Request in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Set approval based on environment (dev = auto-approved, qa/prod = requires approval)
+          if [ "${{ inputs.environment }}" == "dev" ]; then
+            APPROVAL="approved"
+            STATE="-4"  # Assess state (approved, ready to implement)
+          else
+            APPROVAL="not requested"
+            STATE="-5"  # Requested state (needs approval)
+          fi
+
+          # yamllint disable rule:line-length
+          PAYLOAD='{"category":"DevOps","devops_change":true,"approval":"'"$APPROVAL"'","state":"'"$STATE"'","short_description":"Deploy Online Boutique to ENV_PLACEHOLDER","description":"Automated deployment via GitHub Actions.\n\nRepo: REPO_PLACEHOLDER\nEnv: ENV_PLACEHOLDER\nCommit: COMMIT_PLACEHOLDER\nTriggered by: ACTOR_PLACEHOLDER\nWorkflow: WORKFLOW_URL_PLACEHOLDER\n\nSecurity: SECURITY_STATUS_PLACEHOLDER\nFindings: SECURITY_FINDINGS_PLACEHOLDER","implementation_plan":"1. Deploy using Kustomize\n2. Apply to namespace: microservices-ENV_PLACEHOLDER\n3. Wait for deployments (timeout: 10min)\n4. Verify health checks\n5. Test frontend endpoint","backout_plan":"1. kubectl rollout undo deployment --all -n microservices-ENV_PLACEHOLDER\nOR\n2. kubectl delete -k kustomize/overlays/ENV_PLACEHOLDER\n3. Redeploy previous version\n4. Verify rollback","test_plan":"1. Verify pods running in microservices-ENV_PLACEHOLDER\n2. Get ingress gateway URL\n3. Test frontend endpoint (HTTP 200)\n4. Check Istio mesh connectivity\n5. Verify health endpoints","risk":"RISK_PLACEHOLDER","correlation_id":"WORKFLOW_RUN_ID_PLACEHOLDER","u_github_repo":"REPO_PLACEHOLDER","u_github_commit":"COMMIT_PLACEHOLDER","u_tool_id":"TOOL_ID_PLACEHOLDER"}'
+          # yamllint enable rule:line-length
+
+          # Replace placeholders
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|ENV_PLACEHOLDER|${{ inputs.environment }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|REPO_PLACEHOLDER|${{ github.repository }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|COMMIT_PLACEHOLDER|${{ github.sha }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|ACTOR_PLACEHOLDER|${{ github.actor }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|WORKFLOW_URL_PLACEHOLDER|${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|SECURITY_STATUS_PLACEHOLDER|${{ inputs.security_scan_status }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|SECURITY_FINDINGS_PLACEHOLDER|${{ inputs.security_findings }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|RISK_PLACEHOLDER|${{ steps.risk.outputs.risk }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|WORKFLOW_RUN_ID_PLACEHOLDER|${{ github.run_id }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|TOOL_ID_PLACEHOLDER|${{ secrets.SN_ORCHESTRATION_TOOL_ID }}|g")
+
+          echo "Creating change request (Environment: ${{ inputs.environment }}, Approval: $APPROVAL)..."
+
+          # Create change request
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -d "$PAYLOAD" \
+            "https://calitiiltddemo3.service-now.com/api/now/table/change_request")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ ERROR: Failed to create change request (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+            echo "Response: $BODY" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # Extract change request details
+          CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.number // empty')
+          CHANGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id // empty')
+
+          if [ -z "$CHANGE_NUMBER" ] || [ -z "$CHANGE_SYS_ID" ]; then
+            echo "❌ ERROR: Could not extract change request details" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "change-request-number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+          echo "change-request-sys-id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
+          echo "outcome=success" >> $GITHUB_OUTPUT
+
+          echo "✅ Change request created: $CHANGE_NUMBER (Approval: $APPROVAL, State: $STATE)" >> $GITHUB_STEP_SUMMARY
+          echo "Sys ID: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
 
       - name: Validate Change Request Creation
         run: |
