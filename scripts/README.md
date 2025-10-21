@@ -173,3 +173,143 @@ For issues or questions:
   - Automated user creation and role assignment
   - Guided table creation
   - Comprehensive testing and validation
+
+---
+
+## ServiceNow Security Tools Registration
+
+### register-servicenow-security-tools.sh
+
+Registers all security scanning tools used in the GitHub Actions MASTER-PIPELINE workflow with ServiceNow DevOps.
+
+#### Features
+
+- ✅ Registers 7 security scanning tools with ServiceNow DevOps
+- ✅ Associates scans with GitHub repository
+- ✅ Enables automatic security result import from GitHub Actions
+- ✅ Integrates security findings with Change Management
+- ✅ Idempotent - safe to run multiple times
+- ✅ Color-coded output for easy monitoring
+- ✅ Comprehensive error handling and reporting
+
+#### Prerequisites
+
+- ServiceNow credentials configured in `.envrc`
+- `jq` installed for JSON processing
+- GitHub tool already registered in ServiceNow (Tool ID: `2fe9c38bc36c72d0e1bbf0cb050131cc`)
+
+#### Security Tools Registered
+
+1. **CodeQL** - SAST (Static Application Security Testing) for 5 languages
+2. **Trivy** - Container Security (Filesystem & Image Scanning)
+3. **Semgrep** - SAST (Multi-language pattern matching)
+4. **Checkov** - IaC Security (Terraform, Kubernetes manifests)
+5. **tfsec** - IaC Security (Terraform-specific)
+6. **OWASP Dependency Check** - SCA (Software Composition Analysis)
+7. **Polaris** - Kubernetes Security (Manifest analysis)
+
+#### Usage
+
+```bash
+# Load ServiceNow credentials
+source .envrc
+
+# Run the registration script
+./scripts/register-servicenow-security-tools.sh
+```
+
+#### Example Output
+
+```
+=== ServiceNow Security Tools Registration ===
+
+Instance: https://calitiiltddemo3.service-now.com
+Repository: Freundcloud/microservices-demo
+Branch: main
+Tool ID: 2fe9c38bc36c72d0e1bbf0cb050131cc
+
+[1/7] Registering CodeQL (SAST)... ✓ Success
+[2/7] Registering Trivy (Container Security)... ✓ Success
+[3/7] Registering Semgrep (SAST)... ✓ Success
+[4/7] Registering Checkov (IaC Security)... ✓ Success
+[5/7] Registering tfsec (IaC Security)... ✓ Success
+[6/7] Registering OWASP Dependency Check (SCA)... ✓ Success
+[7/7] Registering Polaris (Kubernetes Security)... ✓ Success
+
+=== Registration Summary ===
+Total tools: 7
+Successful: 7
+Failed: 0
+
+✅ All security tools registered successfully!
+```
+
+#### What This Does
+
+- Registers each security scanner with ServiceNow DevOps
+- Associates scans with the GitHub repository `Freundcloud/microservices-demo`
+- Enables automatic security result import via webhook
+- Links security findings to change requests in Change Management
+
+#### After Registration
+
+Security scan results from the MASTER-PIPELINE workflow will automatically flow to ServiceNow via:
+```
+https://calitiiltddemo3.service-now.com/api/sn_devops/v2/devops/tool/softwarequality?toolId=2fe9c38bc36c72d0e1bbf0cb050131cc
+```
+
+#### View Results in ServiceNow
+
+1. Navigate to **ServiceNow DevOps** → **Security** → **Scan Results**
+2. Filter by repository: `Freundcloud/microservices-demo`
+3. View findings by scanner type (SAST, Container Security, IaC Security, SCA)
+4. Security results automatically attached to change requests
+
+#### Re-running Registration
+
+This script is idempotent - you can run it multiple times safely:
+- Updates existing registrations
+- Creates new ones as needed
+- Safe to run after workflow changes
+- Useful for refreshing tool configurations
+
+#### Troubleshooting
+
+**Script fails with "ServiceNow credentials not found":**
+```bash
+# Verify credentials loaded
+source .envrc
+echo $SERVICENOW_USERNAME
+echo $SERVICENOW_INSTANCE_URL
+```
+
+**Tools registration fails:**
+```bash
+# Test ServiceNow connectivity
+curl -s -u "${SERVICENOW_USERNAME}:${SERVICENOW_PASSWORD}" \
+  "${SERVICENOW_INSTANCE_URL}/api/now/table/sn_devops_tool?sysparm_limit=1"
+```
+
+**GitHub tool not found:**
+- Verify GitHub tool exists in ServiceNow
+- Check Tool ID: `2fe9c38bc36c72d0e1bbf0cb050131cc`
+- Navigate to ServiceNow → DevOps → Tools → GitHub Demo
+
+#### Integration with MASTER-PIPELINE
+
+The security-scan.yaml workflow in MASTER-PIPELINE automatically sends results to ServiceNow when:
+1. Security scans complete (CodeQL, Trivy, Semgrep, etc.)
+2. SARIF results are generated
+3. Workflow calls servicenow-integration.yaml
+4. Results flow via the registered webhook endpoint
+
+No additional configuration needed after running this script!
+
+#### Version History
+
+- **1.0.0** (2025-10-21)
+  - Initial release
+  - Support for 7 security scanning tools
+  - Idempotent registration
+  - Color-coded output
+  - Comprehensive error handling
