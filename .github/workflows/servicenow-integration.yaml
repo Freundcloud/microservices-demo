@@ -135,7 +135,6 @@ jobs:
           job-name: 'Create ServiceNow Change Request'
           change-request: |
             {
-              "changeModel": {"sys_id": "e55d0bfec343101035ae3f52c1d3ae49"},
               "setCloseCode": "true",
               "autoCloseChange": true,
               "attributes": {
