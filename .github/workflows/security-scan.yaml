@@ -193,6 +193,7 @@ jobs:
           output_format: sarif
           output_file_path: checkov-results.sarif
           soft_fail: true
+          config_file: .checkov.yml  # Use project-specific config with skip rules
 
       - name: Upload Checkov Results
         uses: github/codeql-action/upload-sarif@v3
@@ -206,13 +207,15 @@ jobs:
         with:
           working_directory: terraform-aws/
           soft_fail: true
+          format: sarif
+          sarif_file: tfsec-results.sarif  # Explicit output path
         continue-on-error: true
 
       - name: Upload tfsec Results to Security Tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: results.sarif
+          sarif_file: tfsec-results.sarif  # Match explicit output path
           category: tfsec-terraform
         continue-on-error: true
 
@@ -239,7 +242,8 @@ jobs:
 
       - name: Run Polaris Audit
         run: |
-          polaris audit --audit-path kubernetes-manifests/ --format json > polaris-results.json || true
+          # Use custom config to adjust warning levels for demo environment
+          polaris audit --audit-path kubernetes-manifests/ --config .polaris.yaml --format json > polaris-results.json || true
         continue-on-error: true
 
       - name: Upload Polaris Results

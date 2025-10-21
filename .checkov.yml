@@ -1,0 +1,45 @@
+# Checkov configuration for microservices-demo
+# This file documents pragmatic security decisions for demo/development environment
+
+# Skip specific checks with justification
+skip-check:
+  # CKV_AWS_51: ECR Image Tags should be immutable
+  # Justification: Using MUTABLE tags for development flexibility
+  # - Allows updating dev/qa/prod tags without unique identifiers
+  # - Avoids forced Terraform resource replacement
+  # - Production deployment should use IMMUTABLE tags with semantic versioning
+  # Risk: Acceptable for demo environment with proper lifecycle policies
+  - CKV_AWS_51
+
+  # CKV_AWS_136: ECR repositories should be encrypted using KMS
+  # Justification: Using AES256 (AWS-managed encryption) instead of KMS
+  # - AES256 provides encryption at rest (secure for demo)
+  # - Avoids KMS costs (~$12/year for 12 repositories)
+  # - Avoids forced Terraform resource replacement
+  # - Production deployment should use KMS for audit trail and compliance
+  # Risk: Acceptable for demo environment, data still encrypted
+  - CKV_AWS_136
+
+# Soft fail mode - report findings but don't fail builds
+soft-fail: true
+
+# Output formats
+output:
+  - cli
+  - sarif
+
+# Framework settings
+framework:
+  - terraform
+  - kubernetes
+
+# Exclude specific directories from scanning
+exclude-paths:
+  - .git
+  - .github
+  - node_modules
+  - venv
+  - __pycache__
+
+# Log level
+log-level: INFO

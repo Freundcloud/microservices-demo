@@ -1,0 +1,57 @@
+# Polaris configuration for Kubernetes manifest security scanning
+# Documentation: https://polaris.docs.fairwinds.com/customization/
+
+# Adjust check severities for demo/development environment
+checks:
+  # Resource Management
+  cpuRequestsMissing: warning
+  cpuLimitsMissing: warning
+  memoryRequestsMissing: warning
+  memoryLimitsMissing: warning
+
+  # Security
+  runAsRootAllowed: warning
+  runAsPrivileged: warning
+  notReadOnlyRootFilesystem: warning
+  privilegeEscalationAllowed: warning
+
+  # Networking
+  hostNetworkSet: error
+  hostPortSet: error
+
+  # Health Checks
+  readinessProbeMissing: warning
+  livenessProbeMissing: warning
+
+  # Images
+  tagNotSpecified: error
+  pullPolicyNotAlways: warning
+
+  # Workload Configuration
+  deploymentMissingReplicas: ignore  # We use HPA for scaling
+  priorityClassNotSet: ignore  # Not critical for demo
+
+# Exemptions for specific workloads
+exemptions:
+  # Load generator is intentionally resource-intensive
+  - namespace: default
+    controllerNames:
+      - loadgenerator
+    rules:
+      - cpuRequestsMissing
+      - cpuLimitsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing
+
+  # Istio sidecars need privileged access
+  - namespace: istio-system
+    controllerNames:
+      - istio-ingressgateway
+    rules:
+      - runAsRootAllowed
+
+# Mutation settings
+mutations: []
+
+# Custom checks (none for now)
+customChecks: {}
