@@ -44,20 +44,20 @@ Other ServiceNow DevOps endpoints **don't require authentication**:
 
 ## Solution Options
 
-### Option 1: Configure ServiceNow to Accept Unauthenticated Webhooks (RECOMMENDED)
+### Option 1: Configure ServiceNow GitHub Tool (RECOMMENDED)
 
 **Steps for ServiceNow Admin**:
 
-1. Navigate to **System Security** → **REST API Security**
-2. Find the rule for `/api/sn_devops/v2/devops/tool/softwarequality`
-3. Configure to accept requests with GitHub's webhook signature
-4. **OR** Add exception for GitHub webhook IP ranges
+1. Navigate to **DevOps** → **Change** → **Tools**
+2. Find and click on **GitHub Demo** tool
+3. Click the **Edit** or **Configure** button (three-dot menu)
+4. Look for webhook or API authentication settings
+5. Check if there's an option to:
+   - Allow unauthenticated webhook requests for security events
+   - Configure token-based authentication for webhooks
+   - Enable GitHub signature verification (instead of Basic Auth)
 
-**Alternative in ServiceNow DevOps**:
-1. Navigate to **DevOps** → **Change** → **Tools** → **GitHub Demo**
-2. Click **Configure**
-3. Under **Webhook Configuration**, enable **Accept Unauthenticated Requests** for security events
-4. Save configuration
+**Note**: The exact UI options depend on your ServiceNow DevOps plugin version. The goal is to configure the tool to accept GitHub webhook payloads for the `/softwarequality` endpoint without requiring Basic Authentication headers.
 
 ### Option 2: Use ServiceNow GitHub App Integration (PREFERRED)
 
@@ -79,14 +79,23 @@ Instead of manual webhooks, use ServiceNow's native GitHub App:
    - ✅ Better security (GitHub App tokens vs webhooks)
    - ✅ Automatic configuration
 
-### Option 3: ServiceNow Proxy/Middleware (If Options 1 & 2 Not Possible)
+### Option 3: Contact ServiceNow Support
 
-Create an authenticated proxy that:
-1. Receives GitHub webhooks (no auth required)
-2. Adds Basic Auth header
-3. Forwards to ServiceNow `/softwarequality` endpoint
+If Options 1 and 2 don't reveal configuration options in the UI:
 
-**Not recommended** - adds complexity and maintenance burden.
+1. **Open ServiceNow Support Case**:
+   - Product: ServiceNow DevOps (Velocity)
+   - Issue: Need to configure `/softwarequality` endpoint to accept GitHub webhooks
+   - Details: Endpoint returns 401 for webhook events, needs to accept GitHub webhook signature auth
+
+2. **Potential ServiceNow Configuration**:
+   - They may need to modify ACL rules for the endpoint
+   - Configure the endpoint to use GitHub webhook secret verification instead of Basic Auth
+   - Add your GitHub webhook IP ranges to allowlist
+
+3. **Documentation to Reference**:
+   - [ServiceNow DevOps API Documentation](https://docs.servicenow.com/bundle/vancouver-devops/page/product/enterprise-dev-ops/reference/r-devops-api.html)
+   - GitHub webhook signature verification: https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
 
 ## Temporary Workaround
 
