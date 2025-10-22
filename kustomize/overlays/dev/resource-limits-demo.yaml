@@ -1,0 +1,211 @@
+# Minimal Demo Resource Limits
+# Purpose: Reduce resource requests to fit entire stack on 2x t3.large nodes
+# For: Demo/Development environment only (NOT for production)
+#
+# Total Resources Available:
+# - 2x t3.large nodes = 4 vCPU, 16 GB RAM total
+# - System pods (CoreDNS, kube-proxy, aws-node, etc.) use ~800m CPU, ~2GB RAM
+# - Istio (istiod + ingress gateway) uses ~500m CPU, ~1GB RAM
+# - Available for workloads: ~2.7 vCPU, ~13 GB RAM
+#
+# Strategy: Reduce all requests by 50-60% from baseline
+#
+# Baseline Total: 1900m CPU, 1.3GB RAM
+# Demo Total:      950m CPU, 650MB RAM (50% reduction)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 100m       # Was: 200m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 300m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productcatalogservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currencyservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shippingservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emailservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkoutservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 32Mi    # Was: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendationservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 50m        # Was: 100m
+            memory: 110Mi   # Was: 220Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+spec:
+  template:
+    spec:
+      containers:
+      - name: server
+        resources:
+          requests:
+            cpu: 100m       # Was: 200m
+            memory: 90Mi    # Was: 180Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cart
+spec:
+  template:
+    spec:
+      containers:
+      - name: redis
+        resources:
+          requests:
+            cpu: 35m        # Was: 70m
+            memory: 100Mi   # Was: 200Mi
+          limits:
+            cpu: 150m
+            memory: 256Mi

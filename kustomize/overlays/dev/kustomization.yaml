@@ -69,12 +69,10 @@ images:
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/adservice
   newTag: dev
 
-# Replica patches for dev (lower replicas)
+# Patches for dev environment
 patches:
-# Apply node affinity and tolerations to all deployments
-- path: node-affinity.yaml
-  target:
-    kind: Deployment
+# Minimal demo resource limits (50% reduction for 2-node cluster)
+- path: resource-limits-demo.yaml
 - patch: |-
     apiVersion: apps/v1
     kind: Deployment

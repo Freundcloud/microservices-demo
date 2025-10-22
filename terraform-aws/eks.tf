@@ -130,43 +130,45 @@ module "eks" {
   }
 
   eks_managed_node_groups = {
-    # ULTRA-MINIMAL DEMO CONFIGURATION
-    # Single node group runs EVERYTHING: system pods, Istio (minimal), and all workloads (dev/qa/prod)
-    # Cost optimization: 1x t3.large = ~$61/month (vs ~$305/month with 4 node groups)
-    # Total cluster cost: ~$134/month (EC2 + EKS control plane)
-    # Savings: 80% reduction from original configuration!
+    # MULTI-ENVIRONMENT CONFIGURATION
+    # 3 nodes total: One per environment (dev/qa/prod) for proper isolation
+    # Cost: 3x t3.large = ~$183/month EC2 + ~$73/month EKS = ~$256/month total
+    # This provides proper capacity for:
+    #   - Dev environment: 11 services × 1 replica = 11 pods (~2.5 GB with sidecars)
+    #   - QA environment: 11 services × 1 replica = 11 pods (~2.5 GB with sidecars)
+    #   - Prod environment: 11 services × 1 replica = 11 pods (~2.5 GB with sidecars)
+    #   - System pods distributed across nodes: ~2 GB total
+    #   - Istio: istiod + ingress gateway: ~1.5 GB
+    #   - Total per node: ~13 pods, ~4 GB RAM (comfortable capacity)
     #
-    # Capacity: 2 vCPU, 8 GB RAM - TIGHT but workable with optimizations:
-    #   - System: CoreDNS (2), EBS CSI (3), metrics-server (1) = 6 pods (~1.5 GB)
-    #   - Istio: istiod (1), ingress-gateway (1) ONLY = 2 pods (~1.5 GB)
-    #   - NOTE: Istio observability addons (Grafana, Prometheus, Jaeger, Kiali) DISABLED to save RAM
-    #   - Workloads: 10 services × 3 envs × 1 replica = 30 pods (~5 GB with sidecars)
-    #   - Total: ~38 pods, ~8 GB RAM (at capacity limit)
-    #
-    # Alternative: Use t3.xlarge (4 vCPU, 16 GB) for $61/month more if stability issues occur
+    # Benefits:
+    #   - Environment isolation (dev failures don't impact prod)
+    #   - Room for rolling deployments (surge pods)
+    #   - Can enable Istio observability addons if needed
+    #   - Proper multi-environment demo capability
     all = {
       name = "${var.cluster_name}-all"
 
-      min_size     = 1
-      max_size     = 2
-      desired_size = 1
+      min_size     = 3
+      max_size     = 5
+      desired_size = 3
 
-      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - absolute minimum for demo
+      instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - one node per environment
       capacity_type  = "ON_DEMAND"
 
       labels = {
-        role     = "all-in-one"
-        workload = "shared"
+        role     = "general"
+        workload = "multi-env"
       }
 
-      # No taints - allow all pods to schedule on this single node
+      # No taints - allow all environments to schedule on any node
 
       tags = merge(
         var.tags,
         {
           Name        = "${var.cluster_name}-all"
-          Environment = "shared"
-          CostCenter  = "demo-minimal"
+          Environment = "multi-env"
+          CostCenter  = "demo"
         }
       )
     }
