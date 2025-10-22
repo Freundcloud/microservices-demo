@@ -370,7 +370,105 @@ jobs:
           echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
           echo "🔗 [DevOps Workspace](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home)" >> $GITHUB_STEP_SUMMARY
 
-  # Job 4: Upload Security Evidence to Change Request
+  # Job 4: Register Work Items in ServiceNow DevOps Table
+  register-work-items:
+    name: Register Work Items in DevOps Table
+    runs-on: ubuntu-latest
+    needs: [extract-work-items, create-change-request]
+    if: |
+      always() &&
+      needs.create-change-request.outputs.change_request_sys_id != '' &&
+      needs.extract-work-items.outputs.issue_count != '0'
+
+    steps:
+      - name: Register GitHub Issues as Work Items
+        env:
+          CHANGE_SYS_ID: ${{ needs.create-change-request.outputs.change_request_sys_id }}
+          ISSUE_NUMBERS: ${{ needs.extract-work-items.outputs.issue_numbers }}
+          TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+        run: |
+          echo "## 📋 Registering Work Items in ServiceNow DevOps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -z "$ISSUE_NUMBERS" ]; then
+            echo "ℹ️  No work items to register" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Split issue numbers by comma
+          IFS=',' read -ra ISSUES <<< "$ISSUE_NUMBERS"
+          REGISTERED_COUNT=0
+
+          for issue_num in "${ISSUES[@]}"; do
+            # Fetch issue details from GitHub
+            ISSUE_DATA=$(gh issue view $issue_num --json number,title,url,state,labels 2>/dev/null || true)
+
+            if [ -z "$ISSUE_DATA" ]; then
+              echo "⚠️  Could not fetch Issue #$issue_num" >> $GITHUB_STEP_SUMMARY
+              continue
+            fi
+
+            ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+            ISSUE_URL=$(echo "$ISSUE_DATA" | jq -r '.url')
+            ISSUE_STATE=$(echo "$ISSUE_DATA" | jq -r '.state')
+
+            # Map GitHub state to ServiceNow state
+            case "$ISSUE_STATE" in
+              open) SN_STATE="open" ;;
+              closed) SN_STATE="closed" ;;
+              *) SN_STATE="open" ;;
+            esac
+
+            # Create work item payload
+            WORK_ITEM_PAYLOAD=$(jq -n \
+              --arg name "$ISSUE_TITLE" \
+              --arg type "issue" \
+              --arg url "$ISSUE_URL" \
+              --arg state "$SN_STATE" \
+              --arg tool_id "$TOOL_ID" \
+              --arg native_id "$issue_num" \
+              --arg external_id "$issue_num" \
+              '{
+                name: $name,
+                type: $type,
+                url: $url,
+                state: $state,
+                tool_id: $tool_id,
+                native_id: $native_id,
+                id: $external_id,
+                record_type: "Work item",
+                active: "true"
+              }')
+
+            echo "Creating work item for Issue #$issue_num: $ISSUE_TITLE"
+
+            # Create work item in ServiceNow
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -d "$WORK_ITEM_PAYLOAD" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_work_item")
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            if [ "$HTTP_CODE" == "201" ]; then
+              WI_NUMBER=$(echo "$BODY" | jq -r '.result.number // "Unknown"')
+              WI_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id // ""')
+              echo "✅ Created: $WI_NUMBER (Issue #$issue_num)" >> $GITHUB_STEP_SUMMARY
+              REGISTERED_COUNT=$((REGISTERED_COUNT + 1))
+            else
+              echo "⚠️  Failed to create work item for Issue #$issue_num (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Work Items Registered**: $REGISTERED_COUNT / ${#ISSUES[@]}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Work Items](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/nav/ui/classic/params/target/sn_devops_work_item_list.do)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 5: Upload Security Evidence to Change Request
   upload-security-evidence:
     name: Upload Security Evidence
     runs-on: ubuntu-latest
