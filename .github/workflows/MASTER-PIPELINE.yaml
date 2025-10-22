@@ -288,6 +288,24 @@ jobs:
       security_scan_status: ${{ needs.security-scans.outputs.overall_status || 'UNKNOWN' }}
       security_findings: ${{ needs.security-scans.outputs.total_findings || '0' }}
 
+  upload-dependency-scan-results:
+    name: "🧪 Upload Dependency Scan Test Results"
+    needs: [pipeline-init, security-scans, create-change-request]
+    # Always run if change request was created successfully (even if security scans had issues)
+    if: |
+      always() &&
+      needs.create-change-request.result == 'success' &&
+      needs.security-scans.outputs.dependency_scan_result != ''
+    uses: ./.github/workflows/upload-test-results-servicenow.yaml
+    secrets: inherit
+    with:
+      test_suite_name: "Dependency Vulnerability Scan"
+      test_result: ${{ needs.security-scans.outputs.dependency_scan_result }}
+      test_duration: 120
+      test_url: "${{ github.server_url }}/${{ github.repository }}/security/dependabot"
+      change_request_number: ${{ needs.create-change-request.outputs.change_request_number }}
+      change_request_sys_id: ${{ needs.create-change-request.outputs.change_request_sys_id }}
+
   # ============================================================================
   # STAGE 5: Deployment (Environment-Specific)
   # ============================================================================
