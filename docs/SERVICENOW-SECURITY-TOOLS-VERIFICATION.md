@@ -247,4 +247,147 @@ echo "════════════════════════�
 
 **Last Updated**: 2025-10-22
 **Workflow Run**: 18710902046 (all 10 security tools registered successfully)
-**Status**: Integration working correctly - verifying visibility in UI
+**Status**: ⚠️ **CRITICAL ISSUE DISCOVERED** - Security tools report SUCCESS but no data persists in ServiceNow
+
+---
+
+## CRITICAL FINDING: Security Tools Data Not Persisting
+
+### Issue Summary
+
+**Problem**: GitHub Actions workflow reports "SUCCESS: Security Scan registration was successful" for all 10 security tools, but no security results appear in ServiceNow.
+
+**Confirmed Facts**:
+- ✅ GitHub Actions job logs show: `SUCCESS: Security Scan registration was successful`
+- ✅ Change request CHG0030063 was created successfully
+- ❌ No records in `sn_devops_test_result` table
+- ❌ No records in `sn_devops_test_execution` table
+- ❌ No records in `sn_devops_security_result` table
+- ❌ No SARIF attachments on change request
+- ❌ ServiceNow API endpoint returns: "Requested URI does not represent any resource"
+
+**Root Cause**: The ServiceNow DevOps Security Result API endpoint does not exist or is not configured in this instance.
+
+### API Investigation
+
+```bash
+# Test the security result API endpoint
+curl --user 'github_integration:PASSWORD' \
+  "https://calitiiltddemo3.service-now.com/api/sn_devops/devops/security/result?toolId=4c5e482cc3383214e1bbf0cb05013196"
+
+# Response:
+{
+  "error": {
+    "message": "Requested URI does not represent any resource",
+    "detail": null
+  },
+  "status": "failure"
+}
+```
+
+This explains why the GitHub Action reports SUCCESS but doesn't actually store data - it's calling a non-existent API endpoint.
+
+### Possible Causes
+
+1. **ServiceNow DevOps Security Plugin Not Installed**: The `sn_devops_security` plugin may not be activated
+2. **Wrong API Version**: The action is using API endpoints that don't exist in this ServiceNow version
+3. **Missing ServiceNow Configuration**: Security result collection may require additional ServiceNow setup
+4. **GitHub Action Bug**: The action reports success even when API calls fail
+
+### Required ServiceNow Configuration
+
+To use the `servicenow-devops-security-result` action, ensure:
+
+1. **Install Required Plugins**:
+   - ServiceNow DevOps plugin (com.sn_devops.*)
+   - ServiceNow DevOps Security plugin
+
+2. **Verify Plugin Versions**:
+   - Navigate to: System Definition → Plugins
+   - Search for: "DevOps Security"
+   - Check if installed and activated
+
+3. **Check API Availability**:
+   ```bash
+   # List available DevOps APIs
+   curl --user 'USER:PASS' \
+     "https://instance.service-now.com/api/sn_devops"
+   ```
+
+### Alternative Approaches
+
+Since the GitHub Action isn't working, consider these alternatives:
+
+**Option A: Manual SARIF Upload (Current Workflow)**
+Our workflow already uploads SARIF files as attachments:
+```yaml
+- name: Upload Security Evidence to ServiceNow
+  run: |
+    for sarif_file in /tmp/security-evidence/*.sarif; do
+      curl -F "file=@$sarif_file" \
+        -F "table_name=change_request" \
+        -F "table_sys_id=$CHANGE_SYS_ID" \
+        "$SERVICENOW_URL/api/now/attachment/upload"
+    done
+```
+
+**Issue**: This is also failing - no attachments appear on change requests.
+
+**Option B: Use ServiceNow REST API Directly**
+Instead of the GitHub Action, post security results via standard table API:
+```yaml
+- name: Register Security Tool
+  run: |
+    curl -X POST \
+      --user "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "scanner": "CodeQL-Python",
+        "tool_id": "4c5e482cc3383214e1bbf0cb05013196",
+        "change_request": "CHG0030063"
+      }' \
+      "https://instance.service-now.com/api/now/table/sn_devops_test_result"
+```
+
+**Option C: Contact ServiceNow Support**
+- Verify which API endpoints are available
+- Confirm DevOps Security plugin requirements
+- Get proper API documentation
+
+### Verification Steps
+
+To confirm this is fixed:
+
+1. **Check ServiceNow Plugins**:
+   - Navigate to: System Definition → Plugins
+   - Verify: "DevOps Security" plugin is installed and active
+
+2. **Test API Endpoint**:
+   ```bash
+   curl --user 'USER:PASS' \
+     "https://instance.service-now.com/api/sn_devops/devops/security/result?toolId=TOOL_ID"
+   ```
+   Should return: `{"result": []}` (not "Requested URI does not represent any resource")
+
+3. **Run Deployment**:
+   - Trigger GitHub Actions workflow
+   - Check for security results in ServiceNow tables
+   - Verify SARIF attachments on change request
+
+4. **Query Tables Directly**:
+   ```bash
+   curl --user 'USER:PASS' \
+     "https://instance.service-now.com/api/now/table/sn_devops_test_result?sysparm_limit=10"
+   ```
+
+### Next Steps
+
+1. ⏸️ **PAUSE** using `servicenow-devops-security-result` action (it's not working)
+2. 🔍 **INVESTIGATE** ServiceNow plugin installation status
+3. 📞 **CONTACT** ServiceNow support or instance admin to verify API availability
+4. 🔧 **IMPLEMENT** alternative approach (Option A or B above)
+5. ✅ **VERIFY** security results actually appear in ServiceNow
+
+---
+
+## Original Documentation (Before Discovery)
