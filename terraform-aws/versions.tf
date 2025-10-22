@@ -15,17 +15,16 @@
 terraform {
   required_version = ">= 1.5.0"
 
-  # IMPORTANT: Configure remote backend for team collaboration
-  # Uncomment after running terraform-aws/backend setup
-  # See: terraform-aws/backend/README.md for instructions
-  #
-  # backend "s3" {
-  #   bucket         = "your-org-microservices-terraform-state-abc123"
-  #   key            = "microservices/terraform.tfstate"
-  #   region         = "eu-west-2"
-  #   dynamodb_table = "microservices-terraform-locks"
-  #   encrypt        = true
-  # }
+  # Remote backend for team collaboration and CI/CD
+  # State stored in S3 with DynamoDB locking
+  # This prevents creating duplicate VPCs in CI/CD workflows!
+  backend "s3" {
+    bucket         = "microservices-terraform-state-1761116893"
+    key            = "microservices/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "microservices-terraform-locks"
+    encrypt        = true
+  }
 
   required_providers {
     aws = {
