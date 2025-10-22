@@ -71,21 +71,122 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
-  # Dependency scanning with Dependabot
+  # Dependency scanning - runs on all events for ServiceNow approval evidence
   dependency-review:
-    name: Dependency Review
+    name: Dependency Review & Vulnerability Scan
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    outputs:
+      test_result: ${{ steps.test-summary.outputs.test_result }}
+      critical_count: ${{ steps.test-summary.outputs.critical_count }}
+      high_count: ${{ steps.test-summary.outputs.high_count }}
+      medium_count: ${{ steps.test-summary.outputs.medium_count }}
+      low_count: ${{ steps.test-summary.outputs.low_count }}
+      total_count: ${{ steps.test-summary.outputs.total_count }}
+      summary: ${{ steps.test-summary.outputs.summary }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Dependency Review
+      - name: Dependency Review (PR only)
+        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0
+
+      - name: Generate SBOM (Software Bill of Materials)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - name: Scan SBOM for vulnerabilities with Grype
+        id: grype-scan
+        uses: anchore/scan-action@v3
+        with:
+          sbom: sbom.cyclonedx.json
+          fail-build: false
+          severity-cutoff: medium
+          output-format: sarif
+
+      - name: Fix Grype SARIF URI Schemes
+        if: always()
+        run: |
+          if [ -f results.sarif ]; then
+            chmod +x scripts/fix-sarif-uris.sh
+            ./scripts/fix-sarif-uris.sh results.sarif
+          fi
+
+      - name: Upload Grype Results to Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+          category: grype-dependency-scan
+
+      - name: Generate Test Results Summary
+        if: always()
+        id: test-summary
+        run: |
+          RESULT="passed"
+          if [ "${{ steps.grype-scan.outcome }}" != "success" ]; then
+            RESULT="failed"
+          fi
+
+          # Count vulnerabilities by severity from SARIF
+          CRITICAL_COUNT=0
+          HIGH_COUNT=0
+          MEDIUM_COUNT=0
+          LOW_COUNT=0
+
+          if [ -f results.sarif ]; then
+            CRITICAL_COUNT=$(jq '[.runs[].results[] | select(.level == "error" or .properties.severity == "critical")] | length' results.sarif 2>/dev/null || echo "0")
+            HIGH_COUNT=$(jq '[.runs[].results[] | select(.level == "warning" or .properties.severity == "high")] | length' results.sarif 2>/dev/null || echo "0")
+            MEDIUM_COUNT=$(jq '[.runs[].results[] | select(.properties.severity == "medium")] | length' results.sarif 2>/dev/null || echo "0")
+            LOW_COUNT=$(jq '[.runs[].results[] | select(.properties.severity == "low")] | length' results.sarif 2>/dev/null || echo "0")
+          fi
+
+          TOTAL_VULNS=$((CRITICAL_COUNT + HIGH_COUNT + MEDIUM_COUNT + LOW_COUNT))
+
+          echo "test_result=$RESULT" >> $GITHUB_OUTPUT
+          echo "critical_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          echo "medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+          echo "low_count=$LOW_COUNT" >> $GITHUB_OUTPUT
+          echo "total_count=$TOTAL_VULNS" >> $GITHUB_OUTPUT
+
+          # Create summary for ServiceNow
+          SUMMARY="Dependency Vulnerability Scan\n\n"
+          SUMMARY="${SUMMARY}Total Vulnerabilities: $TOTAL_VULNS\n"
+          SUMMARY="${SUMMARY}Critical: $CRITICAL_COUNT | High: $HIGH_COUNT | Medium: $MEDIUM_COUNT | Low: $LOW_COUNT\n\n"
+          SUMMARY="${SUMMARY}Tool: Grype (Anchore)\n"
+          SUMMARY="${SUMMARY}SBOM Format: CycloneDX\n"
+          SUMMARY="${SUMMARY}Scan Status: $RESULT"
+
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+
+          echo "📊 Dependency Scan Results:"
+          echo "  Result: $RESULT"
+          echo "  Total Vulnerabilities: $TOTAL_VULNS"
+          echo "  Critical: $CRITICAL_COUNT | High: $HIGH_COUNT | Medium: $MEDIUM_COUNT | Low: $LOW_COUNT"
+
+      - name: Upload SBOM as Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-scan-sbom
+          path: sbom.cyclonedx.json
+          retention-days: 90
+
+      - name: Upload SARIF as Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-scan-sarif
+          path: results.sarif
+          retention-days: 90
 
   # Secret scanning with Gitleaks - DISABLED (requires paid license)
   # secret-scanning:
@@ -295,13 +396,15 @@ jobs:
   # Security summary with detailed evidence generation
   security-summary:
     name: Security Summary & Evidence
-    needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan]
+    needs: [codeql-analysis, semgrep-scan, trivy-fs-scan, iac-scan, k8s-manifest-scan, dependency-review, owasp-dependency-check]
     if: always()
     runs-on: ubuntu-latest
     outputs:
       evidence_generated: ${{ steps.generate-evidence.outputs.evidence_generated }}
       overall_status: ${{ steps.generate-evidence.outputs.overall_status }}
       total_findings: ${{ steps.generate-evidence.outputs.total_findings }}
+      dependency_scan_result: ${{ needs.dependency-review.outputs.test_result }}
+      dependency_scan_summary: ${{ needs.dependency-review.outputs.summary }}
 
     steps:
       - name: Checkout code
