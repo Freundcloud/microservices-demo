@@ -1,0 +1,12 @@
+# Deployment strategy patch for dev environment
+# Use Recreate strategy to avoid resource capacity issues in ultra-minimal cluster
+# This allows deployments to complete even when cluster is at capacity
+# Trade-off: Brief downtime during deployments (acceptable for dev)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-strategy-patch
+spec:
+  strategy:
+    type: Recreate

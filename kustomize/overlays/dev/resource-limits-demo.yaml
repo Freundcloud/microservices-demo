@@ -8,10 +8,11 @@
 # - Istio (istiod + ingress gateway) uses ~500m CPU, ~1GB RAM
 # - Available for workloads: ~2.7 vCPU, ~13 GB RAM
 #
-# Strategy: Reduce all requests by 50-60% from baseline
+# Strategy: Reduce CPU requests, keep memory at namespace minimum (64Mi)
+# Note: LimitRange enforces minimum 64Mi memory per container
 #
 # Baseline Total: 1900m CPU, 1.3GB RAM
-# Demo Total:      950m CPU, 650MB RAM (50% reduction)
+# Demo Total:      600m CPU, ~1GB RAM (respects 64Mi minimum)
 
 apiVersion: apps/v1
 kind: Deployment
@@ -25,7 +26,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi
@@ -43,7 +44,7 @@ spec:
         resources:
           requests:
             cpu: 100m       # Was: 200m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 300m
             memory: 128Mi
@@ -61,7 +62,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi
@@ -79,7 +80,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi
@@ -97,7 +98,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi
@@ -115,7 +116,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi
@@ -133,7 +134,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi
@@ -151,7 +152,7 @@ spec:
         resources:
           requests:
             cpu: 50m        # Was: 100m
-            memory: 32Mi    # Was: 64Mi
+            memory: 64Mi    # Namespace minimum
           limits:
             cpu: 200m
             memory: 128Mi

@@ -73,6 +73,10 @@ images:
 patches:
 # Minimal demo resource limits (50% reduction for 2-node cluster)
 - path: resource-limits-demo.yaml
+# Use Recreate strategy to avoid capacity issues in ultra-minimal cluster
+- path: deployment-strategy.yaml
+  target:
+    kind: Deployment
 - patch: |-
     apiVersion: apps/v1
     kind: Deployment
