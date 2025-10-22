@@ -36,38 +36,38 @@ commonAnnotations:
   environment: development
 
 # Image tag suffix for dev environment - using ECR
-# Using image tags pushed by GitHub Actions workflow
+# Using 'dev' tag for all services
 images:
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/frontend
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/cartservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/productcatalogservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/productcatalogservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/currencyservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/paymentservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/shippingservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/shippingservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/emailservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/checkoutservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/recommendationservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/adservice
-  newTag: dev-e48fda1b6bb73e2827e85fc0c03a0c1c8947a9be
+  newTag: dev
 
 # Replica patches for dev (lower replicas)
 patches:
