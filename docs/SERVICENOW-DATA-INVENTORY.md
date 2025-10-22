@@ -24,18 +24,28 @@ This document provides a complete inventory of all data being sent from GitHub A
 **Data Fields**:
 - `short_description` - Auto-generated from commit/workflow
 - `description` - Detailed deployment information
-- `u_source` - "GitHub Actions"
-- `u_correlation_id` - GitHub Run ID for traceability
-- `u_repository` - Repository name
-- `u_branch` - Git branch name
-- `u_commit_sha` - Git commit SHA
-- `u_commit_message` - Commit message
+- `u_source` - "GitHub Actions" (identifies source system)
+- `u_correlation_id` - GitHub Run ID for traceability (links to workflow)
+- `u_repository` - Repository name (e.g., "Freundcloud/microservices-demo")
+- `u_branch` - Git branch name (e.g., "main", "feature/xyz")
+- `u_commit_sha` - Git commit SHA (40-character hash)
 - `u_actor` - GitHub user who triggered deployment
-- `u_workflow_url` - Direct link to GitHub Actions workflow
 - `u_environment` - Target environment (dev/qa/prod)
-- `u_risk_level` - Calculated risk (Low/Medium/High)
-- `u_business_service` - "Microservices Demo Application"
+- `u_github_repo` - Legacy field (same as u_repository)
+- `u_github_commit` - Legacy field (same as u_commit_sha)
+- `u_github_issues` - Linked GitHub issue numbers
+- `u_work_items_count` - Number of work items in deployment
+- `u_work_items_summary` - HTML summary of work items
+- `u_tool_id` - ServiceNow orchestration tool ID
 - `state` - Change state (New, Assessment, Approved, etc.)
+
+**Custom Fields Setup**:
+All custom fields (u_*) are created automatically via script:
+```bash
+./scripts/create-servicenow-custom-fields.sh
+```
+
+Or manually in ServiceNow: System Definition > Tables > change_request > New Field
 
 **Example Query**:
 ```bash
@@ -237,20 +247,34 @@ GitHub Actions Workflow
 
 ## Custom Fields Required
 
-To support all this data, the following custom fields must be created in ServiceNow:
+To support all this data, the following custom fields must be created in ServiceNow.
+
+**Automated Creation**:
+```bash
+# Run this script to create all required fields
+./scripts/create-servicenow-custom-fields.sh
+```
 
 ### On `change_request` table:
-- `u_source` (String)
-- `u_correlation_id` (String)
-- `u_repository` (String)
-- `u_branch` (String)
-- `u_commit_sha` (String)
-- `u_commit_message` (String)
-- `u_actor` (String)
-- `u_workflow_url` (URL)
-- `u_environment` (Choice: dev/qa/prod)
-- `u_risk_level` (Choice: Low/Medium/High)
-- `u_business_service` (String)
+- `u_source` (String, 100) - Source system identifier ("GitHub Actions")
+- `u_correlation_id` (String, 100) - Workflow run ID for traceability
+- `u_repository` (String, 200) - GitHub repository name
+- `u_branch` (String, 100) - Git branch name
+- `u_commit_sha` (String, 50) - Git commit SHA hash
+- `u_actor` (String, 100) - GitHub user who triggered deployment
+- `u_environment` (String, 20) - Deployment environment (dev/qa/prod)
+- `u_github_repo` (String) - Legacy field (kept for backward compatibility)
+- `u_github_commit` (String) - Legacy field (kept for backward compatibility)
+- `u_github_issues` (String) - Linked GitHub issue numbers
+- `u_work_items_count` (String) - Number of work items
+- `u_work_items_summary` (String) - HTML work items summary
+- `u_tool_id` (String) - ServiceNow orchestration tool ID
+
+**Verification**:
+After creation, verify fields exist:
+```
+https://calitiiltddemo3.service-now.com/sys_dictionary_list.do?sysparm_query=name=change_request^elementSTARTSWITHu_
+```
 
 ### Custom Tables (CMDB):
 - `u_eks_cluster` - For EKS cluster CIs

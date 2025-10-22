@@ -56,13 +56,13 @@ echo ""
 echo "[Test 3] Checking for GitHub-sourced change requests (u_source field)..."
 GITHUB_CHANGES=$(curl -s -u "$USERNAME:$PASSWORD" \
     -H "Accept: application/json" \
-    "${INSTANCE_URL}/api/now/table/change_request?sysparm_query=u_source=GitHub%20Actions&sysparm_limit=10&sysparm_fields=number,short_description,u_source,u_correlation_id,sys_created_on")
+    "${INSTANCE_URL}/api/now/table/change_request?sysparm_query=u_source=GitHub%20Actions&sysparm_limit=10&sysparm_fields=number,short_description,u_source,u_correlation_id,u_repository,u_branch,u_commit_sha,u_actor,u_environment,sys_created_on")
 
 GITHUB_COUNT=$(echo "$GITHUB_CHANGES" | jq -r '.result | length' 2>/dev/null || echo "0")
 echo "GitHub change requests found: $GITHUB_COUNT"
 
 if [ "$GITHUB_COUNT" -gt "0" ]; then
-    echo "$GITHUB_CHANGES" | jq -r '.result[] | "  - \(.number): \(.short_description)\n    Source: \(.u_source // "N/A")\n    Correlation: \(.u_correlation_id // "N/A")\n    Created: \(.sys_created_on)"'
+    echo "$GITHUB_CHANGES" | jq -r '.result[] | "  - \(.number): \(.short_description)\n    Source: \(.u_source // "N/A")\n    Correlation: \(.u_correlation_id // "N/A")\n    Repository: \(.u_repository // "N/A")\n    Branch: \(.u_branch // "N/A")\n    Commit: \(.u_commit_sha // "N/A")\n    Actor: \(.u_actor // "N/A")\n    Environment: \(.u_environment // "N/A")\n    Created: \(.sys_created_on)"'
     echo ""
     echo "✅ GitHub data IS being sent to ServiceNow!"
     echo "View in ServiceNow: ${INSTANCE_URL}/now/nav/ui/classic/params/target/change_request_list.do?sysparm_query=u_sourceSTARTSWITHGitHub"
@@ -72,15 +72,16 @@ elif [ "$GITHUB_COUNT" -eq "0" ] && echo "$GITHUB_CHANGES" | jq -e '.error' > /d
     echo "This likely means the u_source field doesn't exist on change_request table"
     echo ""
     echo "To fix:"
-    echo "1. Log into ServiceNow as admin"
-    echo "2. Go to: System Definition > Tables > change_request"
-    echo "3. Add custom field: u_source (Type: String, Length: 100)"
+    echo "1. Run the custom fields creation script:"
+    echo "   ./scripts/create-servicenow-custom-fields.sh"
+    echo "2. Or manually create fields in ServiceNow:"
+    echo "   System Definition > Tables > change_request > New"
 else
     echo "⚠️  No GitHub change requests found"
     echo "Possible reasons:"
-    echo "1. Workflows haven't run yet"
-    echo "2. Custom field u_source not created"
-    echo "3. Data is going to a different table"
+    echo "1. Workflows haven't run yet (custom fields were just created)"
+    echo "2. Run a deployment to populate fields"
+    echo "3. Check existing change requests were created before fields existed"
 fi
 
 # Test 4: Check correlation ID from most recent workflow
