@@ -124,46 +124,38 @@ jobs:
             else
               echo "⚠️ SARIF file is invalid or empty, creating minimal valid SARIF"
               # Create minimal valid SARIF if file is corrupt
-              cat > results.sarif << 'EOF'
-{
-  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-  "version": "2.1.0",
-  "runs": [
-    {
-      "tool": {
-        "driver": {
-          "name": "Grype",
-          "informationUri": "https://github.com/anchore/grype",
-          "version": "unknown"
-        }
-      },
-      "results": []
-    }
-  ]
-}
-EOF
+              jq -n '{
+                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+                "version": "2.1.0",
+                "runs": [{
+                  "tool": {
+                    "driver": {
+                      "name": "Grype",
+                      "informationUri": "https://github.com/anchore/grype",
+                      "version": "unknown"
+                    }
+                  },
+                  "results": []
+                }]
+              }' > results.sarif
             fi
           else
             echo "⚠️ results.sarif not found, Grype scan may have failed"
             echo "Creating placeholder SARIF file"
-            cat > results.sarif << 'EOF'
-{
-  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-  "version": "2.1.0",
-  "runs": [
-    {
-      "tool": {
-        "driver": {
-          "name": "Grype",
-          "informationUri": "https://github.com/anchore/grype",
-          "version": "unknown"
-        }
-      },
-      "results": []
-    }
-  ]
-}
-EOF
+            jq -n '{
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [{
+                "tool": {
+                  "driver": {
+                    "name": "Grype",
+                    "informationUri": "https://github.com/anchore/grype",
+                    "version": "unknown"
+                  }
+                },
+                "results": []
+              }]
+            }' > results.sarif
           fi
 
       - name: Upload Grype Results to Security Tab
