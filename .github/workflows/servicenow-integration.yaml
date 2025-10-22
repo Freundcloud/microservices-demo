@@ -86,11 +86,120 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔗 [View in ServiceNow DevOps](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/insights-home)" >> $GITHUB_STEP_SUMMARY
 
-  # Job 2: Create ServiceNow Change Request
+  # Job 2: Extract Work Items (GitHub Issues)
+  extract-work-items:
+    name: Extract Work Item Evidence
+    runs-on: ubuntu-latest
+    needs: register-artifacts
+    outputs:
+      issue_numbers: ${{ steps.extract.outputs.issue_numbers }}
+      issue_count: ${{ steps.extract.outputs.issue_count }}
+      work_items_summary: ${{ steps.extract.outputs.work_items_summary }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50  # Fetch enough history to find recent merges
+
+      - name: Extract GitHub Issues from PRs and Commits
+        id: extract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "## 📋 Extracting Work Item Evidence" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get recent merged PRs (last 10, within last 24 hours)
+          MERGED_PRS=$(gh pr list --state merged --base main --json number,mergedAt \
+            --jq '.[] | select(.mergedAt > (now - 86400)) | .number' | head -10)
+
+          ISSUE_NUMBERS=""
+          WORK_ITEMS_HTML="<h3>📋 Work Items in This Deployment:</h3><ul>"
+          WORK_ITEMS_TEXT=""
+          ISSUE_COUNT=0
+
+          if [ -z "$MERGED_PRS" ]; then
+            echo "ℹ️  No recently merged PRs found" >> $GITHUB_STEP_SUMMARY
+            WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<li><em>No work items linked (direct push to main)</em></li>"
+            WORK_ITEMS_TEXT="No work items linked (direct push to main)"
+          else
+            for pr_number in $MERGED_PRS; do
+              # Get PR details
+              PR_DATA=$(gh pr view $pr_number --json title,body,url,author 2>/dev/null || true)
+
+              if [ -z "$PR_DATA" ]; then
+                continue
+              fi
+
+              PR_TITLE=$(echo "$PR_DATA" | jq -r '.title // "Unknown"')
+              PR_BODY=$(echo "$PR_DATA" | jq -r '.body // ""')
+              PR_URL=$(echo "$PR_DATA" | jq -r '.url // ""')
+              PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login // "unknown"')
+
+              # Extract issue numbers (matches: #123, Fixes #456, Closes #789, Resolves #101)
+              FOUND_ISSUES=$(echo "$PR_TITLE $PR_BODY" | grep -oE "(#|[Ff]ixes #|[Cc]loses #|[Rr]esolves #)[0-9]+" | grep -oE "[0-9]+" | sort -u)
+
+              for issue_num in $FOUND_ISSUES; do
+                # Skip if already processed
+                if echo "$ISSUE_NUMBERS" | grep -q "\b$issue_num\b"; then
+                  continue
+                fi
+
+                # Get issue details
+                ISSUE_DATA=$(gh issue view $issue_num --json title,state,labels,url 2>/dev/null || true)
+
+                if [ -z "$ISSUE_DATA" ]; then
+                  continue
+                fi
+
+                ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title // "Unknown"')
+                ISSUE_STATE=$(echo "$ISSUE_DATA" | jq -r '.state // "unknown"')
+                ISSUE_URL=$(echo "$ISSUE_DATA" | jq -r '.url // ""')
+                ISSUE_LABELS=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name] | join(", ") // "none"')
+
+                # Add to lists
+                if [ -z "$ISSUE_NUMBERS" ]; then
+                  ISSUE_NUMBERS="$issue_num"
+                else
+                  ISSUE_NUMBERS="$ISSUE_NUMBERS,$issue_num"
+                fi
+
+                # Build HTML summary
+                WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<li><strong><a href=\"$ISSUE_URL\">Issue #$issue_num</a>: $ISSUE_TITLE</strong><br>"
+                WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<em>Status:</em> $ISSUE_STATE | <em>Labels:</em> $ISSUE_LABELS | <em>PR:</em> <a href=\"$PR_URL\">#$pr_number</a></li>"
+
+                # Build text summary
+                WORK_ITEMS_TEXT="${WORK_ITEMS_TEXT}
+- Issue #$issue_num: $ISSUE_TITLE
+  Status: $ISSUE_STATE | Labels: $ISSUE_LABELS | PR: #$pr_number"
+
+                ISSUE_COUNT=$((ISSUE_COUNT + 1))
+
+                echo "✅ Found Issue #$issue_num: $ISSUE_TITLE" >> $GITHUB_STEP_SUMMARY
+              done
+            done
+          fi
+
+          WORK_ITEMS_HTML="${WORK_ITEMS_HTML}</ul>"
+
+          # Set outputs
+          echo "issue_numbers=$ISSUE_NUMBERS" >> $GITHUB_OUTPUT
+          echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+          # URL encode the HTML for safe passing
+          WORK_ITEMS_HTML_ENCODED=$(echo "$WORK_ITEMS_HTML" | jq -sRr @uri)
+          echo "work_items_summary=$WORK_ITEMS_HTML_ENCODED" >> $GITHUB_OUTPUT
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Work Items Found:** $ISSUE_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Issue Numbers:** $ISSUE_NUMBERS" >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Create ServiceNow Change Request
   create-change-request:
     name: Create ServiceNow Change Request
     runs-on: ubuntu-latest
-    needs: register-artifacts
+    needs: [register-artifacts, extract-work-items]
     outputs:
       change_request_number: ${{ steps.create-change.outputs.change-request-number }}
       change_request_sys_id: ${{ steps.create-change.outputs.change-request-sys-id }}
@@ -129,12 +238,15 @@ jobs:
           echo "## 🎫 Creating Change Request in ServiceNow" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+          # Decode work items summary from URL encoding
+          WORK_ITEMS_DECODED=$(echo "${{ needs.extract-work-items.outputs.work_items_summary }}" | jq -sRr @uri | sed 's/%0A/\n/g')
+
           # Use existing DevOps change model and follow ServiceNow's configuration
           # DevOps Model: adffaa9e4370211072b7f6be5bb8f2ed (mimics ITIL Normal change process)
           # GitHub Integration User: cdbb6e2ec3a8fa90e1bbf0cb050131f9
 
           # yamllint disable rule:line-length
-          PAYLOAD='{"category":"DevOps","devops_change":true,"type":"normal","chg_model":"adffaa9e4370211072b7f6be5bb8f2ed","requested_by":"cdbb6e2ec3a8fa90e1bbf0cb050131f9","business_service":"1e7b938bc360b2d0e1bbf0cb050131da","short_description":"Deploy Online Boutique to ENV_PLACEHOLDER","description":"Automated deployment via GitHub Actions.\n\nRepo: REPO_PLACEHOLDER\nEnv: ENV_PLACEHOLDER\nCommit: COMMIT_PLACEHOLDER\nTriggered by: ACTOR_PLACEHOLDER\nWorkflow: WORKFLOW_URL_PLACEHOLDER\n\nSecurity: SECURITY_STATUS_PLACEHOLDER\nFindings: SECURITY_FINDINGS_PLACEHOLDER","implementation_plan":"1. Deploy using Kustomize\n2. Apply to namespace: microservices-ENV_PLACEHOLDER\n3. Wait for deployments (timeout: 10min)\n4. Verify health checks\n5. Test frontend endpoint","backout_plan":"1. kubectl rollout undo deployment --all -n microservices-ENV_PLACEHOLDER\nOR\n2. kubectl delete -k kustomize/overlays/ENV_PLACEHOLDER\n3. Redeploy previous version\n4. Verify rollback","test_plan":"1. Verify pods running in microservices-ENV_PLACEHOLDER\n2. Get ingress gateway URL\n3. Test frontend endpoint (HTTP 200)\n4. Check Istio mesh connectivity\n5. Verify health endpoints","risk":"RISK_PLACEHOLDER","correlation_id":"WORKFLOW_RUN_ID_PLACEHOLDER","u_github_repo":"REPO_PLACEHOLDER","u_github_commit":"COMMIT_PLACEHOLDER","u_tool_id":"TOOL_ID_PLACEHOLDER"}'
+          PAYLOAD='{"category":"DevOps","devops_change":true,"type":"normal","chg_model":"adffaa9e4370211072b7f6be5bb8f2ed","requested_by":"cdbb6e2ec3a8fa90e1bbf0cb050131f9","business_service":"1e7b938bc360b2d0e1bbf0cb050131da","short_description":"Deploy Online Boutique to ENV_PLACEHOLDER (WORK_ITEM_COUNT_PLACEHOLDER work items)","description":"Automated deployment via GitHub Actions.\n\nRepo: REPO_PLACEHOLDER\nEnv: ENV_PLACEHOLDER\nCommit: COMMIT_PLACEHOLDER\nTriggered by: ACTOR_PLACEHOLDER\nWorkflow: WORKFLOW_URL_PLACEHOLDER\n\nWork Items: WORK_ITEM_NUMBERS_PLACEHOLDER\n\nSecurity: SECURITY_STATUS_PLACEHOLDER\nFindings: SECURITY_FINDINGS_PLACEHOLDER","implementation_plan":"1. Deploy using Kustomize\n2. Apply to namespace: microservices-ENV_PLACEHOLDER\n3. Wait for deployments (timeout: 10min)\n4. Verify health checks\n5. Test frontend endpoint","backout_plan":"1. kubectl rollout undo deployment --all -n microservices-ENV_PLACEHOLDER\nOR\n2. kubectl delete -k kustomize/overlays/ENV_PLACEHOLDER\n3. Redeploy previous version\n4. Verify rollback","test_plan":"1. Verify pods running in microservices-ENV_PLACEHOLDER\n2. Get ingress gateway URL\n3. Test frontend endpoint (HTTP 200)\n4. Check Istio mesh connectivity\n5. Verify health endpoints","risk":"RISK_PLACEHOLDER","correlation_id":"WORKFLOW_RUN_ID_PLACEHOLDER","u_github_repo":"REPO_PLACEHOLDER","u_github_commit":"COMMIT_PLACEHOLDER","u_github_issues":"WORK_ITEM_NUMBERS_PLACEHOLDER","u_work_items_count":"WORK_ITEM_COUNT_PLACEHOLDER","u_work_items_summary":"WORK_ITEMS_HTML_PLACEHOLDER","u_tool_id":"TOOL_ID_PLACEHOLDER"}'
           # yamllint enable rule:line-length
 
           # Replace placeholders
@@ -148,6 +260,11 @@ jobs:
           PAYLOAD=$(echo "$PAYLOAD" | sed "s|RISK_PLACEHOLDER|${{ steps.risk.outputs.risk }}|g")
           PAYLOAD=$(echo "$PAYLOAD" | sed "s|WORKFLOW_RUN_ID_PLACEHOLDER|${{ github.run_id }}|g")
           PAYLOAD=$(echo "$PAYLOAD" | sed "s|TOOL_ID_PLACEHOLDER|${{ secrets.SN_ORCHESTRATION_TOOL_ID }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|WORK_ITEM_NUMBERS_PLACEHOLDER|${{ needs.extract-work-items.outputs.issue_numbers }}|g")
+          PAYLOAD=$(echo "$PAYLOAD" | sed "s|WORK_ITEM_COUNT_PLACEHOLDER|${{ needs.extract-work-items.outputs.issue_count }}|g")
+          # URL decode the work items summary for ServiceNow
+          WORK_ITEMS_DECODED=$(printf '%b' "$(echo "${{ needs.extract-work-items.outputs.work_items_summary }}" | sed 's/+/ /g; s/%/\\x/g')")
+          PAYLOAD=$(echo "$PAYLOAD" | jq --arg summary "$WORK_ITEMS_DECODED" '.u_work_items_summary = $summary')
 
           echo "Creating change request (Environment: ${{ inputs.environment }})..."
 
@@ -210,7 +327,7 @@ jobs:
           echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
           echo "🔗 [DevOps Workspace](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home)" >> $GITHUB_STEP_SUMMARY
 
-  # Job 3: Upload Security Evidence to Change Request
+  # Job 4: Upload Security Evidence to Change Request
   upload-security-evidence:
     name: Upload Security Evidence
     runs-on: ubuntu-latest
@@ -299,7 +416,7 @@ jobs:
 
           echo "✅ Work note added to change request" >> $GITHUB_STEP_SUMMARY
 
-  # Job 4: Register Security Scan Results
+  # Job 5: Register Security Scan Results
   # REMOVED: servicenow-devops-security-result action (API endpoint does not exist)
   #
   # After extensive research and API testing, discovered that:
