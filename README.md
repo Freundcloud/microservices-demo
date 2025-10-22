@@ -77,6 +77,7 @@ kubectl apply -k ../kustomize/overlays/prod
 
 - **[🎓 Developer Onboarding](docs/ONBOARDING.md)** - Start here! Complete setup guide for new developers
 - **[📖 Documentation Index](docs/README.md)** - Complete documentation overview
+- **[✨ What's New](docs/WHATS-NEW.md)** - Latest features: ServiceNow integration, dependency scanning, enhanced security
 - **[☁️  AWS Deployment Guide](docs/README-AWS.md)** - Comprehensive AWS deployment instructions
 - **[🔧 Justfile Reference](justfile)** - All available automation commands
 
