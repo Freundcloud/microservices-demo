@@ -10,9 +10,9 @@ This document provides a complete inventory of all data being sent from GitHub A
 
 | Dashboard | URL | Description |
 |-----------|-----|-------------|
-| **DevOps Dashboard** | [View](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_dashboard.do) | Main DevOps overview |
 | **DevOps Changes** | [View](https://calitiiltddemo3.service-now.com/now/devops-change/changes) | Modern change management view |
 | **Change Requests (Classic)** | [View](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/change_request_list.do) | Traditional change request list |
+| **All Apps / DevOps** | [View](https://calitiiltddemo3.service-now.com/$pa_dashboard.do) | ServiceNow home - navigate to DevOps app |
 
 ## Data Being Sent to ServiceNow
 
@@ -50,7 +50,7 @@ https://calitiiltddemo3.service-now.com/nav_to.do?uri=change_request_list.do?sys
 ### 2. Test Results
 
 **Table**: `sn_devops_test_result`
-**View URL**: [Test Results List](https://calitiiltddemo3.service-now.com/nav_to.do?uri=sn_devops_test_result_list.do)
+**View URL**: [Test Results List](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_test_result_list.do)
 
 **Test Suites Registered**:
 
@@ -85,7 +85,7 @@ https://calitiiltddemo3.service-now.com/nav_to.do?uri=change_request_list.do?sys
 ### 3. Security Scan Results
 
 **Table**: `sn_devops_security_result`
-**View URL**: [Security Results List](https://calitiiltddemo3.service-now.com/nav_to.do?uri=sn_devops_security_result_list.do)
+**View URL**: [Security Results List](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_security_result_list.do)
 
 **Security Tools**:
 - **Trivy** - Container image scanning
@@ -116,7 +116,7 @@ https://calitiiltddemo3.service-now.com/nav_to.do?uri=change_request_list.do?sys
 ### 4. Work Items
 
 **Table**: `sn_devops_work_item`
-**View URL**: [Work Items List](https://calitiiltddemo3.service-now.com/nav_to.do?uri=sn_devops_work_item_list.do)
+**View URL**: [Work Items List](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_work_item_list.do)
 
 **Work Item Types**:
 - Deployment preparation
@@ -139,7 +139,7 @@ https://calitiiltddemo3.service-now.com/nav_to.do?uri=change_request_list.do?sys
 ### 5. EKS Cluster Information (CMDB)
 
 **Table**: `u_eks_cluster`
-**View URL**: [EKS Clusters List](https://calitiiltddemo3.service-now.com/nav_to.do?uri=u_eks_cluster_list.do)
+**View URL**: [EKS Clusters List](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/u_eks_cluster_list.do)
 
 **Data Fields**:
 - `name` - EKS cluster name ("microservices")
@@ -159,7 +159,7 @@ https://calitiiltddemo3.service-now.com/nav_to.do?uri=change_request_list.do?sys
 ### 6. Microservices Information (CMDB)
 
 **Table**: `u_microservice`
-**View URL**: [Microservices List](https://calitiiltddemo3.service-now.com/nav_to.do?uri=u_microservice_list.do)
+**View URL**: [Microservices List](https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/u_microservice_list.do)
 
 **Services Tracked** (12 total):
 1. frontend
@@ -280,6 +280,45 @@ To support all this data, the following custom fields must be created in Service
 2. **Check custom fields**: Ensure all custom fields exist in ServiceNow
 3. **Check workflow runs**: View GitHub Actions to confirm workflows executed
 4. **Check ServiceNow logs**: System Logs > REST API Logs
+5. **Verify URL accessibility**: Some tables may require specific roles or plugins
+
+### URL Not Found Errors?
+
+If you get "Page not found" or empty lists, try these alternatives:
+
+**General Navigation**:
+1. Log into ServiceNow: https://calitiiltddemo3.service-now.com
+2. Click "All" in the top left corner (Application Navigator)
+3. Type "DevOps" in the search box
+4. Browse available DevOps modules
+
+**For DevOps Features**:
+- Type "DevOps Change" in navigator → Click "Changes"
+- Type "Test Results" in navigator → Navigate to DevOps > Testing
+- Type "Security Results" in navigator → Navigate to DevOps > Security
+
+**For Work Items** (if empty or not accessible):
+- Use the API directly: `GET /api/now/table/sn_devops_work_item`
+- Check if sn_devops plugin is fully activated
+- Work items might be attached to change requests instead of separate table
+- Alternative: View work notes on change requests
+- Try: https://calitiiltddemo3.service-now.com/sn_devops_work_item_list.do (without /now/nav/ prefix)
+
+**For Test Results**:
+- Alternative URL: https://calitiiltddemo3.service-now.com/sn_devops_test_result_list.do
+- Or use Application Navigator: DevOps > Testing > Test Results
+- Or direct table access: /api/now/table/sn_devops_test_result
+
+**For Security Results**:
+- Alternative URL: https://calitiiltddemo3.service-now.com/sn_devops_security_result_list.do
+- Or use Application Navigator: DevOps > Security > Security Results
+- Or direct table access: /api/now/table/sn_devops_security_result
+
+**For Custom CMDB Tables**:
+- If u_eks_cluster or u_microservice don't exist, they need to be created
+- See setup documentation for CMDB CI class creation
+- Alternative: Use standard `cmdb_ci` table and filter by class
+- Try simple URLs: /u_eks_cluster_list.do or /u_microservice_list.do
 
 ### Data is Incomplete?
 
