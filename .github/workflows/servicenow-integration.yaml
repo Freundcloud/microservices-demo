@@ -381,8 +381,12 @@ jobs:
       needs.extract-work-items.outputs.issue_count != '0'
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Register GitHub Issues as Work Items
         env:
+          GH_TOKEN: ${{ github.token }}
           CHANGE_SYS_ID: ${{ needs.create-change-request.outputs.change_request_sys_id }}
           ISSUE_NUMBERS: ${{ needs.extract-work-items.outputs.issue_numbers }}
           TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
@@ -400,11 +404,17 @@ jobs:
           REGISTERED_COUNT=0
 
           for issue_num in "${ISSUES[@]}"; do
-            # Fetch issue details from GitHub
-            ISSUE_DATA=$(gh issue view $issue_num --json number,title,url,state,labels 2>/dev/null || true)
+            # Skip empty values
+            if [ -z "$issue_num" ]; then
+              continue
+            fi
 
-            if [ -z "$ISSUE_DATA" ]; then
-              echo "⚠️  Could not fetch Issue #$issue_num" >> $GITHUB_STEP_SUMMARY
+            # Fetch issue details from GitHub
+            echo "Fetching Issue #$issue_num..."
+            ISSUE_DATA=$(gh issue view $issue_num --json number,title,url,state,labels 2>/dev/null || echo "")
+
+            if [ -z "$ISSUE_DATA" ] || [ "$ISSUE_DATA" = "null" ]; then
+              echo "⚠️  Issue #$issue_num not found, skipping" >> $GITHUB_STEP_SUMMARY
               continue
             fi
 
@@ -441,6 +451,7 @@ jobs:
               }')
 
             echo "Creating work item for Issue #$issue_num: $ISSUE_TITLE"
+            echo "Payload: $WORK_ITEM_PAYLOAD"
 
             # Create work item in ServiceNow
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
