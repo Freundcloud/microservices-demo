@@ -170,9 +170,7 @@ jobs:
                 WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<em>Status:</em> $ISSUE_STATE | <em>Labels:</em> $ISSUE_LABELS | <em>PR:</em> <a href=\"$PR_URL\">#$pr_number</a></li>"
 
                 # Build text summary
-                WORK_ITEMS_TEXT="${WORK_ITEMS_TEXT}
-- Issue #$issue_num: $ISSUE_TITLE
-  Status: $ISSUE_STATE | Labels: $ISSUE_LABELS | PR: #$pr_number"
+                WORK_ITEMS_TEXT="${WORK_ITEMS_TEXT}\n- Issue #$issue_num: $ISSUE_TITLE\n  Status: $ISSUE_STATE | Labels: $ISSUE_LABELS | PR: #$pr_number"
 
                 ISSUE_COUNT=$((ISSUE_COUNT + 1))
 
