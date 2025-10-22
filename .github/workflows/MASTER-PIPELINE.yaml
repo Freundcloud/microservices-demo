@@ -193,6 +193,17 @@ jobs:
       environment: ${{ needs.pipeline-init.outputs.environment }}
       action: 'apply'
 
+  eks-discovery:
+    name: "🔍 EKS Cluster Discovery"
+    needs: [pipeline-init, terraform-apply]
+    if: |
+      always() &&
+      (needs.terraform-apply.result == 'success' || needs.terraform-apply.result == 'skipped')
+    uses: ./.github/workflows/eks-discovery.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+
   # ============================================================================
   # STAGE 3: Build Docker Images (Smart Change Detection)
   # ============================================================================
@@ -312,12 +323,13 @@ jobs:
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
-    needs: [pipeline-init, create-change-request]
+    needs: [pipeline-init, create-change-request, eks-discovery]
     if: |
       always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       !inputs.skip_deploy &&
-      (needs.create-change-request.result == 'success' || needs.create-change-request.result == 'skipped')
+      (needs.create-change-request.result == 'success' || needs.create-change-request.result == 'skipped') &&
+      (needs.eks-discovery.result == 'success' || needs.eks-discovery.result == 'skipped')
     uses: ./.github/workflows/deploy-environment.yaml
     secrets: inherit
     with:
@@ -482,6 +494,7 @@ jobs:
       - security-scans
       - detect-terraform-changes
       - detect-service-changes
+      - eks-discovery
       - build-and-push
       - deploy-to-environment
       - smoke-tests
@@ -507,6 +520,7 @@ jobs:
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scans | ${{ needs.security-scans.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| EKS Discovery | ${{ needs.eks-discovery.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
