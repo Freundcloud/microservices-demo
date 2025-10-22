@@ -119,10 +119,54 @@ jobs:
           WORK_ITEMS_TEXT=""
           ISSUE_COUNT=0
 
+          # If no PRs, extract from recent commits (last 10)
           if [ -z "$MERGED_PRS" ]; then
-            echo "ℹ️  No recently merged PRs found" >> $GITHUB_STEP_SUMMARY
-            WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<li><em>No work items linked (direct push to main)</em></li>"
-            WORK_ITEMS_TEXT="No work items linked (direct push to main)"
+            echo "ℹ️  No recently merged PRs found, checking commit messages..." >> $GITHUB_STEP_SUMMARY
+
+            # Get last 10 commits
+            COMMIT_MESSAGES=$(git log --pretty=format:"%s %b" -10 2>/dev/null || echo "")
+
+            if [ -n "$COMMIT_MESSAGES" ]; then
+              # Extract issue numbers from commit messages
+              FOUND_ISSUES=$(echo "$COMMIT_MESSAGES" | grep -oE "(#|[Ff]ixes #|[Cc]loses #|[Rr]esolves #)[0-9]+" | grep -oE "[0-9]+" | sort -u)
+
+              if [ -n "$FOUND_ISSUES" ]; then
+                for issue_num in $FOUND_ISSUES; do
+                  # Get issue details
+                  ISSUE_DATA=$(gh issue view $issue_num --json title,state,labels,url 2>/dev/null || true)
+
+                  if [ -z "$ISSUE_DATA" ]; then
+                    continue
+                  fi
+
+                  ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title // "Unknown"')
+                  ISSUE_STATE=$(echo "$ISSUE_DATA" | jq -r '.state // "unknown"')
+                  ISSUE_URL=$(echo "$ISSUE_DATA" | jq -r '.url // ""')
+                  ISSUE_LABELS=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name] | join(", ") // "none"')
+
+                  # Add to lists
+                  if [ -z "$ISSUE_NUMBERS" ]; then
+                    ISSUE_NUMBERS="$issue_num"
+                  else
+                    ISSUE_NUMBERS="$ISSUE_NUMBERS,$issue_num"
+                  fi
+
+                  # Build HTML summary
+                  WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<li><strong><a href=\"$ISSUE_URL\">Issue #$issue_num</a>: $ISSUE_TITLE</strong><br>"
+                  WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<em>Status:</em> $ISSUE_STATE | <em>Labels:</em> $ISSUE_LABELS | <em>Source:</em> Direct commit</li>"
+
+                  ISSUE_COUNT=$((ISSUE_COUNT + 1))
+
+                  echo "✅ Found Issue #$issue_num from commits: $ISSUE_TITLE" >> $GITHUB_STEP_SUMMARY
+                done
+              fi
+            fi
+
+            # If still no work items found
+            if [ "$ISSUE_COUNT" -eq "0" ]; then
+              WORK_ITEMS_HTML="${WORK_ITEMS_HTML}<li><em>No work items linked (direct push to main without issue references)</em></li>"
+              WORK_ITEMS_TEXT="No work items linked (direct push to main)"
+            fi
           else
             for pr_number in $MERGED_PRS; do
               # Get PR details
