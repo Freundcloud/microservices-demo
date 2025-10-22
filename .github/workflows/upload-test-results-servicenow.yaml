@@ -141,8 +141,9 @@ jobs:
             STATUS_MSG="TESTS FAILED - REVIEW REQUIRED"
           fi
 
-          # Create work note
-          WORK_NOTE="🧪 TEST EXECUTION RESULTS
+          # Create work note with proper escaping
+          WORK_NOTE=$(cat <<EOF
+🧪 TEST EXECUTION RESULTS
 
 Test Suite: ${{ inputs.test_suite_name }}
 Status: $STATUS_ICON $STATUS_MSG
@@ -151,7 +152,9 @@ Test URL: ${{ inputs.test_url }}
 
 Test execution record created in ServiceNow:
 - Test Execution: ${{ steps.create-test-exec.outputs.test_exec_number }}
-- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+EOF
+)
 
           PAYLOAD=$(jq -n --arg note "$WORK_NOTE" '{work_notes: $note}')
 
