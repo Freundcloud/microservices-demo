@@ -141,8 +141,15 @@ jobs:
             STATUS_MSG="TESTS FAILED - REVIEW REQUIRED"
           fi
 
-          # Create work note with proper escaping (avoiding heredoc in YAML)
-          WORK_NOTE="🧪 TEST EXECUTION RESULTS\n\nTest Suite: ${{ inputs.test_suite_name }}\nStatus: $STATUS_ICON $STATUS_MSG\nDuration: ${{ inputs.test_duration }} seconds\nTest URL: ${{ inputs.test_url }}\n\nTest execution record created in ServiceNow:\n- Test Execution: ${{ steps.create-test-exec.outputs.test_exec_number }}\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Create work note - build incrementally to avoid line length issues
+          WORK_NOTE="🧪 TEST EXECUTION RESULTS"
+          WORK_NOTE="${WORK_NOTE}\n\nTest Suite: ${{ inputs.test_suite_name }}"
+          WORK_NOTE="${WORK_NOTE}\nStatus: $STATUS_ICON $STATUS_MSG"
+          WORK_NOTE="${WORK_NOTE}\nDuration: ${{ inputs.test_duration }} seconds"
+          WORK_NOTE="${WORK_NOTE}\nTest URL: ${{ inputs.test_url }}"
+          WORK_NOTE="${WORK_NOTE}\n\nTest execution record created in ServiceNow:"
+          WORK_NOTE="${WORK_NOTE}\n- Test Execution: ${{ steps.create-test-exec.outputs.test_exec_number }}"
+          WORK_NOTE="${WORK_NOTE}\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           PAYLOAD=$(jq -n --arg note "$WORK_NOTE" '{work_notes: $note}')
 
