@@ -105,6 +105,7 @@
 - **[Quick Start](SERVICENOW-QUICK-START.md)** - 5-minute minimal setup
 - **[Application Setup](SERVICENOW-APPLICATION-SETUP.md)** - Register "Online Boutique" app
 - **[DevOps Change Velocity](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)** - Modern change management
+- **[GitHub Spoke Configuration](SERVICENOW-GITHUB-SPOKE-CONFIGURATION.md)** - IntegrationHub Spoke setup ⭐ **NEW**
 - **[Best Practices](GITHUB-SERVICENOW-BEST-PRACTICES.md)** - Integration patterns
 - **[Developer Onboarding](GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md)** - Team setup
 
