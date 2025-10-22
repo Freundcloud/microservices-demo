@@ -151,7 +151,7 @@ module "eks" {
 
       min_size     = 3
       max_size     = 5
-      desired_size = 3
+      desired_size = 4
 
       instance_types = ["t3.large"] # 2 vCPU, 8 GB RAM - one node per environment
       capacity_type  = "ON_DEMAND"
