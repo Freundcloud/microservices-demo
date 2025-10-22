@@ -4,6 +4,8 @@
 
 **New to this project?** Start with **[DEMO-OVERVIEW.md](../DEMO-OVERVIEW.md)** to understand what this demo does.
 
+**✨ Latest Updates**: See **[WHATS-NEW.md](WHATS-NEW.md)** for ServiceNow DevOps integration, dependency scanning, and enhanced security features.
+
 ## Quick Start Guides
 
 ### For Developers
