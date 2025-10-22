@@ -1084,3 +1084,23 @@ release-help:
     @echo "    - Builds and pushes images"
     @echo "    - Triggers ServiceNow change management"
     @echo "    - Deploys after approval"
+
+# ==============================================================================
+# Enterprise Demonstrations
+# ==============================================================================
+
+# Run SOC 2 Type II / ISO 27001 compliant deployment workflow demonstration
+demo-soc-compliance:
+    @echo "🏛️  Starting SOC 2 Type II / ISO 27001 Compliance Demonstration"
+    @echo ""
+    @echo "This interactive demonstration showcases:"
+    @echo "  • Complete change management lifecycle"
+    @echo "  • ServiceNow ITSM integration (Change Requests, Work Items)"
+    @echo "  • Security controls at every SDLC stage"
+    @echo "  • Comprehensive audit trail & evidence collection"
+    @echo "  • Compliance with financial services regulations"
+    @echo ""
+    @echo "Target Audience: Senior engineers in regulated industries"
+    @echo "Standards: SOC 2 Type II, ISO 27001:2022, NIST CSF, CIS Controls"
+    @echo ""
+    @./scripts/demo-soc-iso27001-workflow.sh
