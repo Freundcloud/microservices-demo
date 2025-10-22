@@ -196,6 +196,12 @@ jobs:
           soft_fail: true
           config_file: .checkov.yml  # Use project-specific config with skip rules
 
+      - name: Fix Checkov SARIF URI Schemes
+        if: always()
+        run: |
+          chmod +x scripts/fix-sarif-uris.sh
+          ./scripts/fix-sarif-uris.sh checkov-results.sarif
+
       - name: Upload Checkov Results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
@@ -210,6 +216,13 @@ jobs:
           soft_fail: true
           format: sarif
           additional_args: --out tfsec-results.sarif
+        continue-on-error: true
+
+      - name: Fix tfsec SARIF URI Schemes
+        if: always()
+        run: |
+          chmod +x scripts/fix-sarif-uris.sh
+          ./scripts/fix-sarif-uris.sh tfsec-results.sarif
         continue-on-error: true
 
       - name: Upload tfsec Results to Security Tab
