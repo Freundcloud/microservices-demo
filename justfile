@@ -595,6 +595,141 @@ sn-help:
     @echo "Setup Guide: docs/SERVICENOW-ESSENTIAL-SETUP.md"
 
 # ==============================================================================
+# Demo: End-to-end GitHub ↔ ServiceNow flow
+# ==============================================================================
+
+# One-shot: open work item + PR, merge, deploy, wait for SNOW approval, then close work item
+demo-run ENV TAG="":
+        #!/usr/bin/env bash
+        set -euo pipefail
+        if [ -z "{{ENV}}" ] || [ -z "{{TAG}}" ]; then
+            echo "Usage: just demo-run ENV=<dev|qa|prod> TAG=<version>"; exit 1; fi
+
+        # Preflight checks
+        command -v gh >/dev/null 2>&1 || { echo "gh CLI is required"; exit 1; }
+        command -v jq >/dev/null 2>&1 || { echo "jq is required"; exit 1; }
+        git fetch origin main >/dev/null 2>&1 || true
+
+        BRANCH="feat/version-bump-{{ENV}}-{{TAG}}"
+        echo "📌 Creating feature branch: $BRANCH"
+        git checkout -b "$BRANCH" || git checkout "$BRANCH"
+
+        echo "🧾 Creating GitHub issue (work item)"
+        ISSUE_JSON=$(gh issue create --title "Deploy {{ENV}} to {{TAG}}" \
+            --body "Automate image tag bump to {{TAG}} in {{ENV}} overlay. This will create a ServiceNow change and pause at the deployment gate. Work item will close automatically after approval and successful deployment." \
+            --label enhancement --json number,url 2>/dev/null || true)
+        ISSUE_NUM=$(echo "$ISSUE_JSON" | jq -r '.number // empty')
+        ISSUE_URL=$(echo "$ISSUE_JSON" | jq -r '.url // empty')
+        if [ -z "$ISSUE_NUM" ]; then
+            echo "ℹ️  Could not create issue (possibly missing auth). Proceeding without issue linkage."; fi
+
+        echo "🔧 Bumping version in kustomize overlay"
+        ./scripts/bump-env-version.sh "{{ENV}}" "{{TAG}}"
+
+        echo "📝 Commit changes"
+        if [ -n "$ISSUE_NUM" ]; then
+            git add -A
+            git commit -m "chore({{ENV}}): bump version to {{TAG}} (refs #$ISSUE_NUM)"
+        else
+            git add -A
+            git commit -m "chore({{ENV}}): bump version to {{TAG}}"
+        fi
+
+        echo "📤 Push branch"
+        git push -u origin "$BRANCH"
+
+        echo "🔀 Open pull request"
+        PR_BODY="Update {{ENV}} overlay to {{TAG}} to drive deployment via ServiceNow change gate."
+        if [ -n "$ISSUE_NUM" ]; then PR_BODY+="\n\nRef: #$ISSUE_NUM"; fi
+        gh pr create --fill -t "Bump {{ENV}} to {{TAG}}" -b "$PR_BODY" || true
+
+        echo "✅ Attempting to merge PR"
+        # Try a normal merge first; fall back to admin if available; if both fail, stop
+        if ! gh pr merge --squash --delete-branch --merge; then
+            if ! gh pr merge --squash --delete-branch --admin --merge; then
+                echo "❌ Unable to auto-merge PR (branch protection or required checks). Please merge it in the GitHub UI, then rerun: just demo-deploy ENV={{ENV}}";
+                exit 1
+            fi
+        fi
+
+        echo "🚀 Trigger MASTER-PIPELINE for {{ENV}}"
+        gh workflow run MASTER-PIPELINE.yaml -f environment={{ENV}}
+        # Allow a moment for the run to register
+        sleep 5
+        RUN_ID=$(gh run list --workflow MASTER-PIPELINE.yaml --limit 1 --json databaseId,createdAt | jq -r '.[0].databaseId')
+        if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "❌ Could not determine run id. You can watch runs with: gh run list --workflow MASTER-PIPELINE.yaml"; exit 1; fi
+
+        echo "⏳ Waiting for ServiceNow approval and deployment to complete (run id: $RUN_ID)"
+        echo "👉 If gated (qa/prod), approve the change in ServiceNow to resume deployment."
+        # Exit nonzero on failure so we don't close the issue
+        gh run watch --run-id "$RUN_ID" --exit-status || { echo "❌ Deployment failed. See run $RUN_ID in GitHub Actions."; exit 1; }
+
+        echo "🎉 Deployment completed successfully"
+        if [ -n "$ISSUE_NUM" ]; then
+            echo "🧹 Closing work item #$ISSUE_NUM"
+            gh issue close "$ISSUE_NUM" -c "Deployment to {{ENV}} ({{TAG}}) succeeded after ServiceNow approval." || true
+        fi
+        echo "✅ Demo complete"
+
+# Bump image version in an environment overlay and open a PR with a linked work item
+demo-release ENV TAG="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ENV}}" ]; then
+        echo "Usage: just demo-release ENV=<dev|qa|prod> TAG=<version>"; exit 1; fi
+    if [ -z "{{TAG}}" ]; then
+        echo "Usage: just demo-release ENV=<dev|qa|prod> TAG=<version>"; exit 1; fi
+
+    BRANCH="feat/version-bump-{{ENV}}-{{TAG}}"
+    echo "📌 Creating feature branch: $BRANCH"
+    git checkout -b "$BRANCH"
+
+    echo "🧾 Creating GitHub issue (work item)"
+    ISSUE_JSON=$(gh issue create --title "Bump version to {{TAG}} in {{ENV}}" \
+        --body "Automate image tag bump to {{TAG}} in {{ENV}} overlay to drive SNOW change via deployment gate." \
+        --label enhancement --json number,url || true)
+    ISSUE_NUM=$(echo "$ISSUE_JSON" | jq -r '.number // empty')
+    ISSUE_URL=$(echo "$ISSUE_JSON" | jq -r '.url // empty')
+    if [ -z "$ISSUE_NUM" ]; then
+        echo "ℹ️  Could not create issue (possibly missing auth). Proceeding without issue linkage."; fi
+
+    echo "🔧 Bumping version in kustomize overlay"
+    ./scripts/bump-env-version.sh "{{ENV}}" "{{TAG}}"
+
+    echo "📝 Commit changes"
+    if [ -n "$ISSUE_NUM" ]; then
+        git commit -am "chore({{ENV}}): bump version to {{TAG}} (closes #$ISSUE_NUM)"
+    else
+        git commit -am "chore({{ENV}}): bump version to {{TAG}}"
+    fi
+
+    echo "📤 Push branch"
+    git push -u origin "$BRANCH"
+
+    echo "🔀 Open pull request"
+    PR_FLAGS=()
+    if [ -n "$ISSUE_NUM" ]; then PR_FLAGS+=(--fill -b "Fixes #$ISSUE_NUM"); else PR_FLAGS+=(--fill); fi
+    gh pr create "${PR_FLAGS[@]}" -t "Bump {{ENV}} to {{TAG}}" || true
+
+    echo "✅ PR opened. Review and merge the PR to trigger the pipeline."
+
+# After merging the PR, run the master pipeline with environment and wait for approvals
+demo-deploy ENV:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ENV}}" ]; then echo "Usage: just demo-deploy ENV=<dev|qa|prod>"; exit 1; fi
+    echo "🚀 Trigger MASTER-PIPELINE to deploy to {{ENV}}"
+    gh workflow run MASTER-PIPELINE.yaml -f environment={{ENV}}
+    echo "👀 Watching run... (Ctrl+C to stop live watch)"
+    gh run watch || true
+
+# Close the issue that was used as work item (provide number)
+demo-close-issue ISSUE:
+    @echo "🧹 Closing work item #{{ISSUE}}"
+    gh issue close {{ISSUE}} -c "Deployment successful; closing work item."
+
+# ==============================================================================
 # Cluster Management & Monitoring
 # ==============================================================================
 

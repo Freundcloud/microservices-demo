@@ -276,37 +276,47 @@ jobs:
 
       - name: "Create ServiceNow Change (dev: no gate)"
         if: ${{ inputs.environment == 'dev' }}
-        uses: ServiceNow/servicenow-devops-change-automation@v6.0.0
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
-          change-request-json: |
-            {"type":"${{ inputs.change_type }}",
-             "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
-             "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-             "u_environment":"${{ inputs.environment }}",
-             "u_correlation_id":"${{ github.run_id }}"}
+          job-name: 'Create ServiceNow Change Request'
+          change-request: |
+            {"setCloseCode":"true","autoCloseChange":true,
+             "attributes":{
+               "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
+               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+               "u_environment":"${{ inputs.environment }}",
+               "u_correlation_id":"${{ github.run_id }}",
+               "type":"${{ inputs.change_type }}"
+             }
+            }
 
       - name: "Create ServiceNow Change (qa/prod with deployment gate)"
         if: ${{ inputs.environment != 'dev' }}
-        uses: ServiceNow/servicenow-devops-change-automation@v6.0.0
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
+          job-name: 'Create ServiceNow Change Request'
           deployment-gate: |
             {"environment":"${{ inputs.environment }}","jobName":"deploy-to-environment"}
-          change-request-json: |
-            {"type":"${{ inputs.change_type }}",
-             "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
-             "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-             "u_environment":"${{ inputs.environment }}",
-             "u_correlation_id":"${{ github.run_id }}"}
+          change-request: |
+            {"setCloseCode":"true","autoCloseChange":true,
+             "attributes":{
+               "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
+               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+               "u_environment":"${{ inputs.environment }}",
+               "u_correlation_id":"${{ github.run_id }}",
+               "type":"${{ inputs.change_type }}"
+             }
+            }
 
       - name: Fetch Change Request Details
         id: fetch-change
