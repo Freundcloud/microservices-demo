@@ -337,7 +337,7 @@ jobs:
           echo "change_json=$CHANGE_JSON" >> $GITHUB_OUTPUT
           echo "✅ Change JSON built and validated" >> $GITHUB_STEP_SUMMARY
 
-      - name: Preflight: Verify ServiceNow Basic Auth
+      - name: "Preflight: Verify ServiceNow Basic Auth"
         id: sn-basic-auth-check
         run: |
           URL="${{ steps.resolve.outputs.url }}"
@@ -364,7 +364,7 @@ jobs:
           devops-integration-user-password: ${{ steps.resolve.outputs.pass }}
           instance-url: ${{ steps.resolve.outputs.url }}
           tool-id: ${{ steps.resolve.outputs.tool }}
-          context-github: ${{ toJSON(github) }}
+          context-github: '${{ toJSON(github) }}'
           job-name: 'Create ServiceNow Change Request'
           change-request: ${{ steps.build-json.outputs.change_json }}
 
@@ -377,10 +377,9 @@ jobs:
           devops-integration-user-password: ${{ steps.resolve.outputs.pass }}
           instance-url: ${{ steps.resolve.outputs.url }}
           tool-id: ${{ steps.resolve.outputs.tool }}
-          context-github: ${{ toJSON(github) }}
+          context-github: '${{ toJSON(github) }}'
           job-name: 'Create ServiceNow Change Request'
-          deployment-gate: |
-            {"environment":"${{ inputs.environment }}","jobName":"deploy-to-environment"}
+          deployment-gate: '{"environment":"${{ inputs.environment }}","jobName":"deploy-to-environment"}'
           change-request: ${{ steps.build-json.outputs.change_json }}
 
       - name: Fetch Change Request Details
