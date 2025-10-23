@@ -304,7 +304,7 @@ jobs:
              "attributes":{
                "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
                "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-             }}}
+             }}
 
       - name: "Create ServiceNow Change (qa/prod, basic)"
         if: ${{ inputs.environment != 'dev' }}
@@ -324,7 +324,7 @@ jobs:
              "attributes":{
                "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
                "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-             }}}
+             }}
 
       - name: Fetch Change Request Details
         id: fetch-change
