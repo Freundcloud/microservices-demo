@@ -462,31 +462,40 @@ jobs:
           fi
 
           # Build detailed description with GitHub context
+          REPO="${{ github.repository }}"
+          EVENT="${{ github.event_name }}"
+
           if [ -n "$PR_NUMBER" ]; then
-            PR_INFO="Pull Request: #$PR_NUMBER\n"
-            PR_URL="${{ github.server_url }}/${{ github.repository }}/pull/$PR_NUMBER\n"
+            PR_INFO="Pull Request: #$PR_NUMBER"
+            PR_URL="${{ github.server_url }}/${{ github.repository }}/pull/$PR_NUMBER"
           else
-            PR_INFO="Direct Push\n"
+            PR_INFO="Direct Push"
             PR_URL=""
           fi
 
-          DETAILED_DESC="Automated deployment to $ENV environment via GitHub Actions
+          # Build multi-line description (line by line to avoid YAML issues)
+          DETAILED_DESC="Automated deployment to $ENV environment via GitHub Actions"
+          DETAILED_DESC="${DETAILED_DESC}\n"
+          DETAILED_DESC="${DETAILED_DESC}\nGitHub Context:"
+          DETAILED_DESC="${DETAILED_DESC}\n- Actor: $ACTOR"
+          DETAILED_DESC="${DETAILED_DESC}\n- Branch: $BRANCH"
+          DETAILED_DESC="${DETAILED_DESC}\n- Commit: $COMMIT_SHORT"
+          DETAILED_DESC="${DETAILED_DESC}\n- $PR_INFO"
 
-GitHub Context:
-- Actor: $ACTOR
-- Branch: $BRANCH
-- Commit: $COMMIT_SHORT
-- ${PR_INFO}${PR_URL}
-Workflow Run: $RUN_URL
+          if [ -n "$PR_URL" ]; then
+            DETAILED_DESC="${DETAILED_DESC}\n- PR URL: $PR_URL"
+          fi
 
-Repository: ${{ github.repository }}
-Event: ${{ github.event_name }}"
+          DETAILED_DESC="${DETAILED_DESC}\n"
+          DETAILED_DESC="${DETAILED_DESC}\nWorkflow Run: $RUN_URL"
+          DETAILED_DESC="${DETAILED_DESC}\nRepository: $REPO"
+          DETAILED_DESC="${DETAILED_DESC}\nEvent: $EVENT"
 
           # Build short description
           if [ -n "$PR_NUMBER" ]; then
-            SHORT_DESC="Deploy to $ENV: PR #$PR_NUMBER by $ACTOR"
+            SHORT_DESC="Deploy to $ENV - PR #$PR_NUMBER by $ACTOR"
           else
-            SHORT_DESC="Deploy to $ENV: $BRANCH by $ACTOR"
+            SHORT_DESC="Deploy to $ENV - $BRANCH by $ACTOR"
           fi
 
           # Build JSON with jq to ensure valid formatting
