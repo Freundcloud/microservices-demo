@@ -37,9 +37,6 @@ on:
 permissions:
   contents: read
 
-env:
-  SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-
 jobs:
   # Job 1: Register Build Artifacts in ServiceNow DevOps
   register-artifacts:
@@ -430,10 +427,7 @@ jobs:
     name: Register Work Items in DevOps Table
     runs-on: ubuntu-latest
     needs: [extract-work-items, create-change-request]
-    if: |
-      always() &&
-      needs.create-change-request.outputs.change_request_sys_id != '' &&
-      needs.extract-work-items.outputs.issue_count != '0'
+    if: always() && needs.create-change-request.outputs.change_request_sys_id != '' && needs.extract-work-items.outputs.issue_count != '0'
 
     steps:
       - name: Checkout code
