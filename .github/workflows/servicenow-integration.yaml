@@ -611,20 +611,23 @@ jobs:
           echo "## 📝 Creating ServiceNow Change Request via CLI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Extract change attributes from build-json output
-          CHANGE_JSON='${{ steps.build-json.outputs.change_json }}'
+          # Write change JSON to file to avoid bash interpretation issues
+          cat > /tmp/change_payload.json << 'PAYLOAD_EOF'
+          ${{ steps.build-json.outputs.change_json }}
+          PAYLOAD_EOF
+
+          # Read payload from file
+          CHANGE_JSON=$(cat /tmp/change_payload.json)
 
           # Run ServiceNow CLI in Docker container
+          # Mount temp directory to pass the payload file
           docker run --rm \
+            -v /tmp:/tmp:ro \
             -e TOOL_ID="${{ steps.resolve.outputs.tool }}" \
             -e SN_URL="${{ steps.resolve.outputs.url }}" \
             -e SN_TOKEN_BASE64="$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)" \
             servicenowdocker/sndevops:6.0.0 \
-            sndevopscli create change \
-              --toolId "$TOOL_ID" \
-              --url "$SN_URL" \
-              --payload "$CHANGE_JSON" \
-              --waitForApproval false \
+            sh -c 'sndevopscli create change --toolId "$TOOL_ID" --url "$SN_URL" --payload "$(cat /tmp/change_payload.json)" --waitForApproval false' \
             > /tmp/change_output.txt 2>&1
 
           # Extract change request number and sys_id from output
@@ -649,8 +652,10 @@ jobs:
           echo "## 📝 Creating ServiceNow Change Request via CLI (Approval Required)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Extract change attributes from build-json output
-          CHANGE_JSON='${{ steps.build-json.outputs.change_json }}'
+          # Write change JSON to file to avoid bash interpretation issues
+          cat > /tmp/change_payload.json << 'PAYLOAD_EOF'
+          ${{ steps.build-json.outputs.change_json }}
+          PAYLOAD_EOF
 
           # Add deployment gate context for qa/prod
           PIPELINE_CONTEXT=$(jq -n \
@@ -662,17 +667,15 @@ jobs:
             }')
 
           # Run ServiceNow CLI in Docker container (with approval waiting for qa/prod)
+          # Mount temp directory to pass the payload file
           docker run --rm \
+            -v /tmp:/tmp:ro \
             -e TOOL_ID="${{ steps.resolve.outputs.tool }}" \
             -e SN_URL="${{ steps.resolve.outputs.url }}" \
             -e SN_TOKEN_BASE64="$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)" \
+            -e PIPELINE_CONTEXT="$PIPELINE_CONTEXT" \
             servicenowdocker/sndevops:6.0.0 \
-            sndevopscli create change \
-              --toolId "$TOOL_ID" \
-              --url "$SN_URL" \
-              --payload "$CHANGE_JSON" \
-              --pipelineContext "$PIPELINE_CONTEXT" \
-              --waitForApproval true \
+            sh -c 'sndevopscli create change --toolId "$TOOL_ID" --url "$SN_URL" --payload "$(cat /tmp/change_payload.json)" --pipelineContext "$PIPELINE_CONTEXT" --waitForApproval true' \
             > /tmp/change_output.txt 2>&1
 
           # Extract change request number and sys_id from output
