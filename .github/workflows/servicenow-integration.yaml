@@ -50,6 +50,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Resolve ServiceNow Inputs
+        id: resolve
+        run: |
+          URL="${{ secrets.SN_INSTANCE_URL }}"
+          if [ -z "$URL" ]; then URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"; fi
+          USER="${{ secrets.SN_DEVOPS_USER }}"
+          if [ -z "$USER" ]; then USER="${{ secrets.SERVICENOW_USERNAME }}"; fi
+          PASS="${{ secrets.SN_DEVOPS_PASSWORD }}"
+          if [ -z "$PASS" ]; then PASS="${{ secrets.SERVICENOW_PASSWORD }}"; fi
+          TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "user=$USER" >> $GITHUB_OUTPUT
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+          echo "tool=$TOOL" >> $GITHUB_OUTPUT
+
       - name: Install jq (for JSON validation)
         run: |
           if ! command -v jq >/dev/null 2>&1; then
@@ -59,10 +74,10 @@ jobs:
       - name: Register Docker Images as Artifacts
         uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
         with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ steps.resolve.outputs.user }}
+          devops-integration-user-password: ${{ steps.resolve.outputs.pass }}
+          instance-url: ${{ steps.resolve.outputs.url }}
+          tool-id: ${{ steps.resolve.outputs.tool }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Register Artifacts in ServiceNow'
           artifacts: |
@@ -90,7 +105,7 @@ jobs:
           echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| online-boutique (12 services) | 1.0.${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [View in ServiceNow DevOps](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/insights-home)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View in ServiceNow DevOps](${{ steps.resolve.outputs.url }}/now/devops-change/insights-home)" >> $GITHUB_STEP_SUMMARY
 
   # Job 2: Extract Work Items (GitHub Issues)
   extract-work-items:
@@ -289,10 +304,25 @@ jobs:
           HAS_URL="${{ secrets.SN_INSTANCE_URL != '' || secrets.SERVICENOW_INSTANCE_URL != '' }}"
           HAS_TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID != '' }}"
           echo "- Auth Mode: Basic (username/password)" >> $GITHUB_STEP_SUMMARY
-          echo "- Instance URL: $([[ "$HAS_URL" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
-          echo "- Tool Id: $([[ "$HAS_TOOL" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
-          echo "- Username: $([[ "$HAS_USER" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
-          echo "- Password: $([[ "$HAS_PASS" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Instance URL: $([[ "$HAS_URL" == 'true' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Tool Id: $([[ "$HAS_TOOL" == 'true' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Username: $([[ "$HAS_USER" == 'true' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Password: $([[ "$HAS_PASS" == 'true' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+
+      - name: Resolve ServiceNow Inputs
+        id: resolve
+        run: |
+          URL="${{ secrets.SN_INSTANCE_URL }}"
+          if [ -z "$URL" ]; then URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"; fi
+          USER="${{ secrets.SN_DEVOPS_USER }}"
+          if [ -z "$USER" ]; then USER="${{ secrets.SERVICENOW_USERNAME }}"; fi
+          PASS="${{ secrets.SN_DEVOPS_PASSWORD }}"
+          if [ -z "$PASS" ]; then PASS="${{ secrets.SERVICENOW_PASSWORD }}"; fi
+          TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "user=$USER" >> $GITHUB_OUTPUT
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+          echo "tool=$TOOL" >> $GITHUB_OUTPUT
 
       - name: Build and Validate Change JSON
         id: build-json
@@ -313,9 +343,9 @@ jobs:
       - name: Preflight: Verify ServiceNow Basic Auth
         id: sn-basic-auth-check
         run: |
-          URL="${{ secrets.SN_INSTANCE_URL || secrets.SERVICENOW_INSTANCE_URL }}"
-          USER="${{ secrets.SN_DEVOPS_USER || secrets.SERVICENOW_USERNAME }}"
-          PASS="${{ secrets.SN_DEVOPS_PASSWORD || secrets.SERVICENOW_PASSWORD }}"
+          URL="${{ steps.resolve.outputs.url }}"
+          USER="${{ steps.resolve.outputs.user }}"
+          PASS="${{ steps.resolve.outputs.pass }}"
           if [ -z "$URL" ] || [ -z "$USER" ] || [ -z "$PASS" ]; then
             echo "❌ Missing ServiceNow credentials (URL/USER/PASS)." >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -333,10 +363,10 @@ jobs:
         id: create_dev_basic
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER || secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD || secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL || secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ steps.resolve.outputs.user }}
+          devops-integration-user-password: ${{ steps.resolve.outputs.pass }}
+          instance-url: ${{ steps.resolve.outputs.url }}
+          tool-id: ${{ steps.resolve.outputs.tool }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create ServiceNow Change Request'
           change-request: ${{ steps.build-json.outputs.change_json }}
@@ -346,10 +376,10 @@ jobs:
         id: create_gated_basic
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER || secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD || secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL || secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ steps.resolve.outputs.user }}
+          devops-integration-user-password: ${{ steps.resolve.outputs.pass }}
+          instance-url: ${{ steps.resolve.outputs.url }}
+          tool-id: ${{ steps.resolve.outputs.tool }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create ServiceNow Change Request'
           deployment-gate: |
@@ -392,8 +422,8 @@ jobs:
           echo "| Environment | **${{ inputs.environment }}** |" >> $GITHUB_STEP_SUMMARY
           echo "| Risk Level | ${{ steps.risk.outputs.risk }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [DevOps Workspace](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/home)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View in ServiceNow](${{ steps.resolve.outputs.url }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [DevOps Workspace](${{ steps.resolve.outputs.url }}/now/devops-change/home)" >> $GITHUB_STEP_SUMMARY
 
   # Job 4: Register Work Items in ServiceNow DevOps Table
   register-work-items:
@@ -409,12 +439,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Resolve ServiceNow Inputs
+        id: resolve_work
+        run: |
+          URL="${{ secrets.SN_INSTANCE_URL }}"
+          if [ -z "$URL" ]; then URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"; fi
+          USER="${{ secrets.SN_DEVOPS_USER }}"
+          if [ -z "$USER" ]; then USER="${{ secrets.SERVICENOW_USERNAME }}"; fi
+          PASS="${{ secrets.SN_DEVOPS_PASSWORD }}"
+          if [ -z "$PASS" ]; then PASS="${{ secrets.SERVICENOW_PASSWORD }}"; fi
+          TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "user=$USER" >> $GITHUB_OUTPUT
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+          echo "tool=$TOOL" >> $GITHUB_OUTPUT
+
       - name: Register GitHub Issues as Work Items
         env:
           GH_TOKEN: ${{ github.token }}
           CHANGE_SYS_ID: ${{ needs.create-change-request.outputs.change_request_sys_id }}
           ISSUE_NUMBERS: ${{ needs.extract-work-items.outputs.issue_numbers }}
-          TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          TOOL_ID: ${{ steps.resolve_work.outputs.tool }}
+          SN_URL: ${{ steps.resolve_work.outputs.url }}
+          SN_USER: ${{ steps.resolve_work.outputs.user }}
+          SN_PASS: ${{ steps.resolve_work.outputs.pass }}
         run: |
           echo "## 📋 Registering Work Items in ServiceNow DevOps" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -482,9 +530,9 @@ jobs:
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SN_USER:$SN_PASS" \
               -d "$WORK_ITEM_PAYLOAD" \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_work_item")
+              "$SN_URL/api/now/table/sn_devops_work_item")
 
             HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
             BODY=$(echo "$RESPONSE" | sed '$d')
@@ -502,7 +550,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Work Items Registered**: $REGISTERED_COUNT / ${#ISSUES[@]}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [View Work Items](${{ secrets.SERVICENOW_INSTANCE_URL }}/now/nav/ui/classic/params/target/sn_devops_work_item_list.do)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Work Items]($SN_URL/now/nav/ui/classic/params/target/sn_devops_work_item_list.do)" >> $GITHUB_STEP_SUMMARY
 
   # Job 5: Upload Security Evidence to Change Request
   upload-security-evidence:
@@ -515,6 +563,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Resolve ServiceNow Inputs
+        id: resolve_evidence
+        run: |
+          URL="${{ secrets.SN_INSTANCE_URL }}"
+          if [ -z "$URL" ]; then URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"; fi
+          USER="${{ secrets.SN_DEVOPS_USER }}"
+          if [ -z "$USER" ]; then USER="${{ secrets.SERVICENOW_USERNAME }}"; fi
+          PASS="${{ secrets.SN_DEVOPS_PASSWORD }}"
+          if [ -z "$PASS" ]; then PASS="${{ secrets.SERVICENOW_PASSWORD }}"; fi
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "user=$USER" >> $GITHUB_OUTPUT
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+
       - name: Download security scan artifacts
         uses: actions/download-artifact@v4
         continue-on-error: true
@@ -526,7 +587,7 @@ jobs:
         run: |
           CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
           CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
-          BASIC_AUTH=$(echo -n "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" | base64)
+          BASIC_AUTH=$(echo -n "${{ steps.resolve_evidence.outputs.user }}:${{ steps.resolve_evidence.outputs.pass }}" | base64)
 
           echo "📤 Uploading security evidence to Change Request $CHANGE_NUMBER..."
 
@@ -540,7 +601,7 @@ jobs:
               -F "file_name=security-scan-evidence-${{ github.run_number }}.md" \
               -F "table_name=change_request" \
               -F "table_sys_id=$CHANGE_SYS_ID" \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+              "${{ steps.resolve_evidence.outputs.url }}/api/now/attachment/upload" > /dev/null
             echo "✅ Uploaded: security-scan-evidence.md"
             UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
           fi
@@ -554,7 +615,7 @@ jobs:
                 -F "file=@$sarif_file" \
                 -F "table_name=change_request" \
                 -F "table_sys_id=$CHANGE_SYS_ID" \
-                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/attachment/upload" > /dev/null
+                "${{ steps.resolve_evidence.outputs.url }}/api/now/attachment/upload" > /dev/null
               echo "✅ Uploaded: $(basename $sarif_file)"
               UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
             fi
@@ -587,9 +648,9 @@ jobs:
 
           curl -s -H "Content-Type: application/json" \
             -H "Accept: application/json" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -u "${{ steps.resolve_evidence.outputs.user }}:${{ steps.resolve_evidence.outputs.pass }}" \
             -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYS_ID" > /dev/null
+            "${{ steps.resolve_evidence.outputs.url }}/api/now/table/change_request/$CHANGE_SYS_ID" > /dev/null
 
           echo "✅ Work note added to change request" >> $GITHUB_STEP_SUMMARY
 
