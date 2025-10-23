@@ -18,15 +18,28 @@ for SARIF_FILE in "$@"; do
 
     echo "🔧 Fixing URI schemes in $SARIF_FILE..."
 
+    # Check for git:// URIs before fixing
+    GIT_URIS=$(jq -r '.. | objects | select(has("uri")) | .uri | select(startswith("git://") or contains("git://"))' "$SARIF_FILE" 2>/dev/null | head -5)
+    if [ -n "$GIT_URIS" ]; then
+        echo "   Found git:// URIs to fix:"
+        echo "$GIT_URIS" | sed 's/^/     /'
+    else
+        echo "   No git:// URIs found (file may already be fixed)"
+    fi
+
     # Create backup
     cp "$SARIF_FILE" "${SARIF_FILE}.bak"
 
     # Replace git:// with file:// in URIs
-    # This handles both artifactLocation.uri and physicalLocation.artifactLocation.uri
+    # This handles artifactLocation.uri, physicalLocation.artifactLocation.uri, and any other URI fields
     jq '
         walk(
             if type == "object" and has("uri") then
-                .uri |= gsub("^git://"; "file://")
+                if .uri | type == "string" and (startswith("git://") or contains("git://")) then
+                    .uri |= gsub("git://"; "file://")
+                else
+                    .
+                end
             else
                 .
             end
