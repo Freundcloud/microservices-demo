@@ -448,16 +448,82 @@ jobs:
         run: |
           ENV="${{ inputs.environment }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ACTOR="${{ github.actor }}"
+          BRANCH="${{ github.ref_name }}"
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_SHORT="${COMMIT_SHA:0:7}"
+
+          # Extract PR number if this is triggered by a pull request
+          PR_NUMBER=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "pull_request_target" ]; then
+            PR_NUMBER="${{ github.event.number }}"
+          fi
+
+          # Build detailed description with GitHub context
+          if [ -n "$PR_NUMBER" ]; then
+            PR_INFO="Pull Request: #$PR_NUMBER\n"
+            PR_URL="${{ github.server_url }}/${{ github.repository }}/pull/$PR_NUMBER\n"
+          else
+            PR_INFO="Direct Push\n"
+            PR_URL=""
+          fi
+
+          DETAILED_DESC="Automated deployment to $ENV environment via GitHub Actions
+
+GitHub Context:
+- Actor: $ACTOR
+- Branch: $BRANCH
+- Commit: $COMMIT_SHORT
+- ${PR_INFO}${PR_URL}
+Workflow Run: $RUN_URL
+
+Repository: ${{ github.repository }}
+Event: ${{ github.event_name }}"
+
+          # Build short description
+          if [ -n "$PR_NUMBER" ]; then
+            SHORT_DESC="Deploy to $ENV: PR #$PR_NUMBER by $ACTOR"
+          else
+            SHORT_DESC="Deploy to $ENV: $BRANCH by $ACTOR"
+          fi
+
           # Build JSON with jq to ensure valid formatting
           CHANGE_JSON=$(jq -n \
-            --arg short_desc "Deploy Online Boutique to $ENV" \
-            --arg desc "Automated deployment via GitHub Actions. Run: $RUN_URL" \
-            '{setCloseCode:"true", autoCloseChange:true, attributes:{short_description:$short_desc, description:$desc}}')
+            --arg short_desc "$SHORT_DESC" \
+            --arg desc "$DETAILED_DESC" \
+            --arg actor "$ACTOR" \
+            --arg branch "$BRANCH" \
+            --arg pr "$PR_NUMBER" \
+            --arg commit "$COMMIT_SHORT" \
+            '{
+              setCloseCode: "true",
+              autoCloseChange: true,
+              attributes: {
+                short_description: $short_desc,
+                description: $desc,
+                u_github_actor: $actor,
+                u_github_branch: $branch,
+                u_github_pr: $pr,
+                u_github_commit: $commit
+              }
+            }')
 
           # Validate JSON is parseable
           echo "$CHANGE_JSON" | jq . > /dev/null
           echo "change_json=$CHANGE_JSON" >> $GITHUB_OUTPUT
+
+          # Output summary
           echo "✅ Change JSON built and validated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**GitHub Context:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Actor: $ACTOR" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: $BRANCH" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: $COMMIT_SHORT" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$PR_NUMBER" ]; then
+            echo "- PR: #$PR_NUMBER" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: "Preflight: Verify ServiceNow Basic Auth"
         id: sn-basic-auth-check
