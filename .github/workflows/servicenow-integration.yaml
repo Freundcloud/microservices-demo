@@ -174,21 +174,18 @@ jobs:
             exit 1
           fi
 
-          ACTIVE=$(echo "$BODY" | jq -r '.result.active // false')
           NAME=$(echo "$BODY" | jq -r '.result.name // "unknown"')
-          TYPE=$(echo "$BODY" | jq -r '.result.type // "unknown"')
+          SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id // ""')
 
-          if [ "$ACTIVE" != "true" ]; then
-            echo "❌ Tool is not active: $NAME ($TOOL)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Action Required:** Activate the tool in ServiceNow DevOps" >> $GITHUB_STEP_SUMMARY
-            echo "  - Navigate to: sn_devops_tool.list" >> $GITHUB_STEP_SUMMARY
-            echo "  - Find tool: $NAME" >> $GITHUB_STEP_SUMMARY
-            echo "  - Set 'Active' field to true" >> $GITHUB_STEP_SUMMARY
+          # Note: sn_devops_tool table doesn't have an "active" field
+          # If HTTP 200 and we got the tool, it exists and is usable
+
+          if [ -z "$SYS_ID" ]; then
+            echo "❌ Tool data invalid or empty" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
-          echo "✅ Tool verified: $NAME ($TYPE)" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Tool verified: $NAME (sys_id: ${SYS_ID:0:8}...)" >> $GITHUB_STEP_SUMMARY
 
       - name: Register Docker Images as Artifacts
         uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
