@@ -97,10 +97,39 @@ jobs:
           URL="${{ steps.validate_art_inputs.outputs.url_norm }}"
           USER="${{ steps.resolve.outputs.user }}"
           PASS="${{ steps.resolve.outputs.pass }}"
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sys_user?sysparm_limit=1")
+
+          # Test authentication with detailed error capture
+          RESPONSE=$(curl -s -w "\n%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sys_user?sysparm_limit=1")
+          CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
           if [ "$CODE" != "200" ]; then
             echo "❌ ServiceNow Basic auth failed for Register Artifacts (HTTP $CODE)." >> $GITHUB_STEP_SUMMARY
-            echo "Check repo secrets: SERVICENOW_USERNAME/PASSWORD (or SN_DEVOPS_USER/PASSWORD) and SN_INSTANCE_URL (or SERVICENOW_INSTANCE_URL)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Tested Endpoint:** \`$URL/api/now/table/sys_user\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Username:** ${USER:0:3}***" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Parse error message if JSON
+            if echo "$BODY" | jq . > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+              echo "**ServiceNow Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+            if [ "$CODE" = "401" ]; then
+              echo "  - HTTP 401 = Invalid username or password" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify SERVICENOW_USERNAME and SERVICENOW_PASSWORD secrets" >> $GITHUB_STEP_SUMMARY
+            elif [ "$CODE" = "403" ]; then
+              echo "  - HTTP 403 = User lacks required permissions" >> $GITHUB_STEP_SUMMARY
+              echo "  - User needs 'rest_service' and 'x_snc_devops' roles" >> $GITHUB_STEP_SUMMARY
+            elif [ "$CODE" = "404" ]; then
+              echo "  - HTTP 404 = Invalid instance URL" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify SN_INSTANCE_URL format" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "  - Check ServiceNow instance accessibility" >> $GITHUB_STEP_SUMMARY
+            fi
             exit 1
           fi
           echo "✅ ServiceNow Basic auth verified (Artifacts)" >> $GITHUB_STEP_SUMMARY
@@ -112,20 +141,53 @@ jobs:
           USER="${{ steps.resolve.outputs.user }}"
           PASS="${{ steps.resolve.outputs.pass }}"
           TOOL="${{ steps.resolve.outputs.tool }}"
+
           RESP=$(curl -s -w "\n%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sn_devops_tool/$TOOL?sysparm_fields=sys_id,name,active,type")
           HTTP_CODE=$(echo "$RESP" | tail -n1)
           BODY=$(echo "$RESP" | sed '$d')
+
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Tool ID lookup failed (HTTP $HTTP_CODE). Verify SN_ORCHESTRATION_TOOL_ID and user permissions." >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tool ID lookup failed (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Tool ID:** \`$TOOL\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Endpoint:** \`$URL/api/now/table/sn_devops_tool/$TOOL\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Parse error message if JSON
+            if echo "$BODY" | jq . > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+              echo "**ServiceNow Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+            if [ "$HTTP_CODE" = "404" ]; then
+              echo "  - HTTP 404 = Tool ID not found in ServiceNow" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify SN_ORCHESTRATION_TOOL_ID secret is correct" >> $GITHUB_STEP_SUMMARY
+              echo "  - Check tool exists in ServiceNow: sn_devops_tool table" >> $GITHUB_STEP_SUMMARY
+            elif [ "$HTTP_CODE" = "403" ]; then
+              echo "  - HTTP 403 = User lacks permission to read DevOps tools" >> $GITHUB_STEP_SUMMARY
+              echo "  - User needs 'sn_devops.devops_user' role" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "  - Verify SN_ORCHESTRATION_TOOL_ID and user permissions" >> $GITHUB_STEP_SUMMARY
+            fi
             exit 1
           fi
+
           ACTIVE=$(echo "$BODY" | jq -r '.result.active // false')
           NAME=$(echo "$BODY" | jq -r '.result.name // "unknown"')
           TYPE=$(echo "$BODY" | jq -r '.result.type // "unknown"')
+
           if [ "$ACTIVE" != "true" ]; then
-            echo "❌ Tool is not active: $NAME ($TOOL)." >> $GITHUB_STEP_SUMMARY
+            echo "❌ Tool is not active: $NAME ($TOOL)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Action Required:** Activate the tool in ServiceNow DevOps" >> $GITHUB_STEP_SUMMARY
+            echo "  - Navigate to: sn_devops_tool.list" >> $GITHUB_STEP_SUMMARY
+            echo "  - Find tool: $NAME" >> $GITHUB_STEP_SUMMARY
+            echo "  - Set 'Active' field to true" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
           echo "✅ Tool verified: $NAME ($TYPE)" >> $GITHUB_STEP_SUMMARY
 
       - name: Register Docker Images as Artifacts
@@ -403,16 +465,61 @@ jobs:
           URL="${{ steps.resolve.outputs.url }}"
           USER="${{ steps.resolve.outputs.user }}"
           PASS="${{ steps.resolve.outputs.pass }}"
+
+          # Check credentials exist
           if [ -z "$URL" ] || [ -z "$USER" ] || [ -z "$PASS" ]; then
             echo "❌ Missing ServiceNow credentials (URL/USER/PASS)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Required secrets:" >> $GITHUB_STEP_SUMMARY
+            echo "  - SN_INSTANCE_URL or SERVICENOW_INSTANCE_URL" >> $GITHUB_STEP_SUMMARY
+            echo "  - SN_DEVOPS_USER or SERVICENOW_USERNAME" >> $GITHUB_STEP_SUMMARY
+            echo "  - SN_DEVOPS_PASSWORD or SERVICENOW_PASSWORD" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sys_user?sysparm_limit=1")
+
+          # Validate URL format (should start with https://)
+          if [[ ! "$URL" =~ ^https:// ]]; then
+            echo "❌ ServiceNow URL must start with 'https://' (got: ${URL:0:20}...)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # Test authentication with detailed error capture
+          RESPONSE=$(curl -s -w "\n%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sys_user?sysparm_limit=1")
+          CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
           if [ "$CODE" != "200" ]; then
             echo "❌ ServiceNow Basic auth failed (HTTP $CODE)." >> $GITHUB_STEP_SUMMARY
-            echo "Check repo secrets: SERVICENOW_USERNAME/PASSWORD (or SN_DEVOPS_USER/PASSWORD) and SN_INSTANCE_URL (or SERVICENOW_INSTANCE_URL)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Tested Endpoint:** \`$URL/api/now/table/sys_user\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Username:** ${USER:0:3}***" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Parse error message if JSON
+            if echo "$BODY" | jq . > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+              echo "**ServiceNow Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+            if [ "$CODE" = "401" ]; then
+              echo "  - HTTP 401 = Invalid username or password" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify SERVICENOW_USERNAME and SERVICENOW_PASSWORD secrets" >> $GITHUB_STEP_SUMMARY
+              echo "  - Check if user account is active in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            elif [ "$CODE" = "403" ]; then
+              echo "  - HTTP 403 = User lacks required permissions" >> $GITHUB_STEP_SUMMARY
+              echo "  - User needs 'rest_service' and 'x_snc_devops' roles" >> $GITHUB_STEP_SUMMARY
+            elif [ "$CODE" = "404" ]; then
+              echo "  - HTTP 404 = Invalid instance URL" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify SN_INSTANCE_URL: should be https://your-instance.service-now.com" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "  - Check ServiceNow instance is accessible" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify credentials and URL format" >> $GITHUB_STEP_SUMMARY
+            fi
             exit 1
           fi
+
           echo "✅ ServiceNow Basic auth verified (Table API)" >> $GITHUB_STEP_SUMMARY
 
       - name: "Create ServiceNow Change (dev, basic)"
@@ -456,7 +563,19 @@ jobs:
           if [ -z "$NUM" ] || [ "$NUM" = "null" ]; then NUM=${NUM_GATED_BASIC:-}; SYS=${SYS_GATED_BASIC:-}; fi
 
           if [ -z "$NUM" ] || [ -z "$SYS" ] || [ "$NUM" = "null" ] || [ "$SYS" = "null" ]; then
-            echo "❌ ERROR: Action did not return change outputs. Check ServiceNow action logs for details." >> $GITHUB_STEP_SUMMARY
+            echo "❌ ERROR: ServiceNow action did not return change request details" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Expected Outputs:**" >> $GITHUB_STEP_SUMMARY
+            echo "  - change-request-number: ${NUM:-<missing>}" >> $GITHUB_STEP_SUMMARY
+            echo "  - change-request-sys-id: ${SYS:-<missing>}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+            echo "  1. Check previous step logs for ServiceNow API errors" >> $GITHUB_STEP_SUMMARY
+            echo "  2. Verify Tool ID exists and is active in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "  3. Verify user has 'sn_devops.devops_user' role" >> $GITHUB_STEP_SUMMARY
+            echo "  4. Check ServiceNow Change API is responding: /api/sn_devops/devops/orchestration/changeInfo" >> $GITHUB_STEP_SUMMARY
+            echo "  5. Review ServiceNow DevOps application logs" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
           echo "change_request_number=$NUM" >> $GITHUB_OUTPUT
@@ -597,6 +716,28 @@ jobs:
               REGISTERED_COUNT=$((REGISTERED_COUNT + 1))
             else
               echo "⚠️  Failed to create work item for Issue #$issue_num (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+
+              # Parse and show ServiceNow error if available
+              if echo "$BODY" | jq . > /dev/null 2>&1; then
+                ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+                ERROR_DETAIL=$(echo "$BODY" | jq -r '.error.detail // ""' 2>/dev/null)
+                echo "  **Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+                if [ -n "$ERROR_DETAIL" ] && [ "$ERROR_DETAIL" != "null" ]; then
+                  echo "  **Detail:** $ERROR_DETAIL" >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
+
+              # Common HTTP status code explanations
+              if [ "$HTTP_CODE" = "403" ]; then
+                echo "  **Cause:** User lacks permission to create work items" >> $GITHUB_STEP_SUMMARY
+                echo "  **Fix:** Add 'sn_devops.devops_user' role to user" >> $GITHUB_STEP_SUMMARY
+              elif [ "$HTTP_CODE" = "404" ]; then
+                echo "  **Cause:** sn_devops_work_item table not found" >> $GITHUB_STEP_SUMMARY
+                echo "  **Fix:** Install ServiceNow DevOps application" >> $GITHUB_STEP_SUMMARY
+              elif [ "$HTTP_CODE" = "400" ]; then
+                echo "  **Cause:** Invalid work item payload" >> $GITHUB_STEP_SUMMARY
+                echo "  **Fix:** Check payload format in workflow logs" >> $GITHUB_STEP_SUMMARY
+              fi
             fi
           done
 
@@ -648,29 +789,51 @@ jobs:
 
           # Upload security evidence report
           if [ -f "security-scan-evidence/security-scan-evidence.md" ]; then
-            curl -s -w "\n%{http_code}" \
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
               -H "Authorization: Basic $BASIC_AUTH" \
               -F "file=@security-scan-evidence/security-scan-evidence.md" \
               -F "file_name=security-scan-evidence-${{ github.run_number }}.md" \
               -F "table_name=change_request" \
               -F "table_sys_id=$CHANGE_SYS_ID" \
-              "${{ steps.resolve_evidence.outputs.url }}/api/now/attachment/upload" > /dev/null
-            echo "✅ Uploaded: security-scan-evidence.md"
-            UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+              "${{ steps.resolve_evidence.outputs.url }}/api/now/attachment/upload")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            if [ "$HTTP_CODE" == "201" ]; then
+              echo "✅ Uploaded: security-scan-evidence.md" >> $GITHUB_STEP_SUMMARY
+              UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+            else
+              echo "⚠️  Failed to upload security-scan-evidence.md (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+              if echo "$BODY" | jq . > /dev/null 2>&1; then
+                ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+                echo "  **Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
           fi
 
           # Upload SARIF files
           shopt -s nullglob  # Prevent errors if no .sarif files exist
           for sarif_file in security-scan-evidence/*.sarif; do
             if [ -f "$sarif_file" ]; then
-              curl -s -w "\n%{http_code}" \
+              RESPONSE=$(curl -s -w "\n%{http_code}" \
                 -H "Authorization: Basic $BASIC_AUTH" \
                 -F "file=@$sarif_file" \
                 -F "table_name=change_request" \
                 -F "table_sys_id=$CHANGE_SYS_ID" \
-                "${{ steps.resolve_evidence.outputs.url }}/api/now/attachment/upload" > /dev/null
-              echo "✅ Uploaded: $(basename $sarif_file)"
-              UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+                "${{ steps.resolve_evidence.outputs.url }}/api/now/attachment/upload")
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | sed '$d')
+
+              if [ "$HTTP_CODE" == "201" ]; then
+                echo "✅ Uploaded: $(basename $sarif_file)" >> $GITHUB_STEP_SUMMARY
+                UPLOADED_COUNT=$((UPLOADED_COUNT + 1))
+              else
+                echo "⚠️  Failed to upload $(basename $sarif_file) (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+                if echo "$BODY" | jq . > /dev/null 2>&1; then
+                  ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+                  echo "  **Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
             fi
           done
           shopt -u nullglob  # Restore default behavior
@@ -699,13 +862,44 @@ jobs:
           WORK_NOTE="🔒 SECURITY SCAN EVIDENCE UPLOADED\n\nSecurity Scan Status: $STATUS\n$STATUS_MSG\n\nEvidence: SARIF results + summary report\nWorkflow: $WORKFLOW\nCompliance: SOC 2 CC7.1 security controls"
           PAYLOAD=$(jq -n --arg note "$WORK_NOTE" '{work_notes: $note}')
 
-          curl -s -H "Content-Type: application/json" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -u "${{ steps.resolve_evidence.outputs.user }}:${{ steps.resolve_evidence.outputs.pass }}" \
             -d "$PAYLOAD" \
-            "${{ steps.resolve_evidence.outputs.url }}/api/now/table/change_request/$CHANGE_SYS_ID" > /dev/null
+            "${{ steps.resolve_evidence.outputs.url }}/api/now/table/change_request/$CHANGE_SYS_ID")
 
-          echo "✅ Work note added to change request" >> $GITHUB_STEP_SUMMARY
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" == "200" ]; then
+            echo "✅ Work note added to change request" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  Failed to add work note to change request (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Parse error message if JSON
+            if echo "$BODY" | jq . > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+              echo "**ServiceNow Error:** $ERROR_MSG" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+            if [ "$HTTP_CODE" = "403" ]; then
+              echo "  - HTTP 403 = User lacks permission to update change requests" >> $GITHUB_STEP_SUMMARY
+              echo "  - User needs write access to change_request table" >> $GITHUB_STEP_SUMMARY
+            elif [ "$HTTP_CODE" = "404" ]; then
+              echo "  - HTTP 404 = Change request not found" >> $GITHUB_STEP_SUMMARY
+              echo "  - Verify change_request_sys_id: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "  - Verify ServiceNow API is accessible" >> $GITHUB_STEP_SUMMARY
+              echo "  - Check change request exists in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Don't fail the workflow - work note is optional enhancement
+            exit 0
+          fi
 
   # Job 5: Register Security Scan Results
   # REMOVED: servicenow-devops-security-result action (API endpoint does not exist)
