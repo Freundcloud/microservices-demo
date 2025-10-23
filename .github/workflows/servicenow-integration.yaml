@@ -518,7 +518,11 @@ jobs:
 
           # Validate JSON is parseable
           echo "$CHANGE_JSON" | jq . > /dev/null
-          echo "change_json=$CHANGE_JSON" >> $GITHUB_OUTPUT
+
+          # Use heredoc format for multi-line output
+          echo "change_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGE_JSON" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
           # Output summary
           echo "✅ Change JSON built and validated" >> $GITHUB_STEP_SUMMARY
