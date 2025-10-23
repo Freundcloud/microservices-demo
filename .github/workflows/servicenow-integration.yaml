@@ -608,7 +608,7 @@ jobs:
           tool-id: ${{ steps.resolve.outputs.tool }}
           context-github: '${{ toJSON(github) }}'
           job-name: 'Create ServiceNow Change Request'
-          change-request: ${{ steps.build-json.outputs.change_json }}
+          change-request: '${{ steps.build-json.outputs.change_json }}'
 
       - name: "Create ServiceNow Change (qa/prod, basic)"
         if: ${{ inputs.environment != 'dev' }}
@@ -622,7 +622,7 @@ jobs:
           context-github: '${{ toJSON(github) }}'
           job-name: 'Create ServiceNow Change Request'
           deployment-gate: '{"environment":"${{ inputs.environment }}","jobName":"deploy-to-environment"}'
-          change-request: ${{ steps.build-json.outputs.change_json }}
+          change-request: '${{ steps.build-json.outputs.change_json }}'
 
       - name: Fetch Change Request Details
         id: fetch-change
