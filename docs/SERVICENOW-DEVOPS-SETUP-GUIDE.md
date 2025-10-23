@@ -278,7 +278,7 @@ curl -X GET \
 | Secret Name | Value | Example | Notes |
 |------------|-------|---------|-------|
 | `SERVICENOW_USERNAME` | Integration user | `github_integration` | For REST API fallback |
-| `SERVICENOW_PASSWORD` | User password | `oA3KqdUVI8Q_^>` | For REST API fallback |
+| `SERVICENOW_PASSWORD` | User password | `<your-password>` | For REST API fallback |
 | `SERVICENOW_APP_SYS_ID` | Application sys_id | `abc123...` | From Step 3 (optional) |
 
 **Existing AWS Secrets** (should already exist):

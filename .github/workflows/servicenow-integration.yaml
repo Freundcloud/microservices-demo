@@ -1,7 +1,7 @@
 ---
 name: "ServiceNow DevOps Integration (Reusable)"
 
-"on":
+on:
   workflow_call:
     inputs:
       environment:
