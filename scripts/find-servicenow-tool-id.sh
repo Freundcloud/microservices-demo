@@ -167,7 +167,7 @@ if [ "$1" = "--create" ]; then
   echo ""
 
   PAYLOAD=$(jq -n '{
-    name: "GitHub",
+    name: "GitHubARC",
     type: "Source Control",
     tool_type: "Git",
     active: "true"
