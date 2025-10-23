@@ -382,10 +382,10 @@ jobs:
               image_tag_mutability: .values.image_tag_mutability,
               # In terraform show -json, nested blocks are often arrays; handle both object and array shapes safely
               scan_on_push: ((.values.image_scanning_configuration
-                               | if type == "array" then (.[0] // {}) else (.|tostring|fromjson? // .) end)
+                               | if type == "array" then (.[0] // {}) elif type == "object" then . else {} end)
                                .scan_on_push // false),
               encryption_type: ((.values.encryption_configuration
-                                  | if type == "array" then (.[0] // {}) else (.|tostring|fromjson? // .) end)
+                                  | if type == "array" then (.[0] // {}) elif type == "object" then . else {} end)
                                   .encryption_type // "AES256"),
               tags: (.values.tags // {})
             })

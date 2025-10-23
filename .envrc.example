@@ -1,0 +1,39 @@
+# .envrc.example
+#
+# Copy to .envrc and fill in values. This file is safe to commit;
+# .envrc (actual secrets) is ignored by .gitignore and must NOT be committed.
+#
+# Local usage options:
+# - With direnv: install from https://direnv.net and run `direnv allow`
+# - Without direnv: `source .envrc` in your shell
+
+# ==============================================================================
+# AWS Credentials (Local only)
+# ==============================================================================
+# For local CLI/Terraform use. In CI, prefer GitHub OIDC or repository secrets.
+# export AWS_ACCESS_KEY_ID="YOUR_AWS_ACCESS_KEY_ID"
+# export AWS_SECRET_ACCESS_KEY="YOUR_AWS_SECRET_ACCESS_KEY"
+export AWS_DEFAULT_REGION="eu-west-2"
+export AWS_DEFAULT_OUTPUT="json"
+
+# Optional: AWS profile or session token (if you use SSO/MFA)
+# export AWS_PROFILE="default"
+# export AWS_SESSION_TOKEN="YOUR_SESSION_TOKEN"
+
+# ==============================================================================
+# ServiceNow Credentials (Local only)
+# ==============================================================================
+# Used by local scripts and curl calls. In CI, set these as GitHub secrets:
+#   SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, SERVICENOW_PASSWORD
+export SERVICENOW_INSTANCE_URL="https://your-instance.service-now.com"
+export SERVICENOW_USERNAME="your_username"
+export SERVICENOW_PASSWORD="your_password"
+
+# Optional: DevOps integration tokens if you use the DevOps Change actions locally
+# export SN_DEVOPS_INTEGRATION_TOKEN="your_sn_devops_integration_token"
+# export SN_ORCHESTRATION_TOOL_ID="your_orchestration_tool_sys_id"
+
+# Example of a shared demo password variable used in docs/scripts
+# export PASSWORD="your_demo_password"
+
+echo "✅ Local environment variables loaded (example). Edit .envrc with real values."

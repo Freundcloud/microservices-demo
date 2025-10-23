@@ -1,0 +1,36 @@
+{
+  "values": {
+    "root_module": {
+      "resources": [
+        {
+          "type": "aws_ecr_repository",
+          "values": {
+            "name": "frontend",
+            "arn": "arn:aws:ecr:eu-west-2:123456789012:repository/frontend",
+            "registry_id": "123456789012",
+            "repository_url": "123456789012.dkr.ecr.eu-west-2.amazonaws.com/frontend",
+            "image_tag_mutability": "MUTABLE",
+            "image_scanning_configuration": [
+              {"scan_on_push": true}
+            ],
+            "encryption_configuration": {"encryption_type": "AES256"},
+            "tags": {"Name": "frontend"}
+          }
+        },
+        {
+          "type": "aws_ecr_repository",
+          "values": {
+            "name": "cartservice",
+            "arn": "arn:aws:ecr:eu-west-2:123456789012:repository/cartservice",
+            "registry_id": "123456789012",
+            "repository_url": "123456789012.dkr.ecr.eu-west-2.amazonaws.com/cartservice",
+            "image_tag_mutability": "MUTABLE",
+            "image_scanning_configuration": {"scan_on_push": false},
+            "encryption_configuration": [ {"encryption_type": "KMS"} ],
+            "tags": {"Name": "cartservice"}
+          }
+        }
+      ]
+    }
+  }
+}
