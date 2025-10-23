@@ -8,13 +8,14 @@
 # Usage: ./scripts/update-servicenow-github-token.sh
 #
 
-set -e
+set -euo pipefail
 
-# Configuration
-SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
-TOOL_ID="4c5e482cc3383214e1bbf0cb05013196"
-SERVICENOW_USERNAME="github_integration"
-SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+# Configuration (require environment variables to avoid hardcoding secrets)
+# Required: SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, SERVICENOW_PASSWORD, TOOL_ID
+if [ -z "${SERVICENOW_INSTANCE_URL:-}" ] || [ -z "${SERVICENOW_USERNAME:-}" ] || [ -z "${SERVICENOW_PASSWORD:-}" ] || [ -z "${TOOL_ID:-}" ]; then
+  echo "ERROR: Please set SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, SERVICENOW_PASSWORD, and TOOL_ID in your environment." >&2
+  exit 1
+fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Update ServiceNow GitHub Tool with Token"

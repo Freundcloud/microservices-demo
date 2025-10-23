@@ -36,9 +36,14 @@ if [ -z "${SERVICENOW_INSTANCE_URL:-}" ]; then
     exit 1
 fi
 
-# Get credentials from .envrc or environment
-PASSWORD="${SERVICENOW_PASSWORD:-oA3KqdUVI8Q_^>}"
+# Get credentials from environment (required)
 USERNAME="${SERVICENOW_USERNAME:-github_integration}"
+if [ -z "${SERVICENOW_PASSWORD:-}" ]; then
+    log_error "SERVICENOW_PASSWORD not set"
+    echo "Please export SERVICENOW_PASSWORD before running this script."
+    exit 1
+fi
+PASSWORD="${SERVICENOW_PASSWORD}"
 
 log_info "Starting ServiceNow DevOps diagnostic..."
 echo ""

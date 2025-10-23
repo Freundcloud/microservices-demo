@@ -121,7 +121,7 @@ gh workflow run deploy-with-servicenow-devops.yaml -f environment=dev
 gh run watch
 
 # Check ServiceNow API
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); \
+PASSWORD='<your-password>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); \
 curl -s -H "Authorization: Basic ${BASIC_AUTH}" \
 "https://calitiiltddemo3.service-now.com/api/now/table/sn_devops_security_orchestration_relation?sysparm_limit=20" | jq .'
 ```

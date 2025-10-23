@@ -202,7 +202,7 @@ Until we update the workflow, you can manually request approval:
 
 ### Option 2: Via REST API
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>'
+PASSWORD='<your-password>'
 BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64)
 CHANGE_SYS_ID="20cd77f2c3e4fe90e1bbf0cb050131b8"
 
@@ -230,7 +230,7 @@ For dev environment, we should have an approval rule that:
 
 ### Checking If Rule Exists:
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>'
+PASSWORD='<your-password>'
 curl -s -u "github_integration:$PASSWORD" \
   "https://calitiiltddemo3.service-now.com/api/now/table/sysapproval_approver?sysparm_query=document_id=20cd77f2c3e4fe90e1bbf0cb050131b8" \
   | jq .

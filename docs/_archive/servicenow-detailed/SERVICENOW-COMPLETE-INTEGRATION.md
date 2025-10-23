@@ -301,7 +301,7 @@ frontend (6 dependencies)
 # Automated group creation
 export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 export SERVICENOW_USERNAME="github_integration"
-export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+export SERVICENOW_PASSWORD='<your-password>'
 bash scripts/setup-servicenow-approvals.sh
 ```
 
@@ -326,7 +326,7 @@ bash scripts/setup-servicenow-approvals.sh
 # 1. Get application sys_id
 export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 export SERVICENOW_USERNAME="github_integration"
-export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+export SERVICENOW_PASSWORD='<your-password>'
 bash scripts/get-servicenow-app-sys-id.sh
 
 # 2. Configure GitHub secret (copy sys_id from output)

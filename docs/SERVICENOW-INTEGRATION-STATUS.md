@@ -75,7 +75,7 @@ All required secrets configured:
 - ✅ `SN_ORCHESTRATION_TOOL_ID`: `4c5e482cc3383214e1bbf0cb05013196`
 - ✅ `SN_DEVOPS_INTEGRATION_TOKEN`: `pPdj5JDDCzLHtYcZ7epjlqTXYYs9K1Wd`
 - ✅ `SERVICENOW_USERNAME`: `github_integration`
-- ✅ `SERVICENOW_PASSWORD`: `oA3KqdUVI8Q_^>`
+- ✅ `SERVICENOW_PASSWORD`: `<your-password>`
 
 ## 📊 Workflow Testing Results
 

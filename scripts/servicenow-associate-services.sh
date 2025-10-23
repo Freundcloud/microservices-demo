@@ -26,18 +26,24 @@ readonly YELLOW='\033[1;33m'
 readonly BLUE='\033[0;34m'
 readonly NC='\033[0m' # No Color
 
-# ServiceNow Configuration
-readonly SERVICENOW_INSTANCE="${SERVICENOW_INSTANCE:-https://calitiiltddemo3.service-now.com}"
-readonly SERVICENOW_USERNAME="${SERVICENOW_USERNAME:-github_integration}"
-readonly SERVICENOW_PASSWORD="${SERVICENOW_PASSWORD:-oA3KqdUVI8Q_^>}"
+# ServiceNow Configuration (must be provided via environment)
+# Prefer using variables consistent with other scripts: SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, SERVICENOW_PASSWORD
+readonly SERVICENOW_INSTANCE="${SERVICENOW_INSTANCE_URL:-${SERVICENOW_INSTANCE:-}}"
+readonly SERVICENOW_USERNAME="${SERVICENOW_USERNAME:?SERVICENOW_USERNAME is required}"
+readonly SERVICENOW_PASSWORD="${SERVICENOW_PASSWORD:?SERVICENOW_PASSWORD is required}"
 
-# Known IDs from your ServiceNow instance
+if [ -z "${SERVICENOW_INSTANCE:-}" ]; then
+    echo "ERROR: SERVICENOW_INSTANCE_URL (or SERVICENOW_INSTANCE) is required" >&2
+    exit 1
+fi
+
+# Known IDs from your ServiceNow instance (replace with your instance values)
 readonly DEVOPS_APP_SYS_ID="6047e45ac3e4f690e1bbf0cb05013120"
 readonly BUSINESS_APP_SYS_ID="4ffc7bfec3a4fe90e1bbf0cb0501313f"
 
 # Service IDs (found earlier)
-readonly SERVICE_1_SYS_ID="1e7b938bc360b2d0e1bbf0cb050131da"  # BSN0001005
-readonly SERVICE_2_SYS_ID="3e1c530fc360b2d0e1bbf0cb05013185"  # BSN0001006
+readonly SERVICE_1_SYS_ID="1e7b938bc360b2d0e1bbf0cb050131da" # BSN0001005
+readonly SERVICE_2_SYS_ID="3e1c530fc360b2d0e1bbf0cb05013185" # BSN0001006
 
 ################################################################################
 # Helper Functions
@@ -160,7 +166,8 @@ create_service_relationships() {
         fi
 
         # Create relationship
-        local relationship_payload=$(cat <<EOF
+        local relationship_payload=$(
+            cat <<EOF
 {
   "parent": "${BUSINESS_APP_SYS_ID}",
   "child": "${service_id}",
@@ -169,7 +176,7 @@ create_service_relationships() {
   }
 }
 EOF
-)
+        )
 
         local response=$(snow_api POST "table/cmdb_rel_ci" "$relationship_payload")
         local http_code=$(echo "$response" | tail -1)
@@ -205,13 +212,14 @@ create_service_associations() {
         fi
 
         # Create association
-        local assoc_payload=$(cat <<EOF
+        local assoc_payload=$(
+            cat <<EOF
 {
   "service": "${service_id}",
   "ci_id": "${BUSINESS_APP_SYS_ID}"
 }
 EOF
-)
+        )
 
         local response=$(snow_api POST "table/svc_ci_assoc" "$assoc_payload")
         local http_code=$(echo "$response" | tail -1)

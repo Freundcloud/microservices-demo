@@ -27,7 +27,7 @@ cd /home/olafkfreund/Source/Calitti/ARC/microservices-demo
 # Set environment variables
 export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 export SERVICENOW_USERNAME="github_integration"
-export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+export SERVICENOW_PASSWORD='<your-password>'
 
 # Run setup script
 bash scripts/setup-servicenow-approvals.sh
@@ -368,7 +368,7 @@ After completing all steps, verify:
 
 1. **Check Change Request State**:
    ```bash
-   PASSWORD='oA3KqdUVI8Q_^>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
+   PASSWORD='<your-password>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
      "https://calitiiltddemo3.service-now.com/api/now/table/change_request?sysparm_query=number=CHG0123456" \
      | jq ".result[0] | {state, approval, approval_history}"'
    ```

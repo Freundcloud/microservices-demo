@@ -222,7 +222,7 @@ Frontend (User-facing)
 Check that the EKS discovery workflow has created all service records:
 
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
+PASSWORD='<your-password>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
   "https://calitiiltddemo3.service-now.com/api/now/table/u_microservice?sysparm_query=u_cluster_name=microservices&sysparm_fields=u_name,sys_id" \
   | jq -r ".result[] | \"\(.u_name): \(.sys_id)\""'
 ```
@@ -539,7 +539,7 @@ If you don't have the DevOps Change plugin, create a custom workspace:
 ### Test 1: Verify Application Configuration
 
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
+PASSWORD='<your-password>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
   "https://calitiiltddemo3.service-now.com/api/now/table/cmdb_ci_business_app?sysparm_query=name=Online%20Boutique" \
   | jq .'
 ```
@@ -551,7 +551,7 @@ Expected: Application record with sys_id
 ### Test 2: Verify Service Relationships
 
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
+PASSWORD='<your-password>' bash -c 'curl -s -u "github_integration:$PASSWORD" \
   "https://calitiiltddemo3.service-now.com/api/now/table/cmdb_rel_ci?sysparm_query=parent.name=frontend" \
   | jq -r ".result[] | \"\(.parent.name) → \(.child.name) (\(.type.name))\""'
 ```
@@ -563,7 +563,7 @@ Expected: List of frontend dependencies
 ### Test 3: Create Test Change Request with Application
 
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>' bash -c '
+PASSWORD='<your-password>' bash -c '
 APP_SYS_ID="YOUR_APP_SYS_ID"
 curl -s -X POST \
   -u "github_integration:$PASSWORD" \

@@ -19,7 +19,7 @@
 ```bash
 export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 export SERVICENOW_USERNAME="github_integration"
-export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+export SERVICENOW_PASSWORD='<your-password>'
 bash scripts/create-servicenow-application.sh
 ```
 
@@ -51,7 +51,7 @@ bash scripts/create-servicenow-application.sh
 
 ### Option B: Via REST API (Automated)
 ```bash
-PASSWORD='oA3KqdUVI8Q_^>'
+PASSWORD='<your-password>'
 curl -s -u "github_integration:$PASSWORD" \
   "https://calitiiltddemo3.service-now.com/api/now/table/cmdb_ci_business_app?sysparm_query=name=Online%20Boutique&sysparm_fields=sys_id,name" \
   | jq -r '.result[0].sys_id'
@@ -85,7 +85,7 @@ This creates CMDB relationships for all 11 microservices showing their dependenc
 # Set environment variables
 export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 export SERVICENOW_USERNAME="github_integration"
-export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+export SERVICENOW_PASSWORD='<your-password>'
 
 # Run dependency mapping script
 bash scripts/map-service-dependencies.sh
@@ -231,7 +231,7 @@ Error in CI insert:
 ```bash
 export SERVICENOW_INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 export SERVICENOW_USERNAME="github_integration"
-export SERVICENOW_PASSWORD='oA3KqdUVI8Q_^>'
+export SERVICENOW_PASSWORD='<your-password>'
 bash scripts/create-servicenow-application.sh
 ```
 

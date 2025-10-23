@@ -117,7 +117,7 @@ The URL shows `selected-tab-index/6` which may be the wrong tab.
 
 ```bash
 # Verify required plugins are active
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); curl -s -H "Authorization: Basic ${BASIC_AUTH}" "https://calitiiltddemo3.service-now.com/api/now/table/sys_plugins?sysparm_query=idLIKEsn_devops&sysparm_fields=id,name,active,version" | jq .'
+PASSWORD='<your-password>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); curl -s -H "Authorization: Basic ${BASIC_AUTH}" "https://calitiiltddemo3.service-now.com/api/now/table/sys_plugins?sysparm_query=idLIKEsn_devops&sysparm_fields=id,name,active,version" | jq .'
 ```
 
 Expected plugins:
@@ -160,10 +160,10 @@ Check if security scan data exists in ServiceNow:
 
 ```bash
 # Method 1: Check via tool relation
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); curl -s -H "Authorization: Basic ${BASIC_AUTH}" "https://calitiiltddemo3.service-now.com/api/now/table/sn_devops_security_orchestration_relation?sysparm_limit=20" | jq .'
+PASSWORD='<your-password>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); curl -s -H "Authorization: Basic ${BASIC_AUTH}" "https://calitiiltddemo3.service-now.com/api/now/table/sn_devops_security_orchestration_relation?sysparm_limit=20" | jq .'
 
 # Method 2: Check security scan summaries
-PASSWORD='oA3KqdUVI8Q_^>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); curl -s -H "Authorization: Basic ${BASIC_AUTH}" "https://calitiiltddemo3.service-now.com/api/now/table/sn_devops_security_scan_summary?sysparm_limit=20&sysparm_display_value=true" | jq .'
+PASSWORD='<your-password>' bash -c 'BASIC_AUTH=$(echo -n "github_integration:$PASSWORD" | base64); curl -s -H "Authorization: Basic ${BASIC_AUTH}" "https://calitiiltddemo3.service-now.com/api/now/table/sn_devops_security_scan_summary?sysparm_limit=20&sysparm_display_value=true" | jq .'
 ```
 
 ## Expected Outcome

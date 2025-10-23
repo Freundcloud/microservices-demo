@@ -86,7 +86,7 @@ https://github.com/YOUR-ORG/microservices-demo/settings/secrets/actions
 - ❌ Never commit this password to code
 - ❌ Never share in plain text
 
-**Example working password**: `oA3KqdUVI8Q_^>`
+**Example password placeholder**: `<your-password>`
 
 **Password Requirements**:
 - Minimum length: 8 characters (16+ recommended)
@@ -418,7 +418,7 @@ After completing GitHub secrets setup:
 # Tested and verified configuration
 Instance URL: https://calitiiltddemo3.service-now.com
 Username: github_integration
-Password: oA3KqdUVI8Q_^>
+Password: <your-password>
 Tool sys_id: 4eaebb06c320f690e1bbf0cb05013135
 Roles: rest_service, api_analytics_read, devops_user
 ```
@@ -428,7 +428,7 @@ Roles: rest_service, api_analytics_read, devops_user
 # Test authentication locally
 INSTANCE_URL="https://calitiiltddemo3.service-now.com"
 USERNAME="github_integration"
-PASSWORD="oA3KqdUVI8Q_^>"
+PASSWORD="<your-password>"
 
 curl -s -w "\nHTTP: %{http_code}\n" \
   -u "${USERNAME}:${PASSWORD}" \
