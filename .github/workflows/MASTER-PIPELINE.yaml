@@ -807,29 +807,7 @@ jobs:
         run: |
           echo "## 📤 Sending Evidence to ServiceNow" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          # Compose evidence work_notes text
-          WORK_NOTES=$(cat <<'EOF'
-Deployment Evidence Collection
-
-=== EKS Cluster Evidence ===
-Cluster Version: ${CLUSTER_VERSION}
-Cluster Status: ${CLUSTER_STATUS}
-Deployments: ${DEPLOYMENT_COUNT}
-Total Pods: ${POD_COUNT}
-Running Pods: ${RUNNING_PODS}
-
-=== Infrastructure Evidence ===
-Total Terraform Resources: ${TOTAL_RESOURCES}
-
-=== Workflow Details ===
-Run: ${WORKFLOW_URL}
-Commit: ${COMMIT_SHA}
-Actor: ${ACTOR}
-Timestamp: ${TIMESTAMP}
-EOF
-)
-
-          # Expand variables into the template
+          # Gather values for evidence
           CLUSTER_VERSION='${{ steps.eks-evidence.outputs.cluster_version }}'
           CLUSTER_STATUS='${{ steps.eks-evidence.outputs.cluster_status }}'
           DEPLOYMENT_COUNT='${{ steps.eks-evidence.outputs.deployment_count }}'
@@ -841,8 +819,30 @@ EOF
           ACTOR='${{ github.actor }}'
           TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
-          # Safely construct JSON with jq
-          EVIDENCE=$(jq -n --arg work_notes "$(eval echo "$WORK_NOTES")" '{work_notes: $work_notes}')
+          # Safely construct JSON with jq (compose multi-line work_notes)
+          EVIDENCE=$(jq -n \
+            --arg cv "$CLUSTER_VERSION" \
+            --arg cs "$CLUSTER_STATUS" \
+            --arg dc "$DEPLOYMENT_COUNT" \
+            --arg pc "$POD_COUNT" \
+            --arg rp "$RUNNING_PODS" \
+            --arg tr "$TOTAL_RESOURCES" \
+            --arg wu "$WORKFLOW_URL" \
+            --arg sha "$COMMIT_SHA" \
+            --arg actor "$ACTOR" \
+            --arg ts "$TIMESTAMP" \
+            '{work_notes:
+              "Deployment Evidence Collection\n\n=== EKS Cluster Evidence ===\nCluster Version: " + $cv +
+              "\nCluster Status: " + $cs +
+              "\nDeployments: " + $dc +
+              "\nTotal Pods: " + $pc +
+              "\nRunning Pods: " + $rp +
+              "\n\n=== Infrastructure Evidence ===\nTotal Terraform Resources: " + $tr +
+              "\n\n=== Workflow Details ===\nRun: " + $wu +
+              "\nCommit: " + $sha +
+              "\nActor: " + $actor +
+              "\nTimestamp: " + $ts
+            })
 
           # Update change request with evidence using REST API
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
