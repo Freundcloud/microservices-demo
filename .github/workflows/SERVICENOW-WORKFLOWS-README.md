@@ -1,5 +1,7 @@
 # ServiceNow Integration Workflows
 
+[![Auth Mode: Basic Only](https://img.shields.io/badge/Auth%20Mode-Basic%20Only-blue)](#prerequisites)
+
 This directory contains GitHub Actions workflows that integrate with ServiceNow for automated change management, security vulnerability tracking, and infrastructure discovery.
 
 ## Overview
@@ -18,10 +20,11 @@ Before using these workflows, configure the following secrets in your GitHub rep
 
 | Secret Name | Description | How to Obtain |
 |------------|-------------|---------------|
-| `SN_DEVOPS_INTEGRATION_TOKEN` | ServiceNow DevOps integration token | Generated in ServiceNow: DevOps > Configuration > Integration Tokens |
-| `SN_INSTANCE_URL` | Your ServiceNow instance URL | Your ServiceNow URL (e.g., `https://yourcompany.service-now.com`) |
+| `SERVICENOW_USERNAME` | ServiceNow username for Basic auth | Integration user (e.g., github_integration) |
+| `SERVICENOW_PASSWORD` | ServiceNow password for Basic auth | Set in ServiceNow for integration user |
 | `SN_ORCHESTRATION_TOOL_ID` | GitHub tool ID from ServiceNow | From ServiceNow: DevOps > Configuration > Tool Configuration (GitHub entry) |
-| `SN_OAUTH_TOKEN` | OAuth token for CMDB API access | Generated in ServiceNow: System OAuth > Application Registry |
+| `SN_INSTANCE_URL` | Your ServiceNow instance URL | Your ServiceNow URL (e.g., `https://yourcompany.service-now.com`) |
+| `SN_OAUTH_TOKEN` | OAuth token for CMDB API access (optional) | Generated in ServiceNow: System OAuth > Application Registry |
 | `AWS_ACCESS_KEY_ID` | AWS access key (existing) | AWS IAM Console |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (existing) | AWS IAM Console |
 
@@ -46,12 +49,14 @@ Before using these workflows, configure the following secrets in your GitHub rep
 **Purpose**: Runs comprehensive security scans and uploads results to ServiceNow Vulnerability Response.
 
 **Triggers**:
+
 - Push to `main` or `develop` branches
 - Pull requests to `main`
 - Schedule: Daily at 2 AM UTC
 - Manual trigger via `workflow_dispatch`
 
 **Security Scanners**:
+
 - **CodeQL**: Multi-language SAST (Python, JavaScript, Go, Java, C#)
 - **Semgrep**: Pattern-based security analysis
 - **Trivy**: Filesystem and dependency vulnerabilities
@@ -61,12 +66,14 @@ Before using these workflows, configure the following secrets in your GitHub rep
 - **OWASP Dependency Check**: Known vulnerable dependencies
 
 **ServiceNow Integration**:
+
 - Uploads SARIF results to ServiceNow DevOps Security
 - Creates vulnerability records with severity mapping
 - Blocks deployments if critical vulnerabilities found
 - Tracks remediation status
 
 **Usage**:
+
 ```bash
 # Automatic: Runs on every push/PR
 # Manual trigger:
@@ -74,6 +81,7 @@ gh workflow run security-scan-servicenow.yaml
 ```
 
 **View Results**:
+
 - GitHub: Security tab
 - ServiceNow: DevOps > Security > Security Results
 
@@ -84,13 +92,16 @@ gh workflow run security-scan-servicenow.yaml
 **Purpose**: Deploys microservices to EKS with ServiceNow change management and environment-specific approval workflows.
 
 **Triggers**:
+
 - Manual only (workflow_dispatch)
 
 **Parameters**:
+
 - `environment`: Choose dev, qa, or prod
 - `change_request_id`: Optional existing change request ID
 
 **Workflow Steps**:
+
 1. **Create Change Request**: Automatically creates ServiceNow change request
 2. **Wait for Approval** (qa/prod only):
    - Dev: Auto-approved
@@ -104,11 +115,13 @@ gh workflow run security-scan-servicenow.yaml
 8. **Close Change Request**: Updates change with success/failure status
 
 **On Failure**:
+
 - Automatic rollback to previous version
 - Change request updated with failure details
 - Team notified via ServiceNow
 
 **Usage**:
+
 ```bash
 # Via GitHub Actions UI
 1. Go to Actions tab
@@ -137,6 +150,7 @@ gh workflow run deploy-with-servicenow.yaml \
 | Prod | ✅ CAB approval | Change Manager, App Owner, Security Team | < 24 hours |
 
 **View Status**:
+
 - GitHub: Actions tab > Workflow run
 - ServiceNow: Change Management > My Changes
 
@@ -147,11 +161,13 @@ gh workflow run deploy-with-servicenow.yaml \
 **Purpose**: Automatically discovers EKS cluster and microservices, updating ServiceNow CMDB for infrastructure visibility.
 
 **Triggers**:
+
 - Schedule: Every 6 hours
 - Push to Kustomize/manifest files
 - Manual trigger via `workflow_dispatch`
 
 **What It Discovers**:
+
 - **EKS Cluster**:
   - Cluster name, ARN, version, endpoint
   - VPC ID, region, status
@@ -163,12 +179,14 @@ gh workflow run deploy-with-servicenow.yaml \
   - Health status
 
 **ServiceNow CMDB Updates**:
+
 - Creates/updates `u_eks_cluster` CI
 - Creates/updates `u_microservice` CIs
 - Maintains relationships between services and cluster
 - Timestamps for tracking staleness
 
 **Usage**:
+
 ```bash
 # Automatic: Runs every 6 hours
 # Manual trigger:
@@ -176,6 +194,7 @@ gh workflow run eks-discovery.yaml
 ```
 
 **View Results**:
+
 - GitHub: Actions tab > Workflow artifacts
 - ServiceNow: Configuration > CMDB > EKS Clusters
 
@@ -188,12 +207,14 @@ gh workflow run eks-discovery.yaml
 **Purpose**: Rapid iteration and testing
 
 **Characteristics**:
+
 - Auto-approved deployments
 - Minimal approval overhead
 - Lower resource allocation (1 replica per service)
 - Includes load generator for testing
 
 **Workflow**:
+
 ```
 Code Push → Security Scan → Change Request (Auto) → Deploy → CMDB Update
 ```
@@ -203,12 +224,14 @@ Code Push → Security Scan → Change Request (Auto) → Deploy → CMDB Update
 **Purpose**: Testing and validation before production
 
 **Characteristics**:
+
 - Manual approval from QA Lead
 - Moderate resources (2 replicas per service)
 - Includes load generator for performance testing
 - Full observability stack
 
 **Workflow**:
+
 ```
 Manual Trigger → Change Request → QA Lead Approval → Deploy → Testing → CMDB Update
 ```
@@ -218,12 +241,14 @@ Manual Trigger → Change Request → QA Lead Approval → Deploy → Testing �
 **Purpose**: Production-ready deployments
 
 **Characteristics**:
+
 - Strict CAB approval (3 approvers)
 - High availability (3 replicas per service)
 - No load generator
 - Full monitoring and alerting
 
 **Workflow**:
+
 ```
 Manual Trigger → Change Request → CAB Approval (3) → Deploy → Smoke Tests → CMDB Update
 ```
@@ -309,11 +334,13 @@ Manual Trigger → Change Request → CAB Approval (3) → Deploy → Smoke Test
 ### GitHub Actions
 
 **View Workflow Runs**:
+
 ```
 https://github.com/your-org/microservices-demo/actions
 ```
 
 **Monitor**:
+
 - Workflow success/failure rates
 - Execution times
 - Security scan results
@@ -322,25 +349,31 @@ https://github.com/your-org/microservices-demo/actions
 ### ServiceNow
 
 **Security Dashboard**:
+
 ```
 DevOps > Security > Security Results
 ```
+
 - Vulnerability trends
 - Open findings by severity
 - Remediation status
 
 **Change Management Dashboard**:
+
 ```
 Change Management > My Changes
 ```
+
 - Active change requests
 - Approval status
 - Deployment history
 
 **CMDB Dashboard**:
+
 ```
 Configuration > CMDB > Dashboards
 ```
+
 - EKS cluster health
 - Microservices inventory
 - Configuration drift
@@ -352,6 +385,7 @@ Configuration > CMDB > Dashboards
 For comprehensive troubleshooting information, see **[SERVICENOW-TROUBLESHOOTING.md](/docs/SERVICENOW-TROUBLESHOOTING.md)**.
 
 The troubleshooting guide covers:
+
 - Internal Server Error (500) diagnosis and solutions
 - Authentication error fixes
 - Change request creation failures
@@ -363,17 +397,18 @@ The troubleshooting guide covers:
 
 ### Quick Troubleshooting
 
-#### 1. ServiceNow Integration Token Invalid
+#### 1. ServiceNow Basic Credentials Invalid
 
 **Symptom**: Workflow fails with authentication error
 
 **Solution**:
+
 ```bash
-# Verify token in GitHub Secrets
-# Regenerate token in ServiceNow
-1. DevOps > Configuration > Integration Tokens
-2. Generate New Token
-3. Update GitHub Secret: SN_DEVOPS_INTEGRATION_TOKEN
+# Verify credentials in GitHub Secrets
+# Test with a simple API call locally
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+  "$SN_INSTANCE_URL/api/now/table/sys_user?sysparm_limit=1"
 ```
 
 #### 2. Change Request Not Created (Internal Server Error)
@@ -381,6 +416,7 @@ The troubleshooting guide covers:
 **Symptom**: Deploy workflow fails with "Internal server error"
 
 **Common Causes**:
+
 - ServiceNow DevOps plugin not installed
 - GitHub tool not configured in ServiceNow
 - Invalid assignment group or other field values
@@ -393,15 +429,17 @@ The troubleshooting guide covers:
 **Symptom**: Discovery workflow completes but CMDB not updated
 
 **Check**:
+
 - ServiceNow instance URL correct in secrets
 - Tool ID matches GitHub configuration in ServiceNow
 - Integration user has proper roles
 
 **Verify**:
+
 ```bash
-# Test ServiceNow API access
+# Test ServiceNow API access (Basic auth)
 curl -X GET "$SN_INSTANCE_URL/api/now/table/sys_user?sysparm_limit=1" \
-  -H "Authorization: Bearer $SN_DEVOPS_INTEGRATION_TOKEN"
+  -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD"
 ```
 
 #### 3. CMDB Not Updating
@@ -409,11 +447,13 @@ curl -X GET "$SN_INSTANCE_URL/api/now/table/sys_user?sysparm_limit=1" \
 **Symptom**: Discovery workflow completes but CMDB unchanged
 
 **Check**:
+
 - `SN_OAUTH_TOKEN` secret configured
 - CMDB CI classes created (`u_eks_cluster`, `u_microservice`)
 - OAuth token has table write permissions
 
 **Verify**:
+
 ```bash
 # Test CMDB API access
 curl -X GET "$SN_INSTANCE_URL/api/now/table/u_eks_cluster" \
@@ -425,12 +465,14 @@ curl -X GET "$SN_INSTANCE_URL/api/now/table/u_eks_cluster" \
 **Symptom**: QA/Prod deployment waiting indefinitely
 
 **Check**:
+
 - Assignment groups configured in ServiceNow
 - Approvers have correct permissions
 - Notification emails being sent
 - Timeout not exceeded (1 hour default)
 
 **Manual Override**:
+
 ```
 1. Go to ServiceNow: Change Management
 2. Find change request
@@ -443,11 +485,13 @@ curl -X GET "$SN_INSTANCE_URL/api/now/table/u_eks_cluster" \
 **Symptom**: Scans complete but not in ServiceNow
 
 **Check**:
+
 - Security tool mappings configured
 - Tool IDs match (trivy, codeql, checkov, semgrep)
 - SARIF format valid
 
 **Debug**:
+
 ```bash
 # Check SARIF file format
 cat trivy-fs-results.sarif | jq '.'

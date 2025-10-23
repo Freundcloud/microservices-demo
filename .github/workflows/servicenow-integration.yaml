@@ -274,15 +274,28 @@ jobs:
               ;;
           esac
 
-      - name: "Create ServiceNow Change (dev: no gate)"
+      - name: Validate ServiceNow Secret Wiring
+        id: sn-secrets
+        run: |
+          echo "## 🔐 ServiceNow Configuration" >> $GITHUB_STEP_SUMMARY
+          HAS_USER="${{ secrets.SN_DEVOPS_USER != '' || secrets.SERVICENOW_USERNAME != '' }}"
+          HAS_PASS="${{ secrets.SN_DEVOPS_PASSWORD != '' || secrets.SERVICENOW_PASSWORD != '' }}"
+          HAS_URL="${{ secrets.SN_INSTANCE_URL != '' || secrets.SERVICENOW_INSTANCE_URL != '' }}"
+          HAS_TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID != '' }}"
+          echo "- Auth Mode: Basic (username/password)" >> $GITHUB_STEP_SUMMARY
+          echo "- Instance URL: $([[ "$HAS_URL" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Tool Id: $([[ "$HAS_TOOL" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Username: $([[ "$HAS_USER" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+          echo "- Password: $([[ "$HAS_PASS" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Create ServiceNow Change (dev, basic)"
         if: ${{ inputs.environment == 'dev' }}
-        id: create_dev
+        id: create_dev_basic
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN || '' }}
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER || secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD || secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL || secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create ServiceNow Change Request'
@@ -291,17 +304,16 @@ jobs:
              "attributes":{
                "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
                "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-             }}
+             }}}
 
-      - name: "Create ServiceNow Change (qa/prod with deployment gate)"
+      - name: "Create ServiceNow Change (qa/prod, basic)"
         if: ${{ inputs.environment != 'dev' }}
-        id: create_gated
+        id: create_gated_basic
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN || '' }}
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER || secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD || secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL || secrets.SERVICENOW_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create ServiceNow Change Request'
@@ -312,14 +324,21 @@ jobs:
              "attributes":{
                "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
                "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-             }}
+             }}}
 
       - name: Fetch Change Request Details
         id: fetch-change
         run: |
           echo "## 🔎 Fetching Change Request Details" >> $GITHUB_STEP_SUMMARY
-          NUM="${{ steps.create_dev.outputs['change-request-number'] || steps.create_gated.outputs['change-request-number'] }}"
-          SYS="${{ steps.create_dev.outputs['change-request-sys-id'] || steps.create_gated.outputs['change-request-sys-id'] }}"
+          NUM_DEV_BASIC="${{ steps.create_dev_basic.outputs['change-request-number'] }}"
+          SYS_DEV_BASIC="${{ steps.create_dev_basic.outputs['change-request-sys-id'] }}"
+          NUM_GATED_BASIC="${{ steps.create_gated_basic.outputs['change-request-number'] }}"
+          SYS_GATED_BASIC="${{ steps.create_gated_basic.outputs['change-request-sys-id'] }}"
+
+          NUM=${NUM_DEV_BASIC:-}
+          SYS=${SYS_DEV_BASIC:-}
+          if [ -z "$NUM" ] || [ "$NUM" = "null" ]; then NUM=${NUM_GATED_BASIC:-}; SYS=${SYS_GATED_BASIC:-}; fi
+
           if [ -z "$NUM" ] || [ -z "$SYS" ] || [ "$NUM" = "null" ] || [ "$SYS" = "null" ]; then
             echo "❌ ERROR: Action did not return change outputs. Check ServiceNow action logs for details." >> $GITHUB_STEP_SUMMARY
             exit 1
