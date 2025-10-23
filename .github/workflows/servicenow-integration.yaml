@@ -496,6 +496,7 @@ jobs:
           fi
 
           # Build JSON with jq to ensure valid formatting
+          # ServiceNow DevOps Change action expects flat structure with change_request fields
           CHANGE_JSON=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
             --arg desc "$DETAILED_DESC" \
@@ -504,16 +505,14 @@ jobs:
             --arg pr "$PR_NUMBER" \
             --arg commit "$COMMIT_SHORT" \
             '{
+              short_description: $short_desc,
+              description: $desc,
+              u_github_actor: $actor,
+              u_github_branch: $branch,
+              u_github_pr: $pr,
+              u_github_commit: $commit,
               setCloseCode: "true",
-              autoCloseChange: true,
-              attributes: {
-                short_description: $short_desc,
-                description: $desc,
-                u_github_actor: $actor,
-                u_github_branch: $branch,
-                u_github_pr: $pr,
-                u_github_commit: $commit
-              }
+              autoCloseChange: true
             }')
 
           # Validate JSON is parseable
