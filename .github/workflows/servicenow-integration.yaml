@@ -50,6 +50,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install jq (for JSON validation)
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
       - name: Register Docker Images as Artifacts
         uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
         with:
@@ -288,6 +294,40 @@ jobs:
           echo "- Username: $([[ "$HAS_USER" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
           echo "- Password: $([[ "$HAS_PASS" == 'yes' ]] && echo 'present' || echo 'missing')" >> $GITHUB_STEP_SUMMARY
 
+      - name: Build and Validate Change JSON
+        id: build-json
+        run: |
+          ENV="${{ inputs.environment }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Build JSON with jq to ensure valid formatting
+          CHANGE_JSON=$(jq -n \
+            --arg short_desc "Deploy Online Boutique to $ENV" \
+            --arg desc "Automated deployment via GitHub Actions. Run: $RUN_URL" \
+            '{setCloseCode:"true", autoCloseChange:true, attributes:{short_description:$short_desc, description:$desc}}')
+
+          # Validate JSON is parseable
+          echo "$CHANGE_JSON" | jq . > /dev/null
+          echo "change_json=$CHANGE_JSON" >> $GITHUB_OUTPUT
+          echo "✅ Change JSON built and validated" >> $GITHUB_STEP_SUMMARY
+
+      - name: Preflight: Verify ServiceNow Basic Auth
+        id: sn-basic-auth-check
+        run: |
+          URL="${{ secrets.SN_INSTANCE_URL || secrets.SERVICENOW_INSTANCE_URL }}"
+          USER="${{ secrets.SN_DEVOPS_USER || secrets.SERVICENOW_USERNAME }}"
+          PASS="${{ secrets.SN_DEVOPS_PASSWORD || secrets.SERVICENOW_PASSWORD }}"
+          if [ -z "$URL" ] || [ -z "$USER" ] || [ -z "$PASS" ]; then
+            echo "❌ Missing ServiceNow credentials (URL/USER/PASS)." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sys_user?sysparm_limit=1")
+          if [ "$CODE" != "200" ]; then
+            echo "❌ ServiceNow Basic auth failed (HTTP $CODE)." >> $GITHUB_STEP_SUMMARY
+            echo "Check repo secrets: SERVICENOW_USERNAME/PASSWORD (or SN_DEVOPS_USER/PASSWORD) and SN_INSTANCE_URL (or SERVICENOW_INSTANCE_URL)." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "✅ ServiceNow Basic auth verified (Table API)" >> $GITHUB_STEP_SUMMARY
+
       - name: "Create ServiceNow Change (dev, basic)"
         if: ${{ inputs.environment == 'dev' }}
         id: create_dev_basic
@@ -299,12 +339,7 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create ServiceNow Change Request'
-          change-request: |
-            {"setCloseCode":"true","autoCloseChange":true,
-             "attributes":{
-               "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
-               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-             }}
+          change-request: ${{ steps.build-json.outputs.change_json }}
 
       - name: "Create ServiceNow Change (qa/prod, basic)"
         if: ${{ inputs.environment != 'dev' }}
@@ -319,12 +354,7 @@ jobs:
           job-name: 'Create ServiceNow Change Request'
           deployment-gate: |
             {"environment":"${{ inputs.environment }}","jobName":"deploy-to-environment"}
-          change-request: |
-            {"setCloseCode":"true","autoCloseChange":true,
-             "attributes":{
-               "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
-               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-             }}
+          change-request: ${{ steps.build-json.outputs.change_json }}
 
       - name: Fetch Change Request Details
         id: fetch-change
