@@ -440,59 +440,59 @@ jobs:
     # STAGE 7: Release Tagging (Production Only)
     # ============================================================================
 
-    create-github-release:
-      name: "🏷️ Create Git Tag and Release"
-      needs: [pipeline-init, deploy-to-environment, smoke-tests]
-      if: |
-        needs.pipeline-init.outputs.is_production == 'true' &&
-        needs.deploy-to-environment.result == 'success' &&
-        needs.smoke-tests.result == 'success'
-      runs-on: ubuntu-latest
-      permissions:
-        contents: write
+  create-github-release:
+    name: "🏷️ Create Git Tag and Release"
+    needs: [pipeline-init, deploy-to-environment, smoke-tests]
+    if: |
+      needs.pipeline-init.outputs.is_production == 'true' &&
+      needs.deploy-to-environment.result == 'success' &&
+      needs.smoke-tests.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-      steps:
-        - name: Checkout Code (full history)
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
+    steps:
+      - name: Checkout Code (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        - name: Determine Release Version
-          id: version
-          run: |
-            FILE="kustomize/overlays/prod/kustomization.yaml"
-            if [ ! -f "$FILE" ]; then
-              echo "❌ $FILE not found" >&2; exit 1; fi
-            TAG=$(grep -m1 -E '^\s*newTag:' "$FILE" | awk '{print $2}')
-            if [ -z "$TAG" ]; then
-              echo "❌ Could not determine release tag from $FILE" >&2; exit 1; fi
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
-            echo "Release tag resolved: $TAG"
+      - name: Determine Release Version
+        id: version
+        run: |
+          FILE="kustomize/overlays/prod/kustomization.yaml"
+          if [ ! -f "$FILE" ]; then
+            echo "❌ $FILE not found" >&2; exit 1; fi
+          TAG=$(grep -m1 -E '^\s*newTag:' "$FILE" | awk '{print $2}')
+          if [ -z "$TAG" ]; then
+            echo "❌ Could not determine release tag from $FILE" >&2; exit 1; fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag resolved: $TAG"
 
-        - name: Create and Push Git Tag
-          env:
-            TAG: ${{ steps.version.outputs.tag }}
-          run: |
-            if git rev-parse "v$TAG" >/dev/null 2>&1; then
-              echo "ℹ️ Tag v$TAG already exists"
-            else
-              git tag -a "v$TAG" -m "Release v$TAG"
-              git push origin "v$TAG"
-              echo "✅ Pushed tag v$TAG"
-            fi
+      - name: Create and Push Git Tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse "v$TAG" >/dev/null 2>&1; then
+            echo "ℹ️ Tag v$TAG already exists"
+          else
+            git tag -a "v$TAG" -m "Release v$TAG"
+            git push origin "v$TAG"
+            echo "✅ Pushed tag v$TAG"
+          fi
 
-        - name: Create GitHub Release
-          env:
-            TAG: ${{ steps.version.outputs.tag }}
-            GH_TOKEN: ${{ github.token }}
-          run: |
-            RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            if gh release view "v$TAG" >/dev/null 2>&1; then
-              echo "ℹ️ Release v$TAG already exists"
-            else
-              gh release create "v$TAG" --title "Release v$TAG" --notes "Automated release from CI run: $RUN_URL"
-              echo "✅ Created GitHub Release v$TAG"
-            fi
+      - name: Create GitHub Release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if gh release view "v$TAG" >/dev/null 2>&1; then
+            echo "ℹ️ Release v$TAG already exists"
+          else
+            gh release create "v$TAG" --title "Release v$TAG" --notes "Automated release from CI run: $RUN_URL"
+            echo "✅ Created GitHub Release v$TAG"
+          fi
 
   # ============================================================================
   # STAGE 7: Update ServiceNow & Notifications
