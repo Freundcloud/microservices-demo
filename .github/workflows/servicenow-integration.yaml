@@ -274,8 +274,8 @@ jobs:
               ;;
           esac
 
-      - name: Create ServiceNow Change (dev: no gate)
-        if: inputs.environment == 'dev'
+      - name: "Create ServiceNow Change (dev: no gate)"
+        if: ${{ inputs.environment == 'dev' }}
         uses: ServiceNow/servicenow-devops-change-automation@v6.0.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
@@ -290,8 +290,8 @@ jobs:
              "u_environment":"${{ inputs.environment }}",
              "u_correlation_id":"${{ github.run_id }}"}
 
-      - name: Create ServiceNow Change (qa/prod with deployment gate)
-        if: inputs.environment != 'dev'
+      - name: "Create ServiceNow Change (qa/prod with deployment gate)"
+        if: ${{ inputs.environment != 'dev' }}
         uses: ServiceNow/servicenow-devops-change-automation@v6.0.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
