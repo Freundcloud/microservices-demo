@@ -380,8 +380,13 @@ jobs:
               registry_id: .values.registry_id,
               repository_url: .values.repository_url,
               image_tag_mutability: .values.image_tag_mutability,
-              scan_on_push: (.values.image_scanning_configuration.scan_on_push // false),
-              encryption_type: (.values.encryption_configuration.encryption_type // "AES256"),
+              # In terraform show -json, nested blocks are often arrays; handle both object and array shapes safely
+              scan_on_push: ((.values.image_scanning_configuration
+                               | if type == "array" then (.[0] // {}) else (.|tostring|fromjson? // .) end)
+                               .scan_on_push // false),
+              encryption_type: ((.values.encryption_configuration
+                                  | if type == "array" then (.[0] // {}) else (.|tostring|fromjson? // .) end)
+                                  .encryption_type // "AES256"),
               tags: (.values.tags // {})
             })
           ' terraform-state.json > ecr-repositories.json
