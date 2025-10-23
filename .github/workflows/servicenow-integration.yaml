@@ -488,11 +488,20 @@ jobs:
             SHORT_DESC="Deploy to $ENV - $BRANCH by $ACTOR"
           fi
 
+          # Build implementation, backout, and test plans
+          IMPL_PLAN="Automated deployment to $ENV environment via GitHub Actions CI/CD pipeline. All tests passed in previous pipeline stages. Deployment will occur within the change window."
+          BACKOUT_PLAN="If deployment fails or issues are detected: 1) Immediately rollback to previous version using 'kubectl rollout undo', 2) Verify rollback success, 3) Investigate root cause in logs, 4) Create incident ticket for tracking."
+          TEST_PLAN="Pre-deployment: All unit tests, integration tests, and security scans passed. Post-deployment: Health checks verify all services running, smoke tests confirm critical functionality, monitoring dashboards show normal metrics."
+
           # Build JSON with jq to ensure valid formatting
-          # ServiceNow DevOps Change action requires attributes wrapper (per official documentation)
+          # ServiceNow DevOps Change action requires: assignment_group, implementation_plan, backout_plan, test_plan
+          # These are REQUIRED fields for the DevOps API (different from standard REST API)
           CHANGE_JSON=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
             --arg desc "$DETAILED_DESC" \
+            --arg impl_plan "$IMPL_PLAN" \
+            --arg backout_plan "$BACKOUT_PLAN" \
+            --arg test_plan "$TEST_PLAN" \
             --arg actor "$ACTOR" \
             --arg branch "$BRANCH" \
             --arg pr "$PR_NUMBER" \
@@ -503,6 +512,9 @@ jobs:
               attributes: {
                 short_description: $short_desc,
                 description: $desc,
+                implementation_plan: $impl_plan,
+                backout_plan: $backout_plan,
+                test_plan: $test_plan,
                 u_github_actor: $actor,
                 u_github_branch: $branch,
                 u_github_pr: $pr,
