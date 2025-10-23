@@ -610,7 +610,12 @@ demo-run ENV TAG="":
         command -v jq >/dev/null 2>&1 || { echo "jq is required"; exit 1; }
         git fetch origin main >/dev/null 2>&1 || true
 
-        BRANCH="feat/version-bump-{{ENV}}-{{TAG}}"
+            # Use release/* branches for qa/prod to comply with branch policy
+            if [ "{{ENV}}" = "qa" ] || [ "{{ENV}}" = "prod" ]; then
+                BRANCH="release/{{TAG}}"
+            else
+                BRANCH="feat/version-bump-{{ENV}}-{{TAG}}"
+            fi
         echo "📌 Creating feature branch: $BRANCH"
         git checkout -b "$BRANCH" || git checkout "$BRANCH"
 
@@ -643,14 +648,17 @@ demo-run ENV TAG="":
         if [ -n "$ISSUE_NUM" ]; then PR_BODY+="\n\nRef: #$ISSUE_NUM"; fi
         gh pr create --fill -t "Bump {{ENV}} to {{TAG}}" -b "$PR_BODY" || true
 
-        echo "✅ Attempting to merge PR"
-        # Try a normal merge first; fall back to admin if available; if both fail, stop
-        if ! gh pr merge --squash --delete-branch --merge; then
-            if ! gh pr merge --squash --delete-branch --admin --merge; then
-                echo "❌ Unable to auto-merge PR (branch protection or required checks). Please merge it in the GitHub UI, then rerun: just demo-deploy ENV={{ENV}}";
-                exit 1
+                echo "✅ Attempting to merge PR"
+                # For release branches, do NOT auto-merge into main; keep the PR open for review
+                # The pipeline will back-merge after successful prod release
+                if [[ "$BRANCH" =~ ^release\/ ]]; then
+                    echo "ℹ️ Skipping auto-merge for release branch; PR remains open until production completes."
+                else
+                if ! gh pr merge --squash --delete-branch --merge; then
+                    if ! gh pr merge --squash --delete-branch --admin --merge; then
+                        echo "❌ Unable to auto-merge PR. Please merge it in the GitHub UI, then rerun: just demo-deploy ENV={{ENV}}"; exit 1; fi
+                fi
             fi
-        fi
 
         echo "🚀 Trigger MASTER-PIPELINE for {{ENV}}"
         gh workflow run MASTER-PIPELINE.yaml -f environment={{ENV}}
@@ -671,6 +679,58 @@ demo-run ENV TAG="":
             gh issue close "$ISSUE_NUM" -c "Deployment to {{ENV}} ({{TAG}}) succeeded after ServiceNow approval." || true
         fi
         echo "✅ Demo complete"
+
+    # Cut a release branch from main and run QA deployment
+    cut-release VERSION:
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [ -z "{{VERSION}}" ]; then echo "Usage: just cut-release VERSION=<x.y.z>"; exit 1; fi
+            RELEASE_BRANCH="release/{{VERSION}}"
+            echo "🏷️  Cutting release branch: $RELEASE_BRANCH"
+            git fetch origin main --quiet || true
+            git checkout -B "$RELEASE_BRANCH" origin/main || git checkout -B "$RELEASE_BRANCH" main
+
+            echo "🔧 Bump QA overlay to {{VERSION}}"
+            ./scripts/bump-env-version.sh qa "{{VERSION}}"
+            git add -A
+            git commit -m "release: prepare {{VERSION}} for QA"
+            git push -u origin "$RELEASE_BRANCH"
+
+            echo "🔀 Open PR for release (optional review)"
+            gh pr create --base main --head "$RELEASE_BRANCH" -t "Release {{VERSION}} (QA)" -b "Prepare QA deployment for {{VERSION}} on $RELEASE_BRANCH."
+
+            echo "🚀 Trigger QA deployment from release branch"
+            gh workflow run MASTER-PIPELINE.yaml -r "$RELEASE_BRANCH" -f environment=qa
+            echo "👀 Watching run..."
+            gh run watch || true
+
+    # Promote an already cut release to production
+    promote-to-prod VERSION:
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [ -z "{{VERSION}}" ]; then echo "Usage: just promote-to-prod VERSION=<x.y.z>"; exit 1; fi
+            RELEASE_BRANCH="release/{{VERSION}}"
+            echo "🚢 Promoting {{VERSION}} to production from $RELEASE_BRANCH"
+
+            # Ensure release branch exists locally
+            git fetch origin "$RELEASE_BRANCH" --quiet || true
+            git checkout "$RELEASE_BRANCH" || { echo "Release branch $RELEASE_BRANCH not found"; exit 1; }
+
+            echo "🔧 Bump Prod overlay to {{VERSION}}"
+            ./scripts/bump-env-version.sh prod "{{VERSION}}"
+            git add -A
+            git commit -m "release: promote {{VERSION}} to production"
+            git push
+
+            echo "🔀 Update or create PR for tracking"
+            if ! gh pr list --base main --head "$RELEASE_BRANCH" --state open --json number | jq -e 'length>0' >/dev/null; then
+                gh pr create --base main --head "$RELEASE_BRANCH" -t "Release {{VERSION}} (Prod)" -b "Promote {{VERSION}} to production from $RELEASE_BRANCH."
+            fi
+
+            echo "🚀 Trigger Prod deployment from release branch"
+            gh workflow run MASTER-PIPELINE.yaml -r "$RELEASE_BRANCH" -f environment=prod
+            echo "👀 Watching run... Approve change in ServiceNow when prompted."
+            gh run watch || true
 
 # Bump image version in an environment overlay and open a PR with a linked work item
 demo-release ENV TAG="":
@@ -720,7 +780,8 @@ demo-deploy ENV:
     set -euo pipefail
     if [ -z "{{ENV}}" ]; then echo "Usage: just demo-deploy ENV=<dev|qa|prod>"; exit 1; fi
     echo "🚀 Trigger MASTER-PIPELINE to deploy to {{ENV}}"
-    gh workflow run MASTER-PIPELINE.yaml -f environment={{ENV}}
+    # Trigger from the current branch to satisfy branch policy for qa/prod
+    gh workflow run MASTER-PIPELINE.yaml -r "$BRANCH" -f environment={{ENV}}
     echo "👀 Watching run... (Ctrl+C to stop live watch)"
     gh run watch || true
 

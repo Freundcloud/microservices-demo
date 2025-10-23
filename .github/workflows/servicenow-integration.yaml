@@ -276,8 +276,10 @@ jobs:
 
       - name: "Create ServiceNow Change (dev: no gate)"
         if: ${{ inputs.environment == 'dev' }}
+        id: create_dev
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN || '' }}
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
@@ -288,17 +290,15 @@ jobs:
             {"setCloseCode":"true","autoCloseChange":true,
              "attributes":{
                "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
-               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-               "u_environment":"${{ inputs.environment }}",
-               "u_correlation_id":"${{ github.run_id }}",
-               "type":"${{ inputs.change_type }}"
-             }
-            }
+               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+             }}
 
       - name: "Create ServiceNow Change (qa/prod with deployment gate)"
         if: ${{ inputs.environment != 'dev' }}
+        id: create_gated
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN || '' }}
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
@@ -311,23 +311,17 @@ jobs:
             {"setCloseCode":"true","autoCloseChange":true,
              "attributes":{
                "short_description":"Deploy Online Boutique to ${{ inputs.environment }}",
-               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-               "u_environment":"${{ inputs.environment }}",
-               "u_correlation_id":"${{ github.run_id }}",
-               "type":"${{ inputs.change_type }}"
-             }
-            }
+               "description":"Automated deployment via GitHub Actions. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+             }}
 
       - name: Fetch Change Request Details
         id: fetch-change
         run: |
           echo "## 🔎 Fetching Change Request Details" >> $GITHUB_STEP_SUMMARY
-          QUERY_URL="${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=u_correlation_id=${{ github.run_id }}^ORDERBYDESCsys_created_on&sysparm_limit=1"
-          RESP=$(curl -s -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" "$QUERY_URL")
-          NUM=$(echo "$RESP" | jq -r '.result[0].number // empty')
-          SYS=$(echo "$RESP" | jq -r '.result[0].sys_id // empty')
-          if [ -z "$NUM" ] || [ -z "$SYS" ]; then
-            echo "❌ ERROR: Unable to retrieve change request by correlation id" >> $GITHUB_STEP_SUMMARY
+          NUM="${{ steps.create_dev.outputs['change-request-number'] || steps.create_gated.outputs['change-request-number'] }}"
+          SYS="${{ steps.create_dev.outputs['change-request-sys-id'] || steps.create_gated.outputs['change-request-sys-id'] }}"
+          if [ -z "$NUM" ] || [ -z "$SYS" ] || [ "$NUM" = "null" ] || [ "$SYS" = "null" ]; then
+            echo "❌ ERROR: Action did not return change outputs. Check ServiceNow action logs for details." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
           echo "change_request_number=$NUM" >> $GITHUB_OUTPUT
