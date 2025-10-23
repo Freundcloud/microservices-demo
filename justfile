@@ -514,6 +514,17 @@ sn-diagnose:
     @echo ""
     @./scripts/diagnose-servicenow.sh
 
+# Clean up ServiceNow secrets (remove old/incorrect, set correct ones)
+sn-cleanup:
+    @echo "🧹 Cleaning up ServiceNow secrets..."
+    @echo "This will:"
+    @echo "  - Delete old/incorrect SN_DEVOPS_* secrets"
+    @echo "  - Set correct SERVICENOW_* secrets from .envrc"
+    @echo "  - Test credentials against ServiceNow API"
+    @echo "  - Activate ServiceNow tool if inactive"
+    @echo ""
+    @./scripts/cleanup-servicenow-secrets.sh
+
 # View ServiceNow workflow status
 sn-status:
     @echo "📊 ServiceNow Integration Status"
@@ -583,6 +594,10 @@ sn-help:
     @echo "  just sn-status           - Show workflow status"
     @echo "  just sn-watch            - Watch current workflow"
     @echo "  just sn-history          - Show workflow history"
+    @echo ""
+    @echo "🛠️  Setup & Troubleshooting:"
+    @echo "  just sn-cleanup          - Clean up secrets and test auth"
+    @echo "  just sn-diagnose         - Diagnose integration issues"
     @echo ""
     @echo "📚 Documentation:"
     @echo "  just sn-docs             - View documentation links"
