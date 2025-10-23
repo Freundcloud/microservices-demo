@@ -68,14 +68,74 @@ jobs:
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
+      - name: Validate ServiceNow Inputs (Artifacts)
+        id: validate_art_inputs
+        run: |
+          URL="${{ steps.resolve.outputs.url }}"
+          USER="${{ steps.resolve.outputs.user }}"
+          PASS="${{ steps.resolve.outputs.pass }}"
+          TOOL="${{ steps.resolve.outputs.tool }}"
+
+          echo "## 🔐 ServiceNow Inputs: Register Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- URL: $([[ -n \"$URL\" ]] && echo present || echo MISSING)" >> $GITHUB_STEP_SUMMARY
+          echo "- Username: $([[ -n \"$USER\" ]] && echo present || echo MISSING)" >> $GITHUB_STEP_SUMMARY
+          echo "- Password: $([[ -n \"$PASS\" ]] && echo present || echo MISSING)" >> $GITHUB_STEP_SUMMARY
+          echo "- Tool ID: $([[ -n \"$TOOL\" ]] && echo present || echo MISSING)" >> $GITHUB_STEP_SUMMARY
+
+          if [ -z "$URL" ] || [ -z "$USER" ] || [ -z "$PASS" ] || [ -z "$TOOL" ]; then
+            echo "❌ Missing required ServiceNow inputs (URL/USER/PASS/TOOL)." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # Normalize URL (trim trailing slash)
+          URL_NO_SLASH=${URL%/}
+          echo "url_norm=$URL_NO_SLASH" >> $GITHUB_OUTPUT
+
+      - name: "Preflight: Verify Basic Auth (Artifacts)"
+        id: preflight_art_basic
+        run: |
+          URL="${{ steps.validate_art_inputs.outputs.url_norm }}"
+          USER="${{ steps.resolve.outputs.user }}"
+          PASS="${{ steps.resolve.outputs.pass }}"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sys_user?sysparm_limit=1")
+          if [ "$CODE" != "200" ]; then
+            echo "❌ ServiceNow Basic auth failed for Register Artifacts (HTTP $CODE)." >> $GITHUB_STEP_SUMMARY
+            echo "Check repo secrets: SERVICENOW_USERNAME/PASSWORD (or SN_DEVOPS_USER/PASSWORD) and SN_INSTANCE_URL (or SERVICENOW_INSTANCE_URL)." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "✅ ServiceNow Basic auth verified (Artifacts)" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Preflight: Verify Tool ID (Artifacts)"
+        id: preflight_art_tool
+        run: |
+          URL="${{ steps.validate_art_inputs.outputs.url_norm }}"
+          USER="${{ steps.resolve.outputs.user }}"
+          PASS="${{ steps.resolve.outputs.pass }}"
+          TOOL="${{ steps.resolve.outputs.tool }}"
+          RESP=$(curl -s -w "\n%{http_code}" -u "$USER:$PASS" "$URL/api/now/table/sn_devops_tool/$TOOL?sysparm_fields=sys_id,name,active,type")
+          HTTP_CODE=$(echo "$RESP" | tail -n1)
+          BODY=$(echo "$RESP" | sed '$d')
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Tool ID lookup failed (HTTP $HTTP_CODE). Verify SN_ORCHESTRATION_TOOL_ID and user permissions." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          ACTIVE=$(echo "$BODY" | jq -r '.result.active // false')
+          NAME=$(echo "$BODY" | jq -r '.result.name // "unknown"')
+          TYPE=$(echo "$BODY" | jq -r '.result.type // "unknown"')
+          if [ "$ACTIVE" != "true" ]; then
+            echo "❌ Tool is not active: $NAME ($TOOL)." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "✅ Tool verified: $NAME ($TYPE)" >> $GITHUB_STEP_SUMMARY
+
       - name: Register Docker Images as Artifacts
         uses: ServiceNow/servicenow-devops-register-artifact@v3.1.0
         with:
           devops-integration-user-name: ${{ steps.resolve.outputs.user }}
           devops-integration-user-password: ${{ steps.resolve.outputs.pass }}
-          instance-url: ${{ steps.resolve.outputs.url }}
+          instance-url: ${{ steps.validate_art_inputs.outputs.url_norm }}
           tool-id: ${{ steps.resolve.outputs.tool }}
-          context-github: ${{ toJSON(github) }}
+          context-github: '${{ toJSON(github) }}'
           job-name: 'Register Artifacts in ServiceNow'
           artifacts: |
             [
