@@ -470,25 +470,16 @@ jobs:
             PR_URL=""
           fi
 
-          # Build multi-line description with actual newlines
-          DETAILED_DESC="Automated deployment to $ENV environment via GitHub Actions
-
-GitHub Context:
-- Actor: $ACTOR
-- Branch: $BRANCH
-- Commit: $COMMIT_SHORT
-- $PR_INFO"
+          # Build multi-line description using printf for proper newline handling
+          DETAILED_DESC=$(printf "Automated deployment to %s environment via GitHub Actions\n\nGitHub Context:\n- Actor: %s\n- Branch: %s\n- Commit: %s\n- %s" \
+            "$ENV" "$ACTOR" "$BRANCH" "$COMMIT_SHORT" "$PR_INFO")
 
           if [ -n "$PR_URL" ]; then
-            DETAILED_DESC="${DETAILED_DESC}
-- PR URL: $PR_URL"
+            DETAILED_DESC=$(printf "%s\n- PR URL: %s" "$DETAILED_DESC" "$PR_URL")
           fi
 
-          DETAILED_DESC="${DETAILED_DESC}
-
-Workflow Run: $RUN_URL
-Repository: $REPO
-Event: $EVENT"
+          DETAILED_DESC=$(printf "%s\n\nWorkflow Run: %s\nRepository: %s\nEvent: %s" \
+            "$DETAILED_DESC" "$RUN_URL" "$REPO" "$EVENT")
 
           # Build short description
           if [ -n "$PR_NUMBER" ]; then
