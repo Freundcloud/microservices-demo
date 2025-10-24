@@ -2,16 +2,14 @@
 name: EKS Cluster Discovery to ServiceNow
 
 "on":
-  workflow_call:  # Called from master pipeline after terraform-apply
+  workflow_call:  # Only called from master pipeline after terraform-apply
     inputs:
       environment:
         description: 'Target environment (dev/qa/prod)'
         required: false
         type: string
         default: 'dev'
-  schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:  # Manual trigger only (for troubleshooting)
     inputs:
       environment:
         description: 'Target environment (dev/qa/prod)'
@@ -22,11 +20,6 @@ name: EKS Cluster Discovery to ServiceNow
           - qa
           - prod
         default: 'dev'
-  push:
-    paths:
-      - 'kustomize/overlays/**'
-      - 'kubernetes-manifests/**'
-      - '.github/workflows/deploy-with-servicenow.yaml'
 
 env:
   AWS_REGION: eu-west-2
