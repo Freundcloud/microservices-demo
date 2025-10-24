@@ -38,6 +38,79 @@ permissions:
   contents: read
 
 jobs:
+  # Job 0: Register Security Tools in ServiceNow (runs first, only once)
+  register-security-tools:
+    name: 🔒 Register Security Tools
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Get Pipeline sys_id (if available)
+        id: get-pipeline
+        continue-on-error: true
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+        run: |
+          # Try to find pipeline record for this repository
+          REPO="${{ github.repository }}"
+
+          PIPELINE_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_pipeline?sysparm_query=nameLIKE$REPO&sysparm_limit=1" \
+            -H "Accept: application/json" 2>/dev/null || echo '{"result":[]}')
+
+          PIPELINE_SYS_ID=$(echo "$PIPELINE_RESPONSE" | jq -r '.result[0].sys_id // empty')
+
+          if [ -n "$PIPELINE_SYS_ID" ]; then
+            echo "pipeline_sys_id=$PIPELINE_SYS_ID" >> $GITHUB_OUTPUT
+            echo "✅ Found pipeline: $PIPELINE_SYS_ID"
+          else
+            echo "⚠️  No pipeline found for $REPO"
+            echo "   Security tools will be created but not linked to pipeline"
+          fi
+
+      - name: Register Security Tools
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          PIPELINE_SYS_ID: ${{ steps.get-pipeline.outputs.pipeline_sys_id }}
+        run: |
+          chmod +x scripts/register-security-tools-servicenow.sh
+          ./scripts/register-security-tools-servicenow.sh
+
+      - name: Summary
+        run: |
+          echo "## 🔒 Security Tools Registration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ 10 security tools registered in ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tools registered:**" >> $GITHUB_STEP_SUMMARY
+          echo "- CodeQL (Static Analysis)" >> $GITHUB_STEP_SUMMARY
+          echo "- Trivy (Container Scanner)" >> $GITHUB_STEP_SUMMARY
+          echo "- OWASP Dependency Check (Dependency Scanner)" >> $GITHUB_STEP_SUMMARY
+          echo "- Semgrep (Static Analysis)" >> $GITHUB_STEP_SUMMARY
+          echo "- Gitleaks (Secret Scanner)" >> $GITHUB_STEP_SUMMARY
+          echo "- Checkov (IaC Scanner)" >> $GITHUB_STEP_SUMMARY
+          echo "- tfsec (Terraform Scanner)" >> $GITHUB_STEP_SUMMARY
+          echo "- Grype (Vulnerability Scanner)" >> $GITHUB_STEP_SUMMARY
+          echo "- Bandit (Python Security)" >> $GITHUB_STEP_SUMMARY
+          echo "- ESLint Security (JavaScript Security)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View tools at:**" >> $GITHUB_STEP_SUMMARY
+          echo "- [All Security Tools](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=sn_devops_tool_list.do)" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "${{ steps.get-pipeline.outputs.pipeline_sys_id }}" ]; then
+            PIPELINE_URL="${{ secrets.SERVICENOW_INSTANCE_URL }}/now/devops-change/record/sn_devops_pipeline/${{ steps.get-pipeline.outputs.pipeline_sys_id }}/params/selected-tab-index/3"
+            echo "- [Pipeline Security Tools]($PIPELINE_URL)" >> $GITHUB_STEP_SUMMARY
+          fi
+
   # Job 1: Register Build Artifacts in ServiceNow DevOps
   register-artifacts:
     name: Register Artifacts in ServiceNow
