@@ -1179,3 +1179,69 @@ jobs:
   # - docs/SERVICENOW-SECURITY-TOOLS-VERIFICATION.md - Complete investigation
   # - docs/SERVICENOW-GITHUB-VULNERABILITY-INTEGRATION.md - Plugin comparison
   # - scripts/verify-security-tools.sh - Verification tool
+
+  # Job 6: Register Security Scan Results to GitHubARC Tool
+  register-security-scan-results:
+    name: 🔒 Register Security Scan Results
+    runs-on: ubuntu-latest
+    needs: [create-change-request]
+    if: always()
+
+    strategy:
+      fail-fast: false
+      matrix:
+        scanner:
+          - name: "CodeQL"
+            type: "Static Analysis"
+          - name: "Trivy"
+            type: "Container Scanner"
+          - name: "OWASP Dependency Check"
+            type: "Dependency Scanner"
+          - name: "Semgrep"
+            type: "Static Analysis"
+          - name: "Gitleaks"
+            type: "Secret Scanner"
+          - name: "Checkov"
+            type: "IaC Scanner"
+          - name: "tfsec"
+            type: "Terraform Scanner"
+          - name: "Grype"
+            type: "Vulnerability Scanner"
+          - name: "Bandit"
+            type: "Python Security"
+          - name: "ESLint Security"
+            type: "JavaScript Security"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Register ${{ matrix.scanner.name }} Results
+        uses: ServiceNow/servicenow-devops-security-result@v3.1.0
+        continue-on-error: true
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: f62c4e49c3fcf614e1bbf0cb050131ef
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Register Security Scan Results'
+          security-result-attributes: |
+            {
+              "scanner": "${{ matrix.scanner.name }}",
+              "projectName": "${{ github.repository }}",
+              "projectId": "${{ github.repository }}",
+              "scanId": "${{ github.run_id }}-${{ matrix.scanner.name }}",
+              "securityToolId": "f62c4e49c3fcf614e1bbf0cb050131ef"
+            }
+
+      - name: Log Registration Attempt
+        if: always()
+        run: |
+          echo "## Security Scanner Registration: ${{ matrix.scanner.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Scanner: ${{ matrix.scanner.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Type: ${{ matrix.scanner.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tool ID: f62c4e49c3fcf614e1bbf0cb050131ef" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Scan ID: ${{ github.run_id }}-${{ matrix.scanner.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
