@@ -40,34 +40,34 @@ commonAnnotations:
 images:
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/frontend
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/cartservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/productcatalogservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/productcatalogservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/currencyservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/paymentservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/shippingservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/shippingservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/emailservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/checkoutservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/recommendationservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/adservice
-  newTag: 1.1.1
+  newTag: 1.1.2
 
 # Patches for dev environment
 patches:

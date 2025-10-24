@@ -222,16 +222,6 @@ jobs:
       environment: ${{ needs.pipeline-init.outputs.environment }}
       action: 'apply'
 
-  eks-discovery:
-    name: "🔍 EKS Cluster Discovery"
-    needs: [pipeline-init, terraform-apply]
-    if: |
-      always() &&
-      (needs.terraform-apply.result == 'success' || needs.terraform-apply.result == 'skipped')
-    uses: ./.github/workflows/eks-discovery.yaml
-    secrets: inherit
-    with:
-      environment: ${{ needs.pipeline-init.outputs.environment }}
 
   # ============================================================================
   # STAGE 3: Build Docker Images (Smart Change Detection)
@@ -295,76 +285,21 @@ jobs:
       push_images: ${{ github.event_name != 'pull_request' }}
 
   # ============================================================================
-  # STAGE 4: ServiceNow Change Management (Production Gate)
-  # ============================================================================
-
-  create-change-request:
-    name: "📋 ServiceNow Change Management"
-    needs: [pipeline-init, security-scans, build-and-push]
-    # CRITICAL: Run even if Terraform fails OR no services changed! ServiceNow integration should proceed
-    # as long as security scans succeeded. This ensures:
-    # 1. Security tools are registered in ServiceNow (with change context)
-    # 2. Change requests are created even for failed infrastructure deployments
-    # 3. Audit trail is complete regardless of deployment outcome
-    # 4. Change requests created even when only infrastructure/workflow changes (no service code changes)
-    #
-    # Note: build-and-push.result can be:
-    #   - '' (empty) = job didn't run at all (no service changes detected)
-    #   - 'success' = job ran and succeeded
-    #   - 'skipped' = job was skipped due to condition
-    #   - 'failure' = job ran and failed
-    if: |
-      always() &&
-      needs.pipeline-init.outputs.should_deploy == 'true' &&
-      !inputs.skip_deploy &&
-      github.event_name != 'pull_request' &&
-      (needs.security-scans.result == 'success' || needs.security-scans.result == 'skipped') &&
-      (needs.build-and-push.result == '' || needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
-    uses: ./.github/workflows/servicenow-integration.yaml
-    secrets: inherit
-    with:
-      environment: ${{ needs.pipeline-init.outputs.environment }}
-      change_type: ${{ needs.pipeline-init.outputs.is_production == 'true' && 'normal' || 'standard' }}
-      security_scan_status: ${{ needs.security-scans.outputs.overall_status || 'UNKNOWN' }}
-      security_findings: ${{ needs.security-scans.outputs.total_findings || '0' }}
-
-  upload-dependency-scan-results:
-    name: "🧪 Upload Dependency Scan Test Results"
-    needs: [pipeline-init, security-scans, create-change-request]
-    # Always run if change request was created successfully (even if security scans had issues)
-    if: |
-      always() &&
-      needs.create-change-request.result == 'success' &&
-      needs.security-scans.outputs.dependency_scan_result != ''
-    uses: ./.github/workflows/upload-test-results-servicenow.yaml
-    secrets: inherit
-    with:
-      test_suite_name: "Dependency Vulnerability Scan"
-      test_result: ${{ needs.security-scans.outputs.dependency_scan_result }}
-      test_duration: 120
-      test_url: "${{ github.server_url }}/${{ github.repository }}/security/dependabot"
-      change_request_number: ${{ needs.create-change-request.outputs.change_request_number }}
-      change_request_sys_id: ${{ needs.create-change-request.outputs.change_request_sys_id }}
-
-  # ============================================================================
-  # STAGE 5: Deployment (Environment-Specific)
+  # STAGE 4: Deployment (Environment-Specific)
   # ============================================================================
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
-    needs: [pipeline-init, create-change-request, eks-discovery]
+    needs: [pipeline-init]
     if: |
       always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       needs.pipeline-init.outputs.policy_ok == 'true' &&
-      !inputs.skip_deploy &&
-      (needs.create-change-request.result == 'success' || needs.create-change-request.result == 'skipped') &&
-      (needs.eks-discovery.result == 'success' || needs.eks-discovery.result == 'skipped')
+      !inputs.skip_deploy
     uses: ./.github/workflows/deploy-environment.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
-      change_request_sys_id: ${{ needs.create-change-request.outputs.change_request_sys_id || '' }}
       wait_for_ready: true
       timeout_minutes: ${{ needs.pipeline-init.outputs.is_production == 'true' && 15 || 10 }}
 
@@ -495,36 +430,7 @@ jobs:
           fi
 
   # ============================================================================
-  # STAGE 7: Update ServiceNow & Notifications
-  # ============================================================================
-
-  update-change-request:
-    name: "✅ Update ServiceNow"
-    needs: [create-change-request, deploy-to-environment, smoke-tests]
-    if: |
-      always() &&
-      needs.create-change-request.outputs.change_request_sys_id != ''
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Determine Final Status
-        id: status
-        run: |
-          DEPLOY_STATUS="${{ needs.deploy-to-environment.result }}"
-          SMOKE_STATUS="${{ needs.smoke-tests.result }}"
-
-          if [ "$DEPLOY_STATUS" == "success" ] && [ "$SMOKE_STATUS" == "success" ]; then
-            echo "final_status=successful" >> $GITHUB_OUTPUT
-            echo "state=3" >> $GITHUB_OUTPUT  # Closed
-            echo "notes=Deployment completed successfully. All smoke tests passed." >> $GITHUB_OUTPUT
-          else
-            echo "final_status=unsuccessful" >> $GITHUB_OUTPUT
-            echo "state=4" >> $GITHUB_OUTPUT  # Closed Incomplete
-            echo "notes=Deployment failed or smoke tests did not pass. Check workflow logs." >> $GITHUB_OUTPUT
-          fi
-
-  # ============================================================================
-  # STAGE 8: Back-merge Release Branch to Main (Production Only)
+  # STAGE 7: Back-merge Release Branch to Main (Production Only)
   # ============================================================================
 
   backmerge-release-to-main:
@@ -568,54 +474,6 @@ jobs:
             echo "✅ Opened back-merge PR"
           fi
 
-      - name: Update Change Request via REST API
-        run: |
-          CHANGE_SYS_ID="${{ needs.create-change-request.outputs.change_request_sys_id }}"
-          CHANGE_NUMBER="${{ needs.create-change-request.outputs.change_request_number }}"
-
-          echo "## 🔄 Updating Change Request $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Prepare update payload using jq for proper JSON encoding
-          CLOSE_CODE="${{ steps.status.outputs.final_status }}"
-          STATE="${{ steps.status.outputs.state }}"
-          NOTES="${{ steps.status.outputs.notes }}"
-          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          COMMIT="${{ github.sha }}"
-
-          CLOSE_NOTES=$(printf "%s\n\nWorkflow: %s\nCommit: %s" "$NOTES" "$WORKFLOW_URL" "$COMMIT")
-
-          UPDATE_PAYLOAD=$(jq -n \
-            --arg close_code "$CLOSE_CODE" \
-            --arg close_notes "$CLOSE_NOTES" \
-            --arg state "$STATE" \
-            '{close_code: $close_code, close_notes: $close_notes, state: $state}')
-
-          echo "Updating change request in ServiceNow..."
-
-          # Update change request using REST API
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-            -d "$UPDATE_PAYLOAD" \
-            "https://calitiiltddemo3.service-now.com/api/now/table/change_request/${CHANGE_SYS_ID}")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          echo "HTTP Status: $HTTP_CODE"
-
-          if [ "$HTTP_CODE" == "200" ]; then
-            echo "✅ Change request updated successfully" >> $GITHUB_STEP_SUMMARY
-            echo "Status: ${{ steps.status.outputs.final_status }}" >> $GITHUB_STEP_SUMMARY
-            echo "State: ${{ steps.status.outputs.state }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Failed to update change request (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
-            echo "Response: $BODY" >> $GITHUB_STEP_SUMMARY
-            # Don't fail the workflow - change was already created and deployed
-          fi
-
   # ============================================================================
   # STAGE 8: Pipeline Summary
   # ============================================================================
@@ -627,7 +485,6 @@ jobs:
       - security-scans
       - detect-terraform-changes
       - detect-service-changes
-      - eks-discovery
       - build-and-push
       - deploy-to-environment
       - smoke-tests
@@ -652,9 +509,7 @@ jobs:
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scans | ${{ needs.security-scans.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| EKS Discovery | ${{ needs.eks-discovery.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -672,199 +527,3 @@ jobs:
             echo "Check individual stage logs for details" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # ============================================================================
-  # STAGE 8: Infrastructure Discovery & Evidence Collection
-  # ============================================================================
-
-  collect-evidence:
-    name: "📋 Collect Evidence"
-    needs: [pipeline-init, deploy-to-environment, smoke-tests, create-change-request]
-    # Run if deployment succeeded, to collect evidence of what's running
-    if: |
-      always() &&
-      needs.pipeline-init.outputs.environment != '' &&
-      needs.deploy-to-environment.result == 'success'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install jq (for JSON assembly)
-        run: |
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-2
-
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-
-      - name: Configure kubectl
-        run: |
-          aws eks update-kubeconfig --region eu-west-2 --name microservices
-
-      - name: Collect EKS Cluster Evidence
-        id: eks-evidence
-        run: |
-          echo "## 🔍 EKS Cluster Evidence" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.pipeline-init.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Cluster:** microservices" >> $GITHUB_STEP_SUMMARY
-          echo "**Region:** eu-west-2" >> $GITHUB_STEP_SUMMARY
-          echo "**Collection Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Get cluster info
-          CLUSTER_VERSION=$(aws eks describe-cluster --name microservices --region eu-west-2 --query 'cluster.version' --output text)
-          CLUSTER_STATUS=$(aws eks describe-cluster --name microservices --region eu-west-2 --query 'cluster.status' --output text)
-
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Cluster Version | $CLUSTER_VERSION |" >> $GITHUB_STEP_SUMMARY
-          echo "| Cluster Status | $CLUSTER_STATUS |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Get node info
-          echo "### Node Status" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          kubectl get nodes -o wide >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Get deployments in target namespace
-          NAMESPACE="microservices-${{ needs.pipeline-init.outputs.environment }}"
-          echo "### Deployments in $NAMESPACE" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          kubectl get deployments -n $NAMESPACE -o wide >> $GITHUB_STEP_SUMMARY 2>&1 || echo "Namespace $NAMESPACE not found" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Get pods in target namespace
-          echo "### Pods in $NAMESPACE" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          kubectl get pods -n $NAMESPACE -o wide >> $GITHUB_STEP_SUMMARY 2>&1 || echo "Namespace $NAMESPACE not found" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Store evidence for ServiceNow
-          echo "cluster_version=$CLUSTER_VERSION" >> $GITHUB_OUTPUT
-          echo "cluster_status=$CLUSTER_STATUS" >> $GITHUB_OUTPUT
-
-          DEPLOYMENT_COUNT=$(kubectl get deployments -n $NAMESPACE --no-headers 2>/dev/null | wc -l || echo "0")
-          POD_COUNT=$(kubectl get pods -n $NAMESPACE --no-headers 2>/dev/null | wc -l || echo "0")
-          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
-
-          echo "deployment_count=$DEPLOYMENT_COUNT" >> $GITHUB_OUTPUT
-          echo "pod_count=$POD_COUNT" >> $GITHUB_OUTPUT
-          echo "running_pods=$RUNNING_PODS" >> $GITHUB_OUTPUT
-
-      - name: Collect Terraform State Evidence
-        id: terraform-evidence
-        run: |
-          echo "## 🏗️ Terraform Infrastructure Evidence" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          cd terraform-aws
-
-          # Count resources by type
-          echo "### Resource Summary" >> $GITHUB_STEP_SUMMARY
-          echo "| Resource Type | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------------|-------|" >> $GITHUB_STEP_SUMMARY
-
-          VPC_COUNT=$(terraform state list 2>/dev/null | grep -c "aws_vpc" || echo "0")
-          SUBNET_COUNT=$(terraform state list 2>/dev/null | grep -c "aws_subnet" || echo "0")
-          EKS_COUNT=$(terraform state list 2>/dev/null | grep -c "aws_eks_cluster" || echo "0")
-          NODE_GROUP_COUNT=$(terraform state list 2>/dev/null | grep -c "aws_eks_node_group" || echo "0")
-          ECR_COUNT=$(terraform state list 2>/dev/null | grep -c "aws_ecr_repository" || echo "0")
-          REDIS_COUNT=$(terraform state list 2>/dev/null | grep -c "aws_elasticache_cluster" || echo "0")
-
-          echo "| VPC | $VPC_COUNT |" >> $GITHUB_STEP_SUMMARY
-          echo "| Subnets | $SUBNET_COUNT |" >> $GITHUB_STEP_SUMMARY
-          echo "| EKS Clusters | $EKS_COUNT |" >> $GITHUB_STEP_SUMMARY
-          echo "| Node Groups | $NODE_GROUP_COUNT |" >> $GITHUB_STEP_SUMMARY
-          echo "| ECR Repositories | $ECR_COUNT |" >> $GITHUB_STEP_SUMMARY
-          echo "| Redis Clusters | $REDIS_COUNT |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Store for ServiceNow
-          TOTAL_RESOURCES=$(terraform state list 2>/dev/null | wc -l || echo "0")
-          echo "total_resources=$TOTAL_RESOURCES" >> $GITHUB_OUTPUT
-
-      - name: Send Evidence to ServiceNow (via REST API)
-        if: needs.create-change-request.outputs.change_request_sys_id != ''
-        env:
-          CHANGE_SYS_ID: ${{ needs.create-change-request.outputs.change_request_sys_id }}
-        run: |
-          echo "## 📤 Sending Evidence to ServiceNow" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          # Gather values for evidence
-          CLUSTER_VERSION='${{ steps.eks-evidence.outputs.cluster_version }}'
-          CLUSTER_STATUS='${{ steps.eks-evidence.outputs.cluster_status }}'
-          DEPLOYMENT_COUNT='${{ steps.eks-evidence.outputs.deployment_count }}'
-          POD_COUNT='${{ steps.eks-evidence.outputs.pod_count }}'
-          RUNNING_PODS='${{ steps.eks-evidence.outputs.running_pods }}'
-          TOTAL_RESOURCES='${{ steps.terraform-evidence.outputs.total_resources }}'
-          WORKFLOW_URL='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-          COMMIT_SHA='${{ github.sha }}'
-          ACTOR='${{ github.actor }}'
-          TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-
-          # Safely construct JSON with jq (compose multi-line work_notes)
-          EVIDENCE=$(jq -n \
-            --arg cv "$CLUSTER_VERSION" \
-            --arg cs "$CLUSTER_STATUS" \
-            --arg dc "$DEPLOYMENT_COUNT" \
-            --arg pc "$POD_COUNT" \
-            --arg rp "$RUNNING_PODS" \
-            --arg tr "$TOTAL_RESOURCES" \
-            --arg wu "$WORKFLOW_URL" \
-            --arg sha "$COMMIT_SHA" \
-            --arg actor "$ACTOR" \
-            --arg ts "$TIMESTAMP" \
-            '{
-              work_notes: (
-                "Deployment Evidence Collection\n\n" +
-                "=== EKS Cluster Evidence ===\n" +
-                "Cluster Version: " + $cv + "\n" +
-                "Cluster Status: " + $cs + "\n" +
-                "Deployments: " + $dc + "\n" +
-                "Total Pods: " + $pc + "\n" +
-                "Running Pods: " + $rp + "\n\n" +
-                "=== Infrastructure Evidence ===\n" +
-                "Total Terraform Resources: " + $tr + "\n\n" +
-                "=== Workflow Details ===\n" +
-                "Run: " + $wu + "\n" +
-                "Commit: " + $sha + "\n" +
-                "Actor: " + $actor + "\n" +
-                "Timestamp: " + $ts
-              )
-            }')
-
-          # Update change request with evidence using REST API
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-            -d "$EVIDENCE" \
-            "https://calitiiltddemo3.service-now.com/api/now/table/change_request/${CHANGE_SYS_ID}")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          if [ "$HTTP_CODE" == "200" ]; then
-            echo "✅ Evidence sent to ServiceNow successfully" >> $GITHUB_STEP_SUMMARY
-            echo "Change Request: CHG${CHANGE_SYS_ID}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Failed to send evidence to ServiceNow (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
-            echo "Response: $BODY" >> $GITHUB_STEP_SUMMARY
-          fi
