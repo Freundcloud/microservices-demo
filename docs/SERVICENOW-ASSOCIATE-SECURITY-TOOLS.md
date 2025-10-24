@@ -282,40 +282,6 @@ register-security-tools:
         done
 ```
 
-## Important: Pipeline Linking Limitation
-
-**UPDATE**: After testing with your ServiceNow instance, we discovered:
-
-✅ **Security tools CAN be created** in `sn_devops_tool` table
-❌ **Pipeline linkage table `sn_devops_pipeline_tool` does NOT exist**
-
-This means:
-- Security tools are registered in ServiceNow ✅
-- They appear in the global tools list ✅
-- BUT: They cannot be automatically linked to specific pipelines ❌
-- The "Pipeline Security Tools" tab requires custom configuration or a different plugin
-
-### Workaround Options:
-
-**Option 1: Manual UI Linking** (If Available)
-1. Navigate to your pipeline record
-2. Look for "Related Lists" at the bottom
-3. If you see a "Security Tools" or "Tools" related list, manually add tools there
-
-**Option 2: Custom Relationship Table** (Recommended for Enterprise)
-Create a custom many-to-many relationship table:
-```sql
--- Table: u_pipeline_security_tool
--- Extends: sys_metadata_link (or create as base table)
--- Fields:
---   - pipeline (reference to sn_devops_pipeline)
---   - security_tool (reference to sn_devops_tool)
---   - status (string: active/inactive)
-```
-
-**Option 3: Use Change Request Integration** (Current Implementation)
-Security scan results are attached to change requests, which ARE linked to pipelines.
-
 ## Summary
 
 ### Current State ✅
