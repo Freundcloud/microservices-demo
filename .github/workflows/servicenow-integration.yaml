@@ -611,9 +611,13 @@ jobs:
           echo "## 📝 Creating ServiceNow Change Request via REST API" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Extract payload (attributes only, remove wrapper)
-          CHANGE_PAYLOAD='${{ steps.build-json.outputs.change_json }}'
-          ATTRIBUTES=$(echo "$CHANGE_PAYLOAD" | jq '.attributes')
+          # Write payload to file to avoid bash interpretation
+          cat > /tmp/change_payload.json << 'PAYLOAD_EOF'
+          ${{ steps.build-json.outputs.change_json }}
+          PAYLOAD_EOF
+
+          # Extract attributes from payload
+          ATTRIBUTES=$(jq '.attributes' /tmp/change_payload.json)
 
           echo "Payload:" >> $GITHUB_STEP_SUMMARY
           echo '```json' >> $GITHUB_STEP_SUMMARY
@@ -661,9 +665,13 @@ jobs:
           echo "## 📝 Creating ServiceNow Change Request via REST API (Approval Required)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Extract payload (attributes only, remove wrapper)
-          CHANGE_PAYLOAD='${{ steps.build-json.outputs.change_json }}'
-          ATTRIBUTES=$(echo "$CHANGE_PAYLOAD" | jq '.attributes')
+          # Write payload to file to avoid bash interpretation
+          cat > /tmp/change_payload.json << 'PAYLOAD_EOF'
+          ${{ steps.build-json.outputs.change_json }}
+          PAYLOAD_EOF
+
+          # Extract attributes from payload
+          ATTRIBUTES=$(jq '.attributes' /tmp/change_payload.json)
 
           echo "Payload:" >> $GITHUB_STEP_SUMMARY
           echo '```json' >> $GITHUB_STEP_SUMMARY
