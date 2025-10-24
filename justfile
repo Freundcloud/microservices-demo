@@ -695,8 +695,8 @@ demo-run ENV TAG="":
         fi
         echo "✅ Demo complete"
 
-    # Cut a release branch from main and run QA deployment
-    cut-release VERSION:
+# Cut a release branch from main and run QA deployment
+cut-release VERSION:
             #!/usr/bin/env bash
             set -euo pipefail
             if [ -z "{{VERSION}}" ]; then echo "Usage: just cut-release VERSION=<x.y.z>"; exit 1; fi
