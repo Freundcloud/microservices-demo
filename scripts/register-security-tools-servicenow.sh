@@ -105,6 +105,7 @@ for tool_info in "${TOOLS[@]}"; do
   fi
 
   # Link tool to pipeline (if pipeline sys_id is provided)
+  # NOTE: sn_devops_pipeline_tool table may not exist in all ServiceNow instances
   if [ -n "${PIPELINE_SYS_ID:-}" ] && [ -n "$TOOL_SYS_ID" ]; then
     echo "  → Checking pipeline linkage..."
 
@@ -114,9 +115,14 @@ for tool_info in "${TOOLS[@]}"; do
     EXISTING_LINK=$(curl -s -u "${SERVICENOW_USERNAME}:${SERVICENOW_PASSWORD}" \
       "$LINK_QUERY_URL" \
       -H "Accept: application/json" \
-      2>/dev/null | jq -r '.result[0].sys_id // empty')
+      2>/dev/null | jq -r '.result[0].sys_id // empty' 2>/dev/null)
 
-    if [ -z "$EXISTING_LINK" ]; then
+    # Check if table exists (error message contains "Invalid table")
+    if echo "$EXISTING_LINK" | grep -q "Invalid table"; then
+      echo -e "  ${YELLOW}⚠️  Pipeline linking not available (table doesn't exist)${NC}"
+      echo "     Security tools created but cannot be linked to pipeline"
+      echo "     Tools are still visible in global security tools list"
+    elif [ -z "$EXISTING_LINK" ]; then
       # Create link
       LINK_PAYLOAD=$(jq -n \
         --arg pipeline "${PIPELINE_SYS_ID}" \
@@ -135,14 +141,13 @@ for tool_info in "${TOOLS[@]}"; do
         -d "$LINK_PAYLOAD" \
         2>/dev/null)
 
-      LINK_SYS_ID=$(echo "$LINK_RESPONSE" | jq -r '.result.sys_id // empty')
+      LINK_SYS_ID=$(echo "$LINK_RESPONSE" | jq -r '.result.sys_id // empty' 2>/dev/null)
 
       if [ -n "$LINK_SYS_ID" ]; then
         echo -e "  ${GREEN}✅ Linked to pipeline${NC}"
         LINKED_COUNT=$((LINKED_COUNT + 1))
       else
-        echo -e "  ${YELLOW}⚠️  Failed to link to pipeline${NC}"
-        echo "     Response: $(echo "$LINK_RESPONSE" | jq -c '.')"
+        echo -e "  ${YELLOW}⚠️  Could not link to pipeline${NC}"
       fi
     else
       echo -e "  ${GREEN}✓ Already linked to pipeline${NC}"
