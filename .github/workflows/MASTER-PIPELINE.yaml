@@ -222,16 +222,6 @@ jobs:
       environment: ${{ needs.pipeline-init.outputs.environment }}
       action: 'apply'
 
-  eks-discovery:
-    name: "🔍 EKS Cluster Discovery"
-    needs: [pipeline-init, terraform-apply]
-    if: |
-      always() &&
-      (needs.terraform-apply.result == 'success' || needs.terraform-apply.result == 'skipped')
-    uses: ./.github/workflows/eks-discovery.yaml
-    secrets: inherit
-    with:
-      environment: ${{ needs.pipeline-init.outputs.environment }}
 
   # ============================================================================
   # STAGE 3: Build Docker Images (Smart Change Detection)
@@ -298,39 +288,10 @@ jobs:
   # STAGE 4: ServiceNow Change Management (Production Gate)
   # ============================================================================
 
-  create-change-request:
-    name: "📋 ServiceNow Change Management"
-    needs: [pipeline-init, security-scans, build-and-push]
-    # CRITICAL: Run even if Terraform fails OR no services changed! ServiceNow integration should proceed
-    # as long as security scans succeeded. This ensures:
-    # 1. Security tools are registered in ServiceNow (with change context)
-    # 2. Change requests are created even for failed infrastructure deployments
-    # 3. Audit trail is complete regardless of deployment outcome
-    # 4. Change requests created even when only infrastructure/workflow changes (no service code changes)
-    #
-    # Note: build-and-push.result can be:
-    #   - '' (empty) = job didn't run at all (no service changes detected)
-    #   - 'success' = job ran and succeeded
-    #   - 'skipped' = job was skipped due to condition
-    #   - 'failure' = job ran and failed
-    if: |
-      always() &&
-      needs.pipeline-init.outputs.should_deploy == 'true' &&
-      !inputs.skip_deploy &&
-      github.event_name != 'pull_request' &&
-      (needs.security-scans.result == 'success' || needs.security-scans.result == 'skipped') &&
-      (needs.build-and-push.result == '' || needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
-    uses: ./.github/workflows/servicenow-integration.yaml
-    secrets: inherit
-    with:
-      environment: ${{ needs.pipeline-init.outputs.environment }}
-      change_type: ${{ needs.pipeline-init.outputs.is_production == 'true' && 'normal' || 'standard' }}
-      security_scan_status: ${{ needs.security-scans.outputs.overall_status || 'UNKNOWN' }}
-      security_findings: ${{ needs.security-scans.outputs.total_findings || '0' }}
 
   upload-dependency-scan-results:
     name: "🧪 Upload Dependency Scan Test Results"
-    needs: [pipeline-init, security-scans, create-change-request]
+    needs: [pipeline-init, security-scans]
     # Always run if change request was created successfully (even if security scans had issues)
     if: |
       always() &&
@@ -352,7 +313,7 @@ jobs:
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
-    needs: [pipeline-init, create-change-request, eks-discovery]
+    needs: [pipeline-init]
     if: |
       always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
@@ -500,7 +461,7 @@ jobs:
 
   update-change-request:
     name: "✅ Update ServiceNow"
-    needs: [create-change-request, deploy-to-environment, smoke-tests]
+    needs: [deploy-to-environment, smoke-tests]
     if: |
       always() &&
       needs.create-change-request.outputs.change_request_sys_id != ''
@@ -652,9 +613,7 @@ jobs:
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scans | ${{ needs.security-scans.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| EKS Discovery | ${{ needs.eks-discovery.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -678,7 +637,7 @@ jobs:
 
   collect-evidence:
     name: "📋 Collect Evidence"
-    needs: [pipeline-init, deploy-to-environment, smoke-tests, create-change-request]
+    needs: [pipeline-init, deploy-to-environment, smoke-tests]
     # Run if deployment succeeded, to collect evidence of what's running
     if: |
       always() &&
