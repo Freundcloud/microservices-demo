@@ -604,94 +604,149 @@ jobs:
 
           echo "✅ ServiceNow Basic auth verified (Table API)" >> $GITHUB_STEP_SUMMARY
 
-      - name: "Create ServiceNow Change (dev) - CLI Method"
+      - name: "Create ServiceNow Change (dev) - REST API Method"
         if: ${{ inputs.environment == 'dev' }}
         id: create_dev_basic
         run: |
-          echo "## 📝 Creating ServiceNow Change Request via CLI" >> $GITHUB_STEP_SUMMARY
+          echo "## 📝 Creating ServiceNow Change Request via REST API" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Write change JSON to file to avoid bash interpretation issues
-          cat > /tmp/change_payload.json << 'PAYLOAD_EOF'
-          ${{ steps.build-json.outputs.change_json }}
-          PAYLOAD_EOF
+          # Extract payload (attributes only, remove wrapper)
+          CHANGE_PAYLOAD='${{ steps.build-json.outputs.change_json }}'
+          ATTRIBUTES=$(echo "$CHANGE_PAYLOAD" | jq '.attributes')
 
-          # Read payload from file
-          CHANGE_JSON=$(cat /tmp/change_payload.json)
-
-          # Prepare base64 token for ServiceNow CLI
-          SN_TOKEN_BASE64=$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)
-
-          # Run ServiceNow CLI in Docker container
-          # Mount temp directory to pass the payload file
-          docker run --rm \
-            -v /tmp:/tmp:ro \
-            servicenowdocker/sndevops:6.0.0 \
-            sh -c "sndevopscli create change --toolId '${{ steps.resolve.outputs.tool }}' --url '${{ steps.resolve.outputs.url }}' --token '${SN_TOKEN_BASE64}' --payload \"\$(cat /tmp/change_payload.json)\" --waitForApproval false" \
-            > /tmp/change_output.txt 2>&1
-
-          # Extract change request number and sys_id from output
-          CHANGE_NUMBER=$(grep -oP 'Change Request Number: \K[A-Z0-9]+' /tmp/change_output.txt || echo "unknown")
-          CHANGE_SYS_ID=$(grep -oP 'Change Request Sys ID: \K[a-f0-9]+' /tmp/change_output.txt || echo "unknown")
-
-          echo "change-request-number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
-          echo "change-request-sys-id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
-
-          echo "**Change Request Created:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Number: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "- Sys ID: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
-          echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "Payload:" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo "$ATTRIBUTES" | jq . >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          cat /tmp/change_output.txt
+          # Create change request via REST API (proven to work with basic auth)
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}" \
+            -d "$ATTRIBUTES" \
+            "${{ steps.resolve.outputs.url }}/api/now/table/change_request")
 
-      - name: "Create ServiceNow Change (qa/prod) - CLI Method with Approval"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.number // "unknown"')
+            CHANGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id // "unknown"')
+
+            echo "change-request-number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+            echo "change-request-sys-id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
+
+            echo "**✅ Change Request Created Successfully:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Number: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
+            echo "- Sys ID: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+            echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+            echo "- URL: ${{ steps.resolve.outputs.url }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**❌ Change Request Creation Failed (HTTP $HTTP_CODE)**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$BODY" | jq . 2>/dev/null || echo "$BODY" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: "Create ServiceNow Change (qa/prod) - REST API with Approval"
         if: ${{ inputs.environment != 'dev' }}
         id: create_gated_basic
         run: |
-          echo "## 📝 Creating ServiceNow Change Request via CLI (Approval Required)" >> $GITHUB_STEP_SUMMARY
+          echo "## 📝 Creating ServiceNow Change Request via REST API (Approval Required)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Write change JSON to file to avoid bash interpretation issues
-          cat > /tmp/change_payload.json << 'PAYLOAD_EOF'
-          ${{ steps.build-json.outputs.change_json }}
-          PAYLOAD_EOF
+          # Extract payload (attributes only, remove wrapper)
+          CHANGE_PAYLOAD='${{ steps.build-json.outputs.change_json }}'
+          ATTRIBUTES=$(echo "$CHANGE_PAYLOAD" | jq '.attributes')
 
-          # Add deployment gate context for qa/prod
-          PIPELINE_CONTEXT=$(jq -n \
-            --arg env "${{ inputs.environment }}" \
-            --arg job "deploy-to-environment" \
-            '{
-              environment: $env,
-              jobName: $job
-            }')
-
-          # Prepare base64 token for ServiceNow CLI
-          SN_TOKEN_BASE64=$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)
-
-          # Run ServiceNow CLI in Docker container (with approval waiting for qa/prod)
-          # Mount temp directory to pass the payload file
-          docker run --rm \
-            -v /tmp:/tmp:ro \
-            servicenowdocker/sndevops:6.0.0 \
-            sh -c "sndevopscli create change --toolId '${{ steps.resolve.outputs.tool }}' --url '${{ steps.resolve.outputs.url }}' --token '${SN_TOKEN_BASE64}' --payload \"\$(cat /tmp/change_payload.json)\" --pipelineContext '${PIPELINE_CONTEXT}' --waitForApproval true" \
-            > /tmp/change_output.txt 2>&1
-
-          # Extract change request number and sys_id from output
-          CHANGE_NUMBER=$(grep -oP 'Change Request Number: \K[A-Z0-9]+' /tmp/change_output.txt || echo "unknown")
-          CHANGE_SYS_ID=$(grep -oP 'Change Request Sys ID: \K[a-f0-9]+' /tmp/change_output.txt || echo "unknown")
-
-          echo "change-request-number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
-          echo "change-request-sys-id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
-
-          echo "**Change Request Created and Approved:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Number: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "- Sys ID: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
-          echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: Waiting for approval..." >> $GITHUB_STEP_SUMMARY
+          echo "Payload:" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo "$ATTRIBUTES" | jq . >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          cat /tmp/change_output.txt
+          # Create change request via REST API (proven to work with basic auth)
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}" \
+            -d "$ATTRIBUTES" \
+            "${{ steps.resolve.outputs.url }}/api/now/table/change_request")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.number // "unknown"')
+            CHANGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id // "unknown"')
+
+            echo "change-request-number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+            echo "change-request-sys-id=$CHANGE_SYS_ID" >> $GITHUB_OUTPUT
+
+            echo "**✅ Change Request Created Successfully:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Number: $CHANGE_NUMBER" >> $GITHUB_STEP_SUMMARY
+            echo "- Sys ID: $CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+            echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+            echo "- URL: ${{ steps.resolve.outputs.url }}/nav_to.do?uri=change_request.do?sys_id=$CHANGE_SYS_ID" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⏳ **Waiting for approval** - polling every 30 seconds..." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Poll for approval (qa/prod only)
+            MAX_WAIT=7200  # 2 hours
+            POLL_INTERVAL=30
+            ELAPSED=0
+
+            while [ $ELAPSED -lt $MAX_WAIT ]; do
+              echo "Polling for approval... (${ELAPSED}s elapsed)"
+
+              CHECK_RESPONSE=$(curl -s -w "\n%{http_code}" \
+                -H "Accept: application/json" \
+                -u "${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}" \
+                "${{ steps.resolve.outputs.url }}/api/now/table/change_request/$CHANGE_SYS_ID?sysparm_fields=state,approval")
+
+              CHECK_HTTP_CODE=$(echo "$CHECK_RESPONSE" | tail -n1)
+              CHECK_BODY=$(echo "$CHECK_RESPONSE" | sed '$d')
+
+              if [ "$CHECK_HTTP_CODE" = "200" ]; then
+                STATE=$(echo "$CHECK_BODY" | jq -r '.result.state // "unknown"')
+                APPROVAL=$(echo "$CHECK_BODY" | jq -r '.result.approval // "unknown"')
+
+                echo "  State: $STATE, Approval: $APPROVAL"
+
+                # approval=approved (or state indicates implementation ready)
+                if [ "$APPROVAL" = "approved" ] || [ "$STATE" = "3" ]; then
+                  echo "✅ **Change Request Approved!**" >> $GITHUB_STEP_SUMMARY
+                  echo "  Proceeding with deployment..." >> $GITHUB_STEP_SUMMARY
+                  break
+                elif [ "$APPROVAL" = "rejected" ]; then
+                  echo "❌ **Change Request Rejected**" >> $GITHUB_STEP_SUMMARY
+                  exit 1
+                fi
+              fi
+
+              sleep $POLL_INTERVAL
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+            done
+
+            if [ $ELAPSED -ge $MAX_WAIT ]; then
+              echo "⏱️ **Timeout: Change request not approved within 2 hours**" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          else
+            echo "**❌ Change Request Creation Failed (HTTP $HTTP_CODE)**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$BODY" | jq . 2>/dev/null || echo "$BODY" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Fetch Change Request Details
         id: fetch-change
