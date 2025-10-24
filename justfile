@@ -719,8 +719,8 @@ cut-release VERSION:
             echo "👀 Watching run..."
             gh run watch || true
 
-    # Promote an already cut release to production
-    promote-to-prod VERSION:
+# Promote an already cut release to production
+promote-to-prod VERSION:
             #!/usr/bin/env bash
             set -euo pipefail
             if [ -z "{{VERSION}}" ]; then echo "Usage: just promote-to-prod VERSION=<x.y.z>"; exit 1; fi
