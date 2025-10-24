@@ -619,15 +619,15 @@ jobs:
           # Read payload from file
           CHANGE_JSON=$(cat /tmp/change_payload.json)
 
+          # Prepare base64 token for ServiceNow CLI
+          SN_TOKEN_BASE64=$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)
+
           # Run ServiceNow CLI in Docker container
           # Mount temp directory to pass the payload file
           docker run --rm \
             -v /tmp:/tmp:ro \
-            -e TOOL_ID="${{ steps.resolve.outputs.tool }}" \
-            -e SN_URL="${{ steps.resolve.outputs.url }}" \
-            -e SN_TOKEN_BASE64="$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)" \
             servicenowdocker/sndevops:6.0.0 \
-            sh -c 'sndevopscli create change --toolId "$TOOL_ID" --url "$SN_URL" --payload "$(cat /tmp/change_payload.json)" --waitForApproval false' \
+            sh -c "sndevopscli create change --toolId '${{ steps.resolve.outputs.tool }}' --url '${{ steps.resolve.outputs.url }}' --token '${SN_TOKEN_BASE64}' --payload \"\$(cat /tmp/change_payload.json)\" --waitForApproval false" \
             > /tmp/change_output.txt 2>&1
 
           # Extract change request number and sys_id from output
@@ -666,16 +666,15 @@ jobs:
               jobName: $job
             }')
 
+          # Prepare base64 token for ServiceNow CLI
+          SN_TOKEN_BASE64=$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)
+
           # Run ServiceNow CLI in Docker container (with approval waiting for qa/prod)
           # Mount temp directory to pass the payload file
           docker run --rm \
             -v /tmp:/tmp:ro \
-            -e TOOL_ID="${{ steps.resolve.outputs.tool }}" \
-            -e SN_URL="${{ steps.resolve.outputs.url }}" \
-            -e SN_TOKEN_BASE64="$(echo -n '${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}' | base64)" \
-            -e PIPELINE_CONTEXT="$PIPELINE_CONTEXT" \
             servicenowdocker/sndevops:6.0.0 \
-            sh -c 'sndevopscli create change --toolId "$TOOL_ID" --url "$SN_URL" --payload "$(cat /tmp/change_payload.json)" --pipelineContext "$PIPELINE_CONTEXT" --waitForApproval true' \
+            sh -c "sndevopscli create change --toolId '${{ steps.resolve.outputs.tool }}' --url '${{ steps.resolve.outputs.url }}' --token '${SN_TOKEN_BASE64}' --payload \"\$(cat /tmp/change_payload.json)\" --pipelineContext '${PIPELINE_CONTEXT}' --waitForApproval true" \
             > /tmp/change_output.txt 2>&1
 
           # Extract change request number and sys_id from output
