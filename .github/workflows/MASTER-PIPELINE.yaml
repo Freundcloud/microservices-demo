@@ -831,18 +831,24 @@ jobs:
             --arg sha "$COMMIT_SHA" \
             --arg actor "$ACTOR" \
             --arg ts "$TIMESTAMP" \
-            '{work_notes:
-              "Deployment Evidence Collection\n\n=== EKS Cluster Evidence ===\nCluster Version: " + $cv +
-              "\nCluster Status: " + $cs +
-              "\nDeployments: " + $dc +
-              "\nTotal Pods: " + $pc +
-              "\nRunning Pods: " + $rp +
-              "\n\n=== Infrastructure Evidence ===\nTotal Terraform Resources: " + $tr +
-              "\n\n=== Workflow Details ===\nRun: " + $wu +
-              "\nCommit: " + $sha +
-              "\nActor: " + $actor +
-              "\nTimestamp: " + $ts
-            })
+            '{
+              work_notes: (
+                "Deployment Evidence Collection\n\n" +
+                "=== EKS Cluster Evidence ===\n" +
+                "Cluster Version: " + $cv + "\n" +
+                "Cluster Status: " + $cs + "\n" +
+                "Deployments: " + $dc + "\n" +
+                "Total Pods: " + $pc + "\n" +
+                "Running Pods: " + $rp + "\n\n" +
+                "=== Infrastructure Evidence ===\n" +
+                "Total Terraform Resources: " + $tr + "\n\n" +
+                "=== Workflow Details ===\n" +
+                "Run: " + $wu + "\n" +
+                "Commit: " + $sha + "\n" +
+                "Actor: " + $actor + "\n" +
+                "Timestamp: " + $ts
+              )
+            }')
 
           # Update change request with evidence using REST API
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
