@@ -111,3 +111,35 @@ else
   echo "⚠️  No changes made - service may not exist or version already set"
   exit 1
 fi
+
+# DEMO MODE: Force Docker image rebuild by updating a version file in the service source
+echo ""
+echo "🔨 Triggering Docker image rebuild for ${SERVICE}..."
+
+SERVICE_SRC_DIR="src/${SERVICE}"
+if [ -d "$SERVICE_SRC_DIR" ]; then
+  VERSION_FILE="${SERVICE_SRC_DIR}/VERSION.txt"
+
+  # Create or update VERSION.txt file
+  echo "${VERSION}" > "$VERSION_FILE"
+  echo "   Updated: ${VERSION_FILE}"
+
+  # Also update a comment in Dockerfile to force layer rebuild (if Dockerfile exists)
+  DOCKERFILE="${SERVICE_SRC_DIR}/Dockerfile"
+  if [ -f "$DOCKERFILE" ]; then
+    # Add or update a version label at the top of the Dockerfile
+    if grep -q "^# Service Version:" "$DOCKERFILE"; then
+      # Update existing version label
+      sed -i "s/^# Service Version: .*/# Service Version: ${VERSION}/" "$DOCKERFILE"
+    else
+      # Add version label after FROM line
+      sed -i "0,/^FROM /{s/^\(FROM .*\)/\1\n# Service Version: ${VERSION}/}" "$DOCKERFILE"
+    fi
+    echo "   Updated: ${DOCKERFILE} (version label)"
+  fi
+
+  echo "✅ Service source updated - Docker image will be rebuilt"
+else
+  echo "⚠️  Service directory not found: ${SERVICE_SRC_DIR}"
+  echo "   Kustomize configuration updated, but image rebuild may not be triggered"
+fi

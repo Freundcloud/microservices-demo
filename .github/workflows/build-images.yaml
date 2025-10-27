@@ -79,28 +79,81 @@ jobs:
           filters: |
             emailservice:
               - 'src/emailservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             productcatalogservice:
               - 'src/productcatalogservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             recommendationservice:
               - 'src/recommendationservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             shippingservice:
               - 'src/shippingservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             checkoutservice:
               - 'src/checkoutservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             paymentservice:
               - 'src/paymentservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             currencyservice:
               - 'src/currencyservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             cartservice:
               - 'src/cartservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             frontend:
               - 'src/frontend/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             adservice:
               - 'src/adservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             loadgenerator:
               - 'src/loadgenerator/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
             shoppingassistantservice:
               - 'src/shoppingassistantservice/**'
+              - 'kustomize/overlays/*/kustomization.yaml'
+
+      - name: Detect Version Changes in Kustomize Overlays
+        id: version-changes
+        if: inputs.services == 'all'
+        run: |
+          echo "Checking for version changes in Kustomize overlays..."
+
+          # Get the environment from input (default to dev)
+          ENV="${{ inputs.environment }}"
+          OVERLAY_FILE="kustomize/overlays/${ENV}/kustomization.yaml"
+
+          # Check if the kustomization file changed
+          if git diff --name-only HEAD~1 2>/dev/null | grep -q "$OVERLAY_FILE"; then
+            echo "✅ Kustomization file changed: $OVERLAY_FILE"
+
+            # Extract services that had version (newTag) changes
+            CHANGED_SERVICES=$(git diff HEAD~1 "$OVERLAY_FILE" 2>/dev/null | \
+              awk '/^[-+]  newTag:/ {
+                # Get the service name from the previous "- name:" line
+                if (prev_name) {
+                  split(prev_name, parts, "/")
+                  service = parts[length(parts)]
+                  # Remove any trailing whitespace or quotes
+                  gsub(/[[:space:]"'\'']+$/, "", service)
+                  print service
+                }
+              }
+              /^[-+]- name:/ || /^[-+]  - name:/ {
+                # Store the line for next iteration
+                prev_name = $0
+                gsub(/^[-+][[:space:]]*-[[:space:]]*name:[[:space:]]*/, "", prev_name)
+              }' | \
+              sort -u | \
+              jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+            echo "Services with version changes: $CHANGED_SERVICES"
+            echo "version_changed_services=$CHANGED_SERVICES" >> $GITHUB_OUTPUT
+          else
+            echo "No kustomization file changes detected"
+            echo "version_changed_services=[]" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set Build Matrix
         id: set-matrix
@@ -108,15 +161,29 @@ jobs:
           SERVICES_INPUT='${{ inputs.services }}'
 
           if [ "$SERVICES_INPUT" == "all" ]; then
-            # Build all services that changed
+            # Build all services that changed (source code changes)
             CHANGED=$(echo '${{ steps.filter.outputs.changes }}' | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
+            # Get services with version changes in Kustomize overlays
+            VERSION_CHANGED='${{ steps.version-changes.outputs.version_changed_services }}'
+            if [ -z "$VERSION_CHANGED" ] || [ "$VERSION_CHANGED" == "null" ]; then
+              VERSION_CHANGED='[]'
+            fi
+
+            echo "Source code changes: $CHANGED"
+            echo "Version changes: $VERSION_CHANGED"
+
+            # Merge both lists and remove duplicates
+            MERGED=$(echo "$CHANGED $VERSION_CHANGED" | jq -s 'add | unique | sort')
+
+            echo "Merged services to build: $MERGED"
+
             # If no changes detected or workflow_dispatch, build all
-            if [ "$CHANGED" == "[]" ] || [ "$CHANGED" == '[""]' ]; then
+            if [ "$MERGED" == "[]" ] || [ "$MERGED" == '[""]' ] || [ "$MERGED" == "null" ]; then
               echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
             else
-              echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
+              echo "matrix=$MERGED" >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
             fi
           elif [ "$SERVICES_INPUT" == "none" ]; then
