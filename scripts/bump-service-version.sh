@@ -74,10 +74,16 @@ echo "🔧 Bumping ${SERVICE} version to ${VERSION} in ${ENVIRONMENT}"
 echo "📁 File: ${FILE}"
 
 # Update only the specific service's newTag
-# This uses awk to find the service name and update the NEXT newTag line
+# This uses awk to find the service name (including full image paths) and update the NEXT newTag line
 awk -v service="$SERVICE" -v version="$VERSION" '
   /^  - name:/ {
-    if ($3 == service) {
+    # Extract service name from full image path if present
+    # e.g., us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
+    name_field = $3
+    split(name_field, parts, "/")
+    extracted_service = parts[length(parts)]
+
+    if (extracted_service == service || name_field == service) {
       found = 1
     } else {
       found = 0

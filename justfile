@@ -908,8 +908,18 @@ service-versions ENV:
     echo "=============================="
     echo ""
 
-    # Extract service names and versions
-    awk '/^  - name:/ {service=$3} /^    newTag:/ {print service": "$2}' "$FILE" | \
+    # Extract service names and versions (handling full image paths)
+    awk '
+        /^- name:/ {
+            # Extract service name from full image path
+            # e.g., us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
+            split($3, parts, "/")
+            service = parts[length(parts)]
+        }
+        /^  newTag:/ {
+            print service ": " $2
+        }
+    ' "$FILE" | \
         column -t -s: | \
         sed 's/^/  /'
 
