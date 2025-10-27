@@ -42,15 +42,15 @@ git push origin --delete "$BRANCH" 2>/dev/null || true
 
 git checkout -b "$BRANCH"
 
-# 2. Update kustomization files for all environments
+# 2. Update kustomization files for all environments with semantic version
 echo "📝 Updating kustomization files..."
 for ENV in dev qa prod; do
     FILE="kustomize/overlays/$ENV/kustomization.yaml"
     if [ -f "$FILE" ]; then
         echo "  - $FILE"
-        # For now, we're using environment tags (dev/qa/prod) not semantic versions
-        # This ensures images exist in ECR
-        sed -i "s/newTag: .*/newTag: ${ENV}/" "$FILE"
+        # Update to semantic version tag (v1.2.0)
+        # Images will be tagged with this version during build
+        sed -i "s/newTag: .*/newTag: v${VERSION}/" "$FILE"
         git add "$FILE"
     fi
 done
@@ -64,7 +64,7 @@ Automated version promotion via scripts/promote-version.sh
 - Version: ${VERSION}
 - Services: ${SERVICES}
 - Environments: dev, qa, prod
-- Tags: dev, qa, prod (environment-based)
+- Tags: v${VERSION} (semantic versioning)
 
 This PR will trigger:
 1. Auto-deploy to DEV (ServiceNow CR auto-approved)
@@ -89,11 +89,11 @@ PR_URL=$(gh pr create \
 
 ## 📋 Changes
 
-This PR updates kustomization files for all environments to use consistent environment tags.
+This PR updates kustomization files for all environments to use semantic version tag.
 
-- ✅ Dev environment: \`newTag: dev\`
-- ✅ QA environment: \`newTag: qa\`
-- ✅ Prod environment: \`newTag: prod\`
+- ✅ Dev environment: \`newTag: v${VERSION}\`
+- ✅ QA environment: \`newTag: v${VERSION}\`
+- ✅ Prod environment: \`newTag: v${VERSION}\`
 
 ## 🔄 Deployment Plan
 
@@ -152,20 +152,35 @@ echo ""
 echo "✅ CI checks passed!"
 echo ""
 
-# 7. Auto-approve and merge
-echo "✅ Auto-approving and merging PR..."
-gh pr review "$PR_NUMBER" --approve --body "✅ Automated approval - CI checks passed
+# 7. Wait for manual approval before merging
+echo "📋 Review PR: $PR_URL"
+echo ""
+read -p "✅ Merge PR and proceed with deployment? (y/N): " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "⏸️  Merge cancelled. You can merge manually later:"
+    echo "   gh pr merge $PR_NUMBER --squash --delete-branch"
+    exit 0
+fi
+
+# 8. Merge PR
+echo "✅ Merging PR..."
+gh pr merge "$PR_NUMBER" --squash --delete-branch --body "✅ Manual merge confirmation - CI checks passed
 
 All validations complete:
 - ✅ Security scans passed
 - ✅ Code validation passed
 - ✅ Kustomize configurations valid
 
-Proceeding with automated merge.
-"
-
-gh pr merge "$PR_NUMBER" --squash --delete-branch --auto || {
+Merged via scripts/promote-version.sh" || {
     echo "❌ Failed to merge PR. Please merge manually: $PR_URL"
+    echo ""
+    echo "This might happen if:"
+    echo "  - Branch protection rules require approval"
+    echo "  - GitHub doesn't allow merging your own PR"
+    echo ""
+    echo "To merge manually:"
+    echo "  gh pr merge $PR_NUMBER --squash --delete-branch"
     exit 1
 }
 
