@@ -309,12 +309,17 @@ jobs:
       - name: Fix Checkov SARIF URI Schemes
         if: always()
         run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh checkov-results.sarif
+          if [ -f "checkov-results.sarif" ]; then
+            echo "📄 Checkov SARIF file found, fixing URI schemes..."
+            chmod +x scripts/fix-sarif-uris.sh
+            ./scripts/fix-sarif-uris.sh checkov-results.sarif
+          else
+            echo "⚠️ Checkov SARIF file not found, skipping URI fix"
+          fi
 
       - name: Upload Checkov Results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('checkov-results.sarif') != ''
         with:
           sarif_file: checkov-results.sarif
           category: checkov-terraform
@@ -331,13 +336,18 @@ jobs:
       - name: Fix tfsec SARIF URI Schemes
         if: always()
         run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh tfsec-results.sarif
+          if [ -f "tfsec-results.sarif" ]; then
+            echo "📄 tfsec SARIF file found, fixing URI schemes..."
+            chmod +x scripts/fix-sarif-uris.sh
+            ./scripts/fix-sarif-uris.sh tfsec-results.sarif
+          else
+            echo "⚠️ tfsec SARIF file not found, skipping URI fix"
+          fi
         continue-on-error: true
 
       - name: Upload tfsec Results to Security Tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('tfsec-results.sarif') != ''
         with:
           sarif_file: tfsec-results.sarif
           category: tfsec-terraform
