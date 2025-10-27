@@ -520,19 +520,20 @@ jobs:
       - name: Upload Deployment Config
         uses: ServiceNow/servicenow-devops-config-validate@v1.0.0-beta
         with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
+          devops-integration-username: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
           application-name: 'microservices-demo'
-          snapshot-name: 'deployment-${{ github.run_number }}'
-          target-environment: ${{ needs.pipeline-init.outputs.environment }}
+          target: 'deployable'
           deployable-name: 'microservices-${{ needs.pipeline-init.outputs.environment }}'
+          name-path: 'deployment-${{ github.run_number }}'
+          auto-commit: true
+          auto-validate: true
+          auto-publish: true
           config-file-path: 'kustomize/overlays/${{ needs.pipeline-init.outputs.environment }}/*.yaml'
-          auto-commit: 'true'
-          auto-validate: 'true'
-          auto-publish: 'true'
+          data-format: 'yaml'
+          snapshot-validation-timeout: 30
+          terminate-on-policy-validation-failures: false
 
       - name: Config Upload Summary
         if: always()
