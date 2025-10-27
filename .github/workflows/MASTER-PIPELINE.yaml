@@ -234,7 +234,6 @@ jobs:
     if: ${{ !inputs.skip_security }}
     uses: ./.github/workflows/unit-tests.yaml
     secrets: inherit
-    continue-on-error: true  # Allow workflow to continue even if some tests fail
 
   # ============================================================================
   # STAGE 3: Build Docker Images (Smart Change Detection)
@@ -288,8 +287,10 @@ jobs:
     name: "🐳 Build Docker Images"
     needs: [pipeline-init, detect-service-changes, security-scans, unit-tests]
     if: |
-      needs.detect-service-changes.outputs.has_changes == 'true' ||
-      inputs.force_build_all
+      always() &&
+      !cancelled() &&
+      (needs.detect-service-changes.outputs.has_changes == 'true' ||
+       inputs.force_build_all)
     uses: ./.github/workflows/build-images.yaml
     secrets: inherit
     with:
