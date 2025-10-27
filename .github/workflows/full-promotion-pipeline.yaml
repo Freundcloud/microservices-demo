@@ -14,7 +14,7 @@ name: "🚀 Full Promotion Pipeline (Dev → QA → Prod)"
         type: boolean
         default: true
       auto_promote_prod:
-        description: 'Automatically promote to Prod after QA success (requires ServiceNow approval)'
+        description: 'Auto promote to Prod after QA (requires ServiceNow)'
         required: false
         type: boolean
         default: false
@@ -32,11 +32,53 @@ env:
 
 jobs:
   # ============================================================================
+  # STAGE 0: Update Dev Kustomization with Version
+  # ============================================================================
+
+  update-dev-version:
+    name: "📝 Update Dev Kustomization"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Update Kustomization Version
+        run: |
+          VERSION="${{ inputs.version }}"
+          KUSTOMIZE_FILE="kustomize/overlays/dev/kustomization.yaml"
+
+          echo "📝 Updating all images to version: $VERSION"
+
+          # Update all newTag values to the specified version
+          sed -i "s/newTag: .*/newTag: $VERSION/" "$KUSTOMIZE_FILE"
+
+          echo "✅ Updated $KUSTOMIZE_FILE with version $VERSION"
+          cat "$KUSTOMIZE_FILE"
+
+      - name: Commit Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "⚠️  No changes to commit"
+          else
+            git add kustomize/overlays/dev/kustomization.yaml
+            git commit -m "chore: Update dev to version ${{ inputs.version }} - Automated promotion pipeline"
+            git push
+            echo "✅ Committed version update"
+          fi
+
+  # ============================================================================
   # STAGE 1: Deploy to DEV
   # ============================================================================
 
   deploy-dev:
     name: "🔵 Deploy to DEV"
+    needs: update-dev-version
     uses: ./.github/workflows/deploy-environment.yaml
     with:
       environment: dev
@@ -70,9 +112,6 @@ jobs:
       needs.deploy-dev.result == 'success' &&
       inputs.auto_promote_qa == false
     runs-on: ubuntu-latest
-    environment:
-      name: qa-approval
-      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
       - name: Wait for Manual Approval
@@ -84,6 +123,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version**: ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Next Environment**: QA" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Re-run this workflow with auto_promote_qa=true to proceed." >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
   # STAGE 3: Promote to PROD (requires ServiceNow approval)
@@ -94,7 +135,8 @@ jobs:
     needs: [deploy-dev, promote-to-qa]
     if: |
       always() &&
-      (needs.promote-to-qa.result == 'success' || needs.promote-to-qa.result == 'skipped') &&
+      (needs.promote-to-qa.result == 'success' ||
+       needs.promote-to-qa.result == 'skipped') &&
       inputs.auto_promote_prod == true
     uses: ./.github/workflows/promote-environments.yaml
     with:
@@ -108,12 +150,10 @@ jobs:
     needs: [deploy-dev, promote-to-qa]
     if: |
       always() &&
-      (needs.promote-to-qa.result == 'success' || needs.promote-to-qa.result == 'skipped') &&
+      (needs.promote-to-qa.result == 'success' ||
+       needs.promote-to-qa.result == 'skipped') &&
       inputs.auto_promote_prod == false
     runs-on: ubuntu-latest
-    environment:
-      name: prod-approval
-      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
       - name: Wait for Manual Approval
@@ -125,6 +165,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version**: ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Next Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Re-run with auto_promote_prod=true to proceed." >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
   # FINAL: Summary
@@ -148,14 +190,21 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | Status | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|-------------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔵 DEV | Deployed | \`${{ needs.deploy-dev.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🟡 QA | ${{ inputs.auto_promote_qa && 'Auto-Promoted' || 'Manual Approval' }} | \`${{ needs.promote-to-qa.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔴 PROD | ${{ inputs.auto_promote_prod && 'Auto-Promoted' || 'Manual Approval' }} | \`${{ needs.promote-to-prod.result }}\` |" >> $GITHUB_STEP_SUMMARY
+
+          DEV_RESULT="${{ needs.deploy-dev.result }}"
+          QA_STATUS="${{ inputs.auto_promote_qa && 'Auto' || 'Manual' }}"
+          QA_RESULT="${{ needs.promote-to-qa.result }}"
+          PROD_STATUS="${{ inputs.auto_promote_prod && 'Auto' || 'Manual' }}"
+          PROD_RESULT="${{ needs.promote-to-prod.result }}"
+
+          echo "| 🔵 DEV | Deployed | \`$DEV_RESULT\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 QA | $QA_STATUS | \`$QA_RESULT\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 PROD | $PROD_STATUS | \`$PROD_RESULT\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Overall status
-          if [[ "${{ needs.deploy-dev.result }}" == "success" ]]; then
-            echo "✅ **Overall Status**: Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
+          if [[ "$DEV_RESULT" == "success" ]]; then
+            echo "✅ **Overall**: Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ **Overall Status**: Pipeline encountered issues" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Overall**: Pipeline encountered issues" >> $GITHUB_STEP_SUMMARY
           fi
