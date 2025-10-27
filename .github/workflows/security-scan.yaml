@@ -382,7 +382,14 @@ jobs:
 
       - name: Run Kubesec
         run: |
-          docker run --rm -v $(pwd):/project kubesec/kubesec:v2 scan /project/kubernetes-manifests/*.yaml > kubesec-results.json
+          # Scan each YAML file individually and combine results
+          echo "[]" > kubesec-results.json
+          for file in kubernetes-manifests/*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Scanning $file..."
+              docker run --rm -v $(pwd):/project kubesec/kubesec:v2 scan "/project/$file" >> kubesec-results.json || true
+            fi
+          done
         continue-on-error: true
 
       - name: Install Polaris CLI
