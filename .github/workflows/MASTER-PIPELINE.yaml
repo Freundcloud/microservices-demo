@@ -541,7 +541,7 @@ jobs:
           auto-commit: true
           auto-validate: true
           auto-publish: true
-          config-file-path: 'kustomize/overlays/${{ needs.pipeline-init.outputs.environment }}/*.yaml'
+          config-file-path: 'kustomize/overlays/${{ needs.pipeline-init.outputs.environment }}/kustomization.yaml'
           data-format: 'yaml'
           snapshot-validation-timeout: 30
           terminate-on-policy-validation-failures: false
