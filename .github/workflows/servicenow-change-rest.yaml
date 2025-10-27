@@ -38,6 +38,32 @@ on:
         required: false
         type: string
         default: 'DevOps Engineering'
+      # Additional deployment context
+      services_deployed:
+        description: 'JSON array of services being deployed'
+        required: false
+        type: string
+        default: '[]'
+      infrastructure_changes:
+        description: 'Whether infrastructure changes are included'
+        required: false
+        type: string
+        default: 'false'
+      security_scanners:
+        description: 'List of security scanners that ran'
+        required: false
+        type: string
+        default: ''
+      pr_number:
+        description: 'Pull request number if triggered by PR'
+        required: false
+        type: string
+        default: ''
+      previous_version:
+        description: 'Previous version being replaced'
+        required: false
+        type: string
+        default: ''
     outputs:
       change_number:
         description: "ServiceNow Change Request Number"
@@ -104,6 +130,32 @@ jobs:
             PROD_SYSTEM="false"
           fi
 
+          # Extract branch name from ref
+          BRANCH_NAME="${{ github.ref }}"
+          BRANCH_NAME="${BRANCH_NAME#refs/heads/}"
+          BRANCH_NAME="${BRANCH_NAME#refs/tags/}"
+
+          # Determine PR number
+          PR_NUM="${{ inputs.pr_number }}"
+          if [ -z "$PR_NUM" ] && [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUM="${{ github.event.pull_request.number }}"
+          fi
+
+          # Build security scanners list
+          SCANNERS="${{ inputs.security_scanners }}"
+          if [ -z "$SCANNERS" ]; then
+            SCANNERS="CodeQL, Trivy, Semgrep, OWASP Dependency Check, Gitleaks, Checkov, Kubesec"
+          fi
+
+          # Determine service name based on environment
+          if [ "$ENVIRONMENT" = "dev" ]; then
+            SERVICE_NAME="Online Boutique (DEV)"
+          elif [ "$ENVIRONMENT" = "qa" ]; then
+            SERVICE_NAME="Online Boutique (QA)"
+          else
+            SERVICE_NAME="Online Boutique (PROD)"
+          fi
+
           # Build the JSON payload using jq
           PAYLOAD=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
@@ -124,6 +176,7 @@ jobs:
             --argjson cab_required "$CAB_REQUIRED" \
             --argjson prod_system "$PROD_SYSTEM" \
             --arg outside_maint "false" \
+            --arg business_service "$SERVICE_NAME" \
             --arg u_source "GitHub Actions" \
             --arg u_env "$ENVIRONMENT" \
             --arg u_type "$CHANGE_TYPE" \
@@ -133,6 +186,13 @@ jobs:
             --arg u_actor "${{ github.actor }}" \
             --arg u_ref "${{ github.ref }}" \
             --arg u_sha "${{ github.sha }}" \
+            --arg u_branch "$BRANCH_NAME" \
+            --arg u_pr_number "$PR_NUM" \
+            --arg u_services_deployed "${{ inputs.services_deployed }}" \
+            --arg u_infrastructure_changes "${{ inputs.infrastructure_changes }}" \
+            --arg u_security_scanners "$SCANNERS" \
+            --arg u_previous_version "${{ inputs.previous_version }}" \
+            --arg u_commit_message "${{ github.event.head_commit.message }}" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -152,6 +212,7 @@ jobs:
               cab_required: $cab_required,
               production_system: $prod_system,
               outside_maintenance_schedule: $outside_maint,
+              business_service: $business_service,
               u_source: $u_source,
               u_environment: $u_env,
               u_change_type: $u_type,
@@ -160,7 +221,14 @@ jobs:
               u_github_run_id: $u_run_id,
               u_github_actor: $u_actor,
               u_github_ref: $u_ref,
-              u_github_sha: $u_sha
+              u_github_sha: $u_sha,
+              u_github_branch: $u_branch,
+              u_github_pr_number: $u_pr_number,
+              u_services_deployed: $u_services_deployed,
+              u_infrastructure_changes: $u_infrastructure_changes,
+              u_security_scanners: $u_security_scanners,
+              u_previous_version: $u_previous_version,
+              u_commit_message: $u_commit_message
             }'
           )
 

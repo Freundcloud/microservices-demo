@@ -386,7 +386,7 @@ jobs:
 
   servicenow-change:
     name: "📝 ServiceNow Change Request"
-    needs: [pipeline-init, register-packages]
+    needs: [pipeline-init, register-packages, detect-service-changes, detect-terraform-changes, security-scans]
     if: |
       always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
@@ -425,6 +425,12 @@ jobs:
         3. Verify service endpoints responding
         4. Test frontend URL accessibility
         5. Monitor application metrics and logs
+      # Additional context fields for ServiceNow traceability
+      services_deployed: ${{ needs.detect-service-changes.outputs.services_changed }}
+      infrastructure_changes: ${{ needs.detect-terraform-changes.outputs.terraform_changed }}
+      security_scanners: 'CodeQL, Trivy, Semgrep, OWASP Dependency Check, Gitleaks, Checkov, Kubesec'
+      pr_number: ${{ github.event.pull_request.number || '' }}
+      previous_version: '${{ needs.pipeline-init.outputs.environment }}'
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
