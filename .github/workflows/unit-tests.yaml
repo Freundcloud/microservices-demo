@@ -81,7 +81,7 @@ jobs:
           path: src/${{ matrix.service }}/coverage.out
           retention-days: 30
 
-  # Python services testing (email, recommendation)
+  # Python services testing (email, recommendation, shopping assistant)
   test-python-services:
     name: Test Python Services
     runs-on: ubuntu-latest
@@ -91,6 +91,7 @@ jobs:
         service:
           - emailservice
           - recommendationservice
+          - shoppingassistantservice
 
     steps:
       - name: Checkout Code
@@ -149,7 +150,7 @@ jobs:
           retention-days: 30
         continue-on-error: true
 
-  # Java services testing (adservice, shoppingassistant)
+  # Java services testing (adservice only)
   test-java-services:
     name: Test Java Services
     runs-on: ubuntu-latest
@@ -158,7 +159,6 @@ jobs:
       matrix:
         service:
           - adservice
-          - shoppingassistantservice
 
     steps:
       - name: Checkout Code
