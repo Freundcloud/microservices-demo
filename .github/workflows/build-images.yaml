@@ -289,19 +289,24 @@ jobs:
         run: |
           SERVICE_DIR="src/${{ matrix.service }}"
           TEST_FILE=""
+          IS_DIRECTORY="false"
 
           if [ -f "$SERVICE_DIR/test-results.xml" ]; then
             TEST_FILE="$SERVICE_DIR/test-results.xml"
+            IS_DIRECTORY="false"
           elif [ -d "$SERVICE_DIR/test-results" ]; then
             TEST_FILE="$SERVICE_DIR/test-results"
+            IS_DIRECTORY="true"
           elif [ -d "$SERVICE_DIR/build/test-results/test" ]; then
             TEST_FILE="$SERVICE_DIR/build/test-results/test"
+            IS_DIRECTORY="true"
           fi
 
           if [ -n "$TEST_FILE" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
             echo "path=$TEST_FILE" >> $GITHUB_OUTPUT
-            echo "✅ Test results: $TEST_FILE"
+            echo "is_directory=$IS_DIRECTORY" >> $GITHUB_OUTPUT
+            echo "✅ Test results: $TEST_FILE (directory: $IS_DIRECTORY)"
           else
             echo "found=false" >> $GITHUB_OUTPUT
             echo "⚠️ No test results found"
@@ -325,7 +330,8 @@ jobs:
         if: always() && steps.find-test-results.outputs.found == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          files: ${{ steps.find-test-results.outputs.path }}/**/*.xml
+          # If path is a directory, use /**/*.xml pattern; if file, use path as-is
+          files: ${{ steps.find-test-results.outputs.is_directory == 'true' && format('{0}/**/*.xml', steps.find-test-results.outputs.path) || steps.find-test-results.outputs.path }}
           check_name: "${{ matrix.service }} Tests"
         continue-on-error: true
 
