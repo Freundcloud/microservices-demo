@@ -59,21 +59,15 @@ jobs:
       - name: Determine Release Tag
         id: release
         run: |
-          # For dev, stick to 'dev' tag; for qa/prod, read desired tag from kustomize overlay
-          if [ "${{ inputs.environment }}" = "dev" ]; then
-            echo "tag=dev" >> $GITHUB_OUTPUT
+          # Use semantic version if provided, otherwise use environment tag
+          if [ -n "${{ inputs.version }}" ]; then
+            # Semantic version provided - use it with v prefix
+            echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
+            echo "Using semantic version: v${{ inputs.version }}"
           else
-            FILE="kustomize/overlays/${{ inputs.environment }}/kustomization.yaml"
-            if [ ! -f "$FILE" ]; then
-              echo "Overlay file not found: $FILE" >&2
-              exit 1
-            fi
-            TAG=$(awk '/newTag:/ {print $2; exit}' "$FILE")
-            if [ -z "$TAG" ]; then
-              echo "Failed to determine release tag from $FILE" >&2
-              exit 1
-            fi
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            # No semantic version - use environment tag
+            echo "tag=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "Using environment tag: ${{ inputs.environment }}"
           fi
 
       - name: Check Changed Files
@@ -337,21 +331,15 @@ jobs:
       - name: Determine Release Tag
         id: release
         run: |
-          # For dev, stick to 'dev' tag; for qa/prod, read desired tag from kustomize overlay
-          if [ "${{ inputs.environment }}" = "dev" ]; then
-            echo "tag=dev" >> $GITHUB_OUTPUT
+          # Use semantic version if provided, otherwise use environment tag
+          if [ -n "${{ inputs.version }}" ]; then
+            # Semantic version provided - use it with v prefix
+            echo "tag=v${{ inputs.version }}" >> $GITHUB_OUTPUT
+            echo "Using semantic version: v${{ inputs.version }}"
           else
-            FILE="kustomize/overlays/${{ inputs.environment }}/kustomization.yaml"
-            if [ ! -f "$FILE" ]; then
-              echo "Overlay file not found: $FILE" >&2
-              exit 1
-            fi
-            TAG=$(awk '/newTag:/ {print $2; exit}' "$FILE")
-            if [ -z "$TAG" ]; then
-              echo "Failed to determine release tag from $FILE" >&2
-              exit 1
-            fi
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            # No semantic version - use environment tag
+            echo "tag=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "Using environment tag: ${{ inputs.environment }}"
           fi
 
       - name: Set up Docker Buildx

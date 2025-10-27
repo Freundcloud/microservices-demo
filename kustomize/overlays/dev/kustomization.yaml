@@ -34,7 +34,7 @@ commonAnnotations:
   environment: development
 
 # Image tag suffix for dev environment - using ECR
-# Using 'dev' tag for all services
+# Using semantic version for all services
 images:
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/frontend
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend
