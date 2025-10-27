@@ -4,8 +4,6 @@
 
 **New to this project?** Start with **[DEMO-OVERVIEW.md](../DEMO-OVERVIEW.md)** to understand what this demo does.
 
-**✨ Latest Updates**: See **[WHATS-NEW.md](WHATS-NEW.md)** for ServiceNow DevOps integration, dependency scanning, and enhanced security features.
-
 ## Quick Start Guides
 
 ### For Developers
@@ -19,13 +17,6 @@
 - **[AWS Setup](setup/AWS-SETUP.md)** - AWS account and credentials
 - **[GitHub Actions Setup](setup/GITHUB-ACTIONS-SETUP.md)** - CI/CD configuration
 - **[Security Scanning](setup/SECURITY-SCANNING.md)** - Configure security tools
-
-### For ServiceNow Integration
-- **[ServiceNow Integration](servicenow-integration/SERVICENOW-INTEGRATION.md)** - Complete guide
-  - Service account setup (5 min)
-  - GitHub secrets configuration (2 min)
-  - CMDB table creation (10 min)
-  - Testing the integration (5 min)
 
 ## Documentation by Category
 
@@ -87,27 +78,7 @@
 
 - **[Security Evidence](SECURITY-EVIDENCE-GUIDE.md)** - Evidence generation for compliance
   - SARIF format exports
-  - ServiceNow attachment
   - Compliance reporting
-
-### 🏢 ServiceNow Integration
-
-**Change Management & CMDB**:
-- **[ServiceNow Integration Guide](servicenow-integration/SERVICENOW-INTEGRATION.md)** ⭐ **START HERE**
-  - Quick setup (15 minutes)
-  - Two integration approaches (Table API vs DevOps Change)
-  - Available workflows
-  - Environment-specific approvals
-  - CMDB automation
-  - Testing and troubleshooting
-
-**Additional ServiceNow Docs**:
-- **[Quick Start](SERVICENOW-QUICK-START.md)** - 5-minute minimal setup
-- **[Application Setup](SERVICENOW-APPLICATION-SETUP.md)** - Register "Online Boutique" app
-- **[DevOps Change Velocity](SERVICENOW-DEVOPS-CHANGE-VELOCITY.md)** - Modern change management
-- **[GitHub Spoke Configuration](SERVICENOW-GITHUB-SPOKE-CONFIGURATION.md)** - IntegrationHub Spoke setup ⭐ **NEW**
-- **[Best Practices](GITHUB-SERVICENOW-BEST-PRACTICES.md)** - Integration patterns
-- **[Developer Onboarding](GITHUB-SERVICENOW-DEVELOPER-ONBOARDING.md)** - Team setup
 
 ### 📊 Operations
 
@@ -147,7 +118,6 @@
 ### CI/CD
 - **Platform**: GitHub Actions
 - **Security**: CodeQL, Trivy, Gitleaks, Semgrep, Checkov, tfsec
-- **Change Management**: ServiceNow DevOps Change Velocity
 
 ## Project Structure
 
@@ -199,12 +169,6 @@ just istio-grafana             # Metrics dashboards
 just cluster-status            # Complete overview
 ```
 
-### ServiceNow
-```bash
-gh workflow run deploy-with-servicenow-basic.yaml -f environment=dev
-gh workflow run aws-infrastructure-discovery.yaml
-```
-
 **Full command reference**: Run `just` to see all commands
 
 ## Troubleshooting
@@ -234,7 +198,6 @@ just tf-test                   # Run tests
 
 - **[AWS Deployment Guide - Troubleshooting](README-AWS.md#troubleshooting)**
 - **[Istio Troubleshooting](architecture/ISTIO-DEPLOYMENT.md#troubleshooting)**
-- **[ServiceNow Integration Issues](servicenow-integration/SERVICENOW-INTEGRATION.md#common-issues)**
 
 ## Getting Help
 
@@ -270,5 +233,4 @@ Apache License 2.0 - Based on [GoogleCloudPlatform/microservices-demo](https://g
 **Quick Links**:
 - **[Project Overview](../DEMO-OVERVIEW.md)** - Understand the demo
 - **[Onboarding](ONBOARDING.md)** - Get started in 30 minutes
-- **[ServiceNow Integration](servicenow-integration/SERVICENOW-INTEGRATION.md)** - Change management setup
 - **[Cost Optimization](../COST-OPTIMIZATION.md)** - Scaling options
