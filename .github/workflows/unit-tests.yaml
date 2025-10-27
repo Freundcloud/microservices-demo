@@ -288,8 +288,21 @@ jobs:
             npx mocha test/placeholder.test.js --reporter mocha-junit-reporter --reporter-options mochaFile=test-results.xml || true
           fi
 
-      - name: ServiceNow DevOps Unit Test Results
+      - name: Check Test Results Exist
         if: always()
+        id: check-test-results
+        working-directory: src/${{ matrix.service }}
+        run: |
+          if [ -f "test-results.xml" ]; then
+            echo "test_results_exist=true" >> $GITHUB_OUTPUT
+            echo "✅ Test results file found: test-results.xml"
+          else
+            echo "test_results_exist=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No test results file found - service may not have tests configured"
+          fi
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always() && steps.check-test-results.outputs.test_results_exist == 'true'
         uses: ServiceNow/servicenow-devops-test-report@v6.0.0
         with:
           devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
@@ -356,8 +369,21 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: ServiceNow DevOps Unit Test Results
+      - name: Check Test Results Exist
         if: always()
+        id: check-test-results
+        working-directory: src/cartservice/src
+        run: |
+          if [ -f "TestResults/test-results.trx" ]; then
+            echo "test_results_exist=true" >> $GITHUB_OUTPUT
+            echo "✅ Test results file found: TestResults/test-results.trx"
+          else
+            echo "test_results_exist=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No test results file found - service may not have tests configured"
+          fi
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always() && steps.check-test-results.outputs.test_results_exist == 'true'
         uses: ServiceNow/servicenow-devops-test-report@v6.0.0
         with:
           devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
