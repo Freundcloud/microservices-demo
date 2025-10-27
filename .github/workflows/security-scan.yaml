@@ -46,9 +46,10 @@ jobs:
         if: matrix.language == 'java'
         run: |
           # Build adservice (Java with Gradle)
+          # Skip tests and format verification for CodeQL analysis
           cd src/adservice
           chmod +x gradlew
-          ./gradlew build -x test --no-daemon
+          ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon
         continue-on-error: true
 
       - name: Perform CodeQL Analysis
