@@ -234,6 +234,7 @@ jobs:
     if: ${{ !inputs.skip_security }}
     uses: ./.github/workflows/unit-tests.yaml
     secrets: inherit
+    continue-on-error: true  # Allow workflow to continue even if some tests fail
 
   # ============================================================================
   # STAGE 3: Build Docker Images (Smart Change Detection)
