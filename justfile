@@ -1250,6 +1250,184 @@ bump-patch:
     echo "✅ Version bumped to $NEW_VERSION"
 
 # ==============================================================================
+# Automated Promotion Pipeline Commands
+# ==============================================================================
+
+# Promote version through all environments (dev → qa → prod) with auto-merge
+promote-all VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🚀 Starting Full Promotion Pipeline"
+    echo "=================================="
+    echo "Version: {{VERSION}}"
+    echo ""
+    echo "This will:"
+    echo "  1. Create version bump PR (auto-merges when checks pass)"
+    echo "  2. Deploy to DEV"
+    echo "  3. Auto-promote to QA (after dev success)"
+    echo "  4. Wait for manual approval for PROD"
+    echo "  5. Deploy to PROD (requires ServiceNow approval)"
+    echo "  6. Create release tag v{{VERSION}}"
+    echo ""
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Aborted"
+        exit 1
+    fi
+
+    # Trigger full promotion pipeline
+    gh workflow run full-promotion-pipeline.yaml \
+        -f version={{VERSION}} \
+        -f auto_promote_qa=true \
+        -f auto_promote_prod=false
+
+    echo ""
+    echo "✅ Full promotion pipeline started!"
+    echo ""
+    echo "Track progress:"
+    echo "  gh run list --workflow='Full Promotion Pipeline'"
+    echo "  gh run watch"
+    echo ""
+    echo "View in browser:"
+    gh run list --workflow="Full Promotion Pipeline" --limit 1 --json url --jq '.[0].url' | \
+        xargs -I {} echo "  {}"
+
+# Promote version with full automation (including prod - use with caution!)
+promote-all-auto VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "⚠️  FULL AUTO-PROMOTION TO PRODUCTION"
+    echo "===================================="
+    echo "Version: {{VERSION}}"
+    echo ""
+    echo "⚠️  WARNING: This will automatically promote to PRODUCTION"
+    echo "  without manual approval gates!"
+    echo ""
+    echo "This will:"
+    echo "  1. Create version bump PR (auto-merges)"
+    echo "  2. Deploy to DEV"
+    echo "  3. Auto-promote to QA"
+    echo "  4. Auto-promote to PROD (still requires ServiceNow approval)"
+    echo "  5. Create release tag v{{VERSION}}"
+    echo ""
+    read -p "Are you SURE you want to auto-promote to PROD? (yes/NO): " -r
+    if [[ ! $REPLY =~ ^yes$ ]]; then
+        echo "❌ Aborted (must type 'yes' to confirm)"
+        exit 1
+    fi
+
+    gh workflow run full-promotion-pipeline.yaml \
+        -f version={{VERSION}} \
+        -f auto_promote_qa=true \
+        -f auto_promote_prod=true
+
+    echo ""
+    echo "✅ Full auto-promotion pipeline started!"
+    echo "⚠️  Monitor closely - PROD deployment will proceed automatically"
+    echo ""
+    gh run watch
+
+# Promote from dev to qa only
+promote-to-qa VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🟡 Promoting {{VERSION}} to QA"
+    echo ""
+
+    # Verify version exists in dev
+    if ! grep -q "newTag: {{VERSION}}" kustomize/overlays/dev/kustomization.yaml; then
+        echo "❌ Version {{VERSION}} not deployed in dev"
+        echo "   Deploy to dev first: just demo-run dev {{VERSION}}"
+        exit 1
+    fi
+
+    gh workflow run promote-environments.yaml \
+        -f target_environment=qa \
+        -f source_version={{VERSION}}
+
+    echo "✅ QA promotion started"
+    gh run watch
+
+# Promote from qa to prod (requires ServiceNow approval)
+promote-to-prod VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🔴 Promoting {{VERSION}} to PRODUCTION"
+    echo ""
+
+    # Verify version exists in qa
+    if ! grep -q "newTag: {{VERSION}}" kustomize/overlays/qa/kustomization.yaml; then
+        echo "❌ Version {{VERSION}} not deployed in qa"
+        echo "   Promote to qa first: just promote-to-qa {{VERSION}}"
+        exit 1
+    fi
+
+    echo "⚠️  This will create a ServiceNow Change Request for production"
+    echo "   Manual approval required in ServiceNow before deployment proceeds"
+    echo ""
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Aborted"
+        exit 1
+    fi
+
+    gh workflow run promote-environments.yaml \
+        -f target_environment=prod \
+        -f source_version={{VERSION}}
+
+    echo ""
+    echo "✅ PROD promotion started"
+    echo "⏸️  Waiting for ServiceNow approval..."
+    echo ""
+    echo "Approve in ServiceNow:"
+    echo "  https://your-instance.service-now.com"
+    echo ""
+    gh run watch
+
+# Check promotion status across all environments
+promotion-status VERSION:
+    #!/usr/bin/env bash
+    echo "📊 Promotion Status for Version {{VERSION}}"
+    echo "=========================================="
+    echo ""
+
+    # Check dev
+    if grep -q "newTag: {{VERSION}}" kustomize/overlays/dev/kustomization.yaml 2>/dev/null; then
+        echo "🔵 DEV:  ✅ Deployed"
+    else
+        echo "🔵 DEV:  ❌ Not deployed"
+    fi
+
+    # Check qa
+    if grep -q "newTag: {{VERSION}}" kustomize/overlays/qa/kustomization.yaml 2>/dev/null; then
+        echo "🟡 QA:   ✅ Deployed"
+    else
+        echo "🟡 QA:   ❌ Not deployed"
+    fi
+
+    # Check prod
+    if grep -q "newTag: {{VERSION}}" kustomize/overlays/prod/kustomization.yaml 2>/dev/null; then
+        echo "🔴 PROD: ✅ Deployed"
+    else
+        echo "🔴 PROD: ❌ Not deployed"
+    fi
+
+    echo ""
+
+    # Check for git tag
+    if git rev-parse "v{{VERSION}}" >/dev/null 2>&1; then
+        echo "🏷️  Git Tag: ✅ v{{VERSION}} exists"
+    else
+        echo "🏷️  Git Tag: ❌ v{{VERSION}} not created"
+    fi
+
+# ==============================================================================
 # Development Helpers
 # ==============================================================================
 
