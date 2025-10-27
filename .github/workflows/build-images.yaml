@@ -140,10 +140,21 @@ jobs:
             # Build specific services provided as JSON array
             # Validate it's valid JSON first
             if echo "$SERVICES_INPUT" | jq empty 2>/dev/null; then
-              echo "matrix=$SERVICES_INPUT" >> $GITHUB_OUTPUT
-              echo 'has_services=true' >> $GITHUB_OUTPUT
+              # Check if it's an empty array - if so, build all services
+              SERVICE_COUNT=$(echo "$SERVICES_INPUT" | jq 'length')
+              echo "DEBUG: SERVICE_COUNT=$SERVICE_COUNT"
+
+              if [ "$SERVICE_COUNT" -eq 0 ]; then
+                echo "⚠️ Received empty services array, building all services instead"
+                echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
+                echo 'has_services=true' >> $GITHUB_OUTPUT
+              else
+                echo "matrix=$SERVICES_INPUT" >> $GITHUB_OUTPUT
+                echo 'has_services=true' >> $GITHUB_OUTPUT
+                echo "📦 Building specific services: $SERVICES_INPUT"
+              fi
             else
-              echo "Error: Invalid JSON in services input"
+              echo "Error: Invalid JSON in services input: $SERVICES_INPUT"
               exit 1
             fi
           fi
