@@ -43,6 +43,7 @@ permissions:
   pull-requests: write
   id-token: write
   actions: read
+  checks: write  # Required for unit-tests.yaml to publish test results
 
 env:
   AWS_REGION: eu-west-2
