@@ -97,23 +97,23 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create Change Request (${{ inputs.environment }})'
-          change-request: |
+          change-request: >-
             {
               "setCloseCode": "true",
               "autoCloseChange": true,
               "attributes": {
-                "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-                "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}",
-                "assignment_group": "${{ inputs.assignment_group }}",
-                "implementation_plan": "${{ inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health' }}",
-                "backout_plan": "${{ inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability' }}",
-                "test_plan": "${{ inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics' }}",
+                "short_description": ${{ toJSON(format('{0} [{1}]', inputs.short_description, inputs.environment)) }},
+                "description": ${{ toJSON(inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment)) }},
+                "assignment_group": ${{ toJSON(inputs.assignment_group) }},
+                "implementation_plan": ${{ toJSON(inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health') }},
+                "backout_plan": ${{ toJSON(inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability') }},
+                "test_plan": ${{ toJSON(inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics') }},
                 "type": "standard",
                 "state": "implement",
                 "priority": "3",
                 "u_source": "GitHub Actions",
-                "u_environment": "${{ inputs.environment }}",
-                "u_change_type": "${{ inputs.change_type }}"
+                "u_environment": ${{ toJSON(inputs.environment) }},
+                "u_change_type": ${{ toJSON(inputs.change_type) }}
               }
             }
           interval: '30'
@@ -136,23 +136,23 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create Change Request (${{ inputs.environment }})'
-          change-request: |
+          change-request: >-
             {
               "setCloseCode": "true",
               "autoCloseChange": true,
               "attributes": {
-                "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-                "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}",
-                "assignment_group": "${{ inputs.assignment_group }}",
-                "implementation_plan": "${{ inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health' }}",
-                "backout_plan": "${{ inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability' }}",
-                "test_plan": "${{ inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics' }}",
+                "short_description": ${{ toJSON(format('{0} [{1}]', inputs.short_description, inputs.environment)) }},
+                "description": ${{ toJSON(inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment)) }},
+                "assignment_group": ${{ toJSON(inputs.assignment_group) }},
+                "implementation_plan": ${{ toJSON(inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health') }},
+                "backout_plan": ${{ toJSON(inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability') }},
+                "test_plan": ${{ toJSON(inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics') }},
                 "type": "standard",
                 "state": "assess",
-                "priority": "${{ inputs.environment == 'prod' && '2' || '3' }}",
+                "priority": ${{ toJSON(inputs.environment == 'prod' && '2' || '3') }},
                 "u_source": "GitHub Actions",
-                "u_environment": "${{ inputs.environment }}",
-                "u_change_type": "${{ inputs.change_type }}"
+                "u_environment": ${{ toJSON(inputs.environment) }},
+                "u_change_type": ${{ toJSON(inputs.change_type) }}
               }
             }
           interval: '100'
