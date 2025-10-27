@@ -302,7 +302,28 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Download Test Result Artifacts
+        id: download-tests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: test-results
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Check for Test Results
+        id: check-tests
+        run: |
+          if [ -d "test-results" ] && [ "$(find test-results -name '*.xml' | wc -l)" -gt 0 ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "Found $(find test-results -name '*.xml' | wc -l') test result files"
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "No test result files found"
+          fi
+
       - name: Upload Test Results
+        if: steps.check-tests.outputs.found == 'true'
         uses: ServiceNow/servicenow-devops-test-report@v2.0.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
@@ -311,14 +332,19 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Build and Test - ${{ needs.pipeline-init.outputs.environment }}'
-          xml-report-filename: '**/test-results/*.xml'
+          xml-report-filename: 'test-results/**/*.xml'
+        continue-on-error: true
 
       - name: Test Upload Summary
         if: always()
         run: |
-          echo "## 📊 Test Results Uploaded" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Test Results Upload" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Test results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check-tests.outputs.found }}" == "true" ]; then
+            echo "✅ Test results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No test results to upload (tests run during build jobs)" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "Environment: **${{ needs.pipeline-init.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
 
   register-packages:
