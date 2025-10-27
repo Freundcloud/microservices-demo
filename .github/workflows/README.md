@@ -114,6 +114,12 @@ Environment-specific deployment using Kustomize with ServiceNow Change Managemen
   - Test plan (verification steps)
   - Complete metadata (commit, branch, actor, etc.)
   - Links to test results and packages
+  - **Linked work items** (GitHub issues extracted from commits)
+- **Work Item Linking**:
+  - Automatically extracts GitHub issue numbers from commit messages
+  - Supports: `Fixes #123`, `Closes #456`, `Resolves #789`, `#123`
+  - Links change request to work items in ServiceNow
+  - Provides full traceability: Issue → Commit → CR → Deployment
 - **Polling**: Checks approval status every 30 seconds
 - **Timeout**: 30 minutes for approval (configurable)
 - **Change Creation**: 10 minutes timeout for CR creation
@@ -432,6 +438,180 @@ When manually triggering the Master Pipeline:
 │  - Display success/failure for all stages               │
 └─────────────────────────────────────────────────────────┘
 ```
+
+## Work Item → Change Request Workflow Example
+
+### Complete End-to-End Flow:
+
+```
+Step 1: Create GitHub Issue
+┌─────────────────────────────────────────────┐
+│ Create issue: "Add user authentication"    │
+│ Issue number: #123                          │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 2: Create Feature Branch
+┌─────────────────────────────────────────────┐
+│ git checkout -b feature/user-auth-123       │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 3: Make Changes and Commit
+┌─────────────────────────────────────────────┐
+│ git commit -m "feat: Add user auth          │
+│                                             │
+│ Implements authentication system            │
+│ Fixes #123"                                 │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 4: Create Pull Request
+┌─────────────────────────────────────────────┐
+│ PR title: "Add user authentication"        │
+│ PR description mentions: Closes #123        │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 5: Unit Tests Run → Upload to ServiceNow
+┌─────────────────────────────────────────────┐
+│ - All tests pass                            │
+│ - Test results uploaded to ServiceNow      │
+│ - Work item #123 registered in ServiceNow  │
+│ ✅ sn_devops_work_item table                │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 6: Merge Pull Request
+┌─────────────────────────────────────────────┐
+│ PR merged to main branch                    │
+│ Commit message includes: "Fixes #123"       │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 7: Build Images → Register Packages
+┌─────────────────────────────────────────────┐
+│ - Docker images built                       │
+│ - Packages registered in ServiceNow        │
+│ ✅ 12 packages in DevOps → Packages        │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 8: Deployment Triggered
+┌─────────────────────────────────────────────┐
+│ Deploy to dev environment                   │
+│ Workflow extracts work items from commits   │
+│ Found: #123                                 │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 9: Change Request Created
+┌─────────────────────────────────────────────┐
+│ ServiceNow Change Request:                  │
+│ - CHG0012345                                │
+│ - Description: "Linked Work Items: 123"     │
+│ - Work Notes: "Work items: 123"             │
+│ - Linked to test results ✅                 │
+│ - Linked to packages ✅                     │
+│ - Linked to work item #123 ✅              │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 10: Approval in ServiceNow
+┌─────────────────────────────────────────────┐
+│ Approver reviews:                           │
+│ - Issue #123 details                        │
+│ - Test results (all passing)                │
+│ - Package versions                          │
+│ - Implementation plan                       │
+│ Decision: ✅ APPROVED                       │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 11: Deployment Proceeds
+┌─────────────────────────────────────────────┐
+│ - Deployment completes                      │
+│ - CR status: "Implemented"                  │
+│ - Smoke tests run                           │
+│ - CR status: "Closed"                       │
+└─────────────────────────────────────────────┘
+                    │
+                    ▼
+Step 12: Complete Audit Trail
+┌─────────────────────────────────────────────┐
+│ ServiceNow shows complete traceability:     │
+│ Issue #123 → Commit abc123 →                │
+│ Change CHG0012345 → Deployment to dev       │
+│ ✅ Full compliance audit trail              │
+└─────────────────────────────────────────────┘
+```
+
+### Commit Message Patterns:
+
+The workflow extracts work items from these patterns:
+
+- `Fixes #123` - Closes the issue
+- `Closes #456` - Closes the issue
+- `Resolves #789` - Closes the issue
+- `#123` - References the issue (doesn't close)
+- Multiple issues: `Fixes #123, #456, closes #789`
+
+### Example Commit Messages:
+
+```bash
+# Good: Links to work item
+git commit -m "feat: Add user authentication
+
+Implements JWT-based authentication system
+with refresh tokens and role-based access.
+
+Fixes #123"
+
+# Good: Multiple work items
+git commit -m "fix: Resolve authentication bugs
+
+Fixed token expiration and refresh logic.
+
+Fixes #123, #124, closes #125"
+
+# Bad: No work item reference
+git commit -m "Add authentication"
+# Result: CR created without work item links
+```
+
+### ServiceNow Views:
+
+**In Change Request (CHG0012345)**:
+```
+Short Description: Deployment to dev environment
+Description:
+  Commit: abc123
+  Branch: main
+  Triggered by: john.doe
+  Linked Work Items: 123
+
+Work Notes:
+  Deployment triggered for work items: 123
+
+Related Work Items:
+  - WORK0000123: Add user authentication
+```
+
+**In Work Item (WORK0000123)**:
+```
+Title: Add user authentication
+Status: Closed
+Related Change Requests:
+  - CHG0012345: Deployment to dev environment (Closed)
+```
+
+### Benefits:
+
+✅ **Full Traceability**: Issue → Commit → CR → Deployment
+✅ **Automatic Linking**: No manual work required
+✅ **Compliance**: Complete audit trail for SOC 2, ISO 27001
+✅ **Visibility**: Approvers see why deployment is needed
+✅ **Context**: Change requests have business context from issues
 
 ## Related Documentation
 
