@@ -112,12 +112,14 @@ jobs:
             CHANGED=$(echo '${{ steps.filter.outputs.changes }}' | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
             # If no changes detected or workflow_dispatch, build all
-            if [ "$CHANGED" == "[]" ] || [ "$CHANGED" == '[""]' ]; then
+            if [ -z "$CHANGED" ] || [ "$CHANGED" == "[]" ] || [ "$CHANGED" == '[""]' ] || [ "$CHANGED" == "" ]; then
               echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
+              echo "🔨 Building all services (no changes detected or force build)"
             else
               echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
+              echo "📦 Building changed services: $CHANGED"
             fi
           elif [ "$SERVICES_INPUT" == "none" ]; then
             # Build nothing
