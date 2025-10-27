@@ -112,29 +112,16 @@ jobs:
         run: |
           SERVICES_INPUT='${{ inputs.services }}'
 
+          echo "========================================="
           echo "DEBUG: SERVICES_INPUT='$SERVICES_INPUT'"
+          echo "========================================="
 
           if [ "$SERVICES_INPUT" == "all" ]; then
-            # Build all services that changed
-            CHANGED=$(echo '${{ steps.filter.outputs.changes }}' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-
-            echo "DEBUG: CHANGED='$CHANGED'"
-            echo "DEBUG: Length: ${#CHANGED}"
-
-            # Use jq to check if it's an empty array - most reliable method
-            CHANGE_COUNT=$(echo "$CHANGED" | jq 'length' 2>/dev/null || echo "999")
-            echo "DEBUG: CHANGE_COUNT=$CHANGE_COUNT"
-
-            # If no changes detected or workflow_dispatch, build all
-            if [ "$CHANGE_COUNT" -eq 0 ] || [ -z "$CHANGED" ]; then
-              echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
-              echo 'has_services=true' >> $GITHUB_OUTPUT
-              echo "🔨 Building all services (no changes detected: count=$CHANGE_COUNT)"
-            else
-              echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
-              echo 'has_services=true' >> $GITHUB_OUTPUT
-              echo "📦 Building changed services (count=$CHANGE_COUNT): $CHANGED"
-            fi
+            # SIMPLIFIED: Always build all 12 services when "all" is specified
+            # No smart detection - just build everything
+            echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
+            echo 'has_services=true' >> $GITHUB_OUTPUT
+            echo "🔨 Building ALL 12 services (SERVICES_INPUT='all')"
           elif [ "$SERVICES_INPUT" == "none" ]; then
             # Build nothing
             echo 'matrix=[]' >> $GITHUB_OUTPUT
