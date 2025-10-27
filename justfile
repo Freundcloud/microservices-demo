@@ -1225,141 +1225,68 @@ bump-patch:
 # Automated Promotion Pipeline Commands
 # ==============================================================================
 
-# Promote version through all environments (dev → qa → prod) with auto-merge
+# ============================================================================
+# Automated Version Promotion
+# ============================================================================
+
+# Promote version through all environments (creates PR, auto-merges, deploys dev/qa/prod)
+promote VERSION SERVICES="all":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./scripts/promote-version.sh {{ VERSION }} {{ SERVICES }}
+
+# Promote all services (alias for promote VERSION all)
 promote-all VERSION:
+    just promote {{ VERSION }} all
+
+# Promote specific service only
+promote-service SERVICE VERSION:
+    just promote {{ VERSION }} {{ SERVICE }}
+
+# ============================================================================
+# Manual Environment Deployments
+# ============================================================================
+
+# Deploy to DEV environment
+deploy-dev:
     #!/usr/bin/env bash
     set -euo pipefail
+    echo "🟢 Deploying to DEV environment"
+    gh workflow run MASTER-PIPELINE.yaml -f environment=dev
+    gh run watch
 
-    echo "🚀 Starting Full Promotion Pipeline"
-    echo "=================================="
-    echo "Version: {{VERSION}}"
-    echo ""
-    echo "This will:"
-    echo "  1. Create version bump PR (auto-merges when checks pass)"
-    echo "  2. Deploy to DEV"
-    echo "  3. Auto-promote to QA (after dev success)"
-    echo "  4. Wait for manual approval for PROD"
-    echo "  5. Deploy to PROD (requires ServiceNow approval)"
-    echo "  6. Create release tag v{{VERSION}}"
-    echo ""
-    read -p "Continue? (y/N): " -n 1 -r
+# Deploy to QA environment (requires ServiceNow approval)
+deploy-qa:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🟡 Deploying to QA environment"
+    echo "⚠️  Requires ServiceNow Change Request approval"
+    gh workflow run MASTER-PIPELINE.yaml -f environment=qa
+    gh run watch
+
+# Deploy to PROD environment (requires ServiceNow approval)
+deploy-prod:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🔴 Deploying to PROD environment"
+    read -p "⚠️  Deploy to PRODUCTION? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "❌ Aborted"
         exit 1
     fi
-
-    # Trigger full promotion pipeline
-    gh workflow run full-promotion-pipeline.yaml \
-        -f version={{VERSION}} \
-        -f auto_promote_qa=true \
-        -f auto_promote_prod=false
-
-    echo ""
-    echo "✅ Full promotion pipeline started!"
-    echo ""
-    echo "Track progress:"
-    echo "  gh run list --workflow=full-promotion-pipeline.yaml"
-    echo "  gh run watch"
-    echo ""
-    echo "View in browser:"
-    gh run list --workflow=full-promotion-pipeline.yaml --limit 1 --json url --jq '.[0].url' | \
-        xargs -I {} echo "  {}"
-
-# Promote version with full automation (including prod - use with caution!)
-promote-all-auto VERSION:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "⚠️  FULL AUTO-PROMOTION TO PRODUCTION"
-    echo "===================================="
-    echo "Version: {{VERSION}}"
-    echo ""
-    echo "⚠️  WARNING: This will automatically promote to PRODUCTION"
-    echo "  without manual approval gates!"
-    echo ""
-    echo "This will:"
-    echo "  1. Create version bump PR (auto-merges)"
-    echo "  2. Deploy to DEV"
-    echo "  3. Auto-promote to QA"
-    echo "  4. Auto-promote to PROD (still requires ServiceNow approval)"
-    echo "  5. Create release tag v{{VERSION}}"
-    echo ""
-    read -p "Are you SURE you want to auto-promote to PROD? (yes/NO): " -r
-    if [[ ! $REPLY =~ ^yes$ ]]; then
-        echo "❌ Aborted (must type 'yes' to confirm)"
-        exit 1
-    fi
-
-    gh workflow run full-promotion-pipeline.yaml \
-        -f version={{VERSION}} \
-        -f auto_promote_qa=true \
-        -f auto_promote_prod=true
-
-    echo ""
-    echo "✅ Full auto-promotion pipeline started!"
-    echo "⚠️  Monitor closely - PROD deployment will proceed automatically"
-    echo ""
+    echo "⚠️  Requires ServiceNow Change Request approval"
+    gh workflow run MASTER-PIPELINE.yaml -f environment=prod
     gh run watch
 
-# Promote from dev to qa only
-promote-to-qa VERSION:
+# Force rebuild all services for an environment
+rebuild-all ENV:
     #!/usr/bin/env bash
     set -euo pipefail
-
-    echo "🟡 Promoting {{VERSION}} to QA"
-    echo ""
-
-    # Verify version exists in dev
-    if ! grep -q "newTag: {{VERSION}}" kustomize/overlays/dev/kustomization.yaml; then
-        echo "❌ Version {{VERSION}} not deployed in dev"
-        echo "   Deploy to dev first: just demo-run dev {{VERSION}}"
-        exit 1
-    fi
-
-    gh workflow run promote-environments.yaml \
-        -f target_environment=qa \
-        -f source_version={{VERSION}}
-
-    echo "✅ QA promotion started"
-    gh run watch
-
-# Promote from qa to prod (requires ServiceNow approval)
-promote-to-prod VERSION:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    echo "🔴 Promoting {{VERSION}} to PRODUCTION"
-    echo ""
-
-    # Verify version exists in qa
-    if ! grep -q "newTag: {{VERSION}}" kustomize/overlays/qa/kustomization.yaml; then
-        echo "❌ Version {{VERSION}} not deployed in qa"
-        echo "   Promote to qa first: just promote-to-qa {{VERSION}}"
-        exit 1
-    fi
-
-    echo "⚠️  This will create a ServiceNow Change Request for production"
-    echo "   Manual approval required in ServiceNow before deployment proceeds"
-    echo ""
-    read -p "Continue? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "❌ Aborted"
-        exit 1
-    fi
-
-    gh workflow run promote-environments.yaml \
-        -f target_environment=prod \
-        -f source_version={{VERSION}}
-
-    echo ""
-    echo "✅ PROD promotion started"
-    echo "⏸️  Waiting for ServiceNow approval..."
-    echo ""
-    echo "Approve in ServiceNow:"
-    echo "  https://your-instance.service-now.com"
-    echo ""
+    echo "🔨 Force rebuilding all services for {{ ENV }}"
+    gh workflow run MASTER-PIPELINE.yaml \
+        -f environment={{ ENV }} \
+        -f force_build_all=true
     gh run watch
 
 # Check promotion status across all environments
