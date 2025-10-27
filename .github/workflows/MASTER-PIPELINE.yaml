@@ -537,7 +537,7 @@ jobs:
           application-name: 'microservices-demo'
           target: 'deployable'
           deployable-name: 'microservices-${{ needs.pipeline-init.outputs.environment }}'
-          name-path: 'deployment-${{ github.run_number }}'
+          name-path: 'kustomize/overlays/${{ needs.pipeline-init.outputs.environment }}/kustomization.yaml'
           auto-commit: true
           auto-validate: true
           auto-publish: true
