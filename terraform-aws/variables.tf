@@ -113,22 +113,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-
-# Istio Service Mesh Variables
-variable "enable_istio" {
-  description = "Enable Istio service mesh"
-  type        = bool
-  default     = true
-}
-
-variable "istio_version" {
-  description = "Istio version to install"
-  type        = string
-  default     = "1.20.0"
-}
-
-variable "enable_istio_addons" {
-  description = "Enable Istio observability addons (Kiali, Prometheus, Jaeger, Grafana) - DISABLED by default for cost savings (~2GB RAM)"
-  type        = bool
-  default     = false
-}

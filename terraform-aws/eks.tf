@@ -134,17 +134,16 @@ module "eks" {
     # 3 nodes total: One per environment (dev/qa/prod) for proper isolation
     # Cost: 3x t3.large = ~$183/month EC2 + ~$73/month EKS = ~$256/month total
     # This provides proper capacity for:
-    #   - Dev environment: 11 services × 1 replica = 11 pods (~2.5 GB with sidecars)
-    #   - QA environment: 11 services × 1 replica = 11 pods (~2.5 GB with sidecars)
-    #   - Prod environment: 11 services × 1 replica = 11 pods (~2.5 GB with sidecars)
+    #   - Dev environment: 11 services × 1 replica = 11 pods (~1.0 GB without sidecars)
+    #   - QA environment: 11 services × 1 replica = 11 pods (~1.0 GB without sidecars)
+    #   - Prod environment: 11 services × 1 replica = 11 pods (~1.0 GB without sidecars)
     #   - System pods distributed across nodes: ~2 GB total
-    #   - Istio: istiod + ingress gateway: ~1.5 GB
-    #   - Total per node: ~13 pods, ~4 GB RAM (comfortable capacity)
+    #   - Total per node: ~13 pods, ~2.5 GB RAM (comfortable capacity)
     #
     # Benefits:
     #   - Environment isolation (dev failures don't impact prod)
     #   - Room for rolling deployments (surge pods)
-    #   - Can enable Istio observability addons if needed
+    #   - Simplified native Kubernetes networking (no service mesh)
     #   - Proper multi-environment demo capability
     all = {
       name = "${var.cluster_name}-all"

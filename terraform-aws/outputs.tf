@@ -153,34 +153,3 @@ output "ecr_login_command" {
   description = "Command to login to ECR"
   value       = "aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 }
-
-# Istio Outputs
-output "istio_enabled" {
-  description = "Whether Istio is enabled"
-  value       = var.enable_istio
-}
-
-output "istio_version" {
-  description = "Istio version installed"
-  value       = var.enable_istio ? var.istio_version : null
-}
-
-output "istio_ingress_gateway_url" {
-  description = "Istio Ingress Gateway LoadBalancer URL"
-  value       = var.enable_istio ? "kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'" : null
-}
-
-output "kiali_dashboard_command" {
-  description = "Command to access Kiali dashboard"
-  value       = var.enable_istio && var.enable_istio_addons ? "kubectl port-forward svc/kiali-server -n istio-system 20001:20001" : null
-}
-
-output "grafana_dashboard_command" {
-  description = "Command to access Grafana dashboard"
-  value       = var.enable_istio && var.enable_istio_addons ? "kubectl port-forward svc/grafana -n istio-system 3000:80" : null
-}
-
-output "jaeger_dashboard_command" {
-  description = "Command to access Jaeger tracing UI"
-  value       = var.enable_istio && var.enable_istio_addons ? "kubectl port-forward svc/jaeger-query -n istio-system 16686:16686" : null
-}

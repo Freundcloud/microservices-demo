@@ -21,10 +21,8 @@ resources:
 - ../../base
 - namespace.yaml
 - resourcequota.yaml
-- gateway.yaml
 
 components:
-- ../../components/service-mesh-istio
 - ../../components/without-loadgenerator  # Disable load generator in dev
 
 commonLabels:

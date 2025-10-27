@@ -18,5 +18,4 @@ metadata:
   name: microservices-dev
   labels:
     environment: dev
-    istio-injection: enabled
     name: microservices-dev

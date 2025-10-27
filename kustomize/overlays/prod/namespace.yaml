@@ -18,5 +18,4 @@ metadata:
   name: microservices-prod
   labels:
     environment: prod
-    istio-injection: enabled
     name: microservices-prod

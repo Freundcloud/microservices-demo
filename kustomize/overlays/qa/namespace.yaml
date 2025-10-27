@@ -18,5 +18,4 @@ metadata:
   name: microservices-qa
   labels:
     environment: qa
-    istio-injection: enabled
     name: microservices-qa
