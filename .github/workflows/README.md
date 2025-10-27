@@ -1,65 +1,287 @@
 # GitHub Actions Workflows
 
-This page describes the CI/CD workflows for the Online Boutique app, which run in [Github Actions](https://github.com/GoogleCloudPlatform/microservices-demo/actions).
+This page describes the CI/CD workflows for the Online Boutique app on AWS EKS.
 
 ## Infrastructure
 
-The CI/CD pipelines for Online Boutique run in Github Actions, using a pool of two [self-hosted runners]((https://help.github.com/en/actions/automating-your-workflow-with-github-actions/about-self-hosted-runners)). These runners are GCE instances (virtual machines) that, for every open Pull Request in the repo, run the code test pipeline, deploy test pipeline, and (on main) deploy the latest version of the app to [cymbal-shops.retail.cymbal.dev](https://cymbal-shops.retail.cymbal.dev)
+The CI/CD pipelines run in GitHub Actions using GitHub-hosted runners. The workflows deploy to AWS EKS cluster with multi-environment support (dev/qa/prod) using Kustomize overlays and Istio service mesh.
 
-We also host a test GKE cluster, which is where the deploy tests run. Every PR has its own namespace in the cluster.
+## Workflows Overview
 
-## Workflows
+All workflows are reusable and called by the [MASTER-PIPELINE.yaml](MASTER-PIPELINE.yaml), which orchestrates the complete CI/CD process.
 
-**Note**: In order for the current CI/CD setup to work on your pull request, you must branch directly off the repo (no forks). This is because the Github secrets necessary for these tests aren't copied over when you fork.
+**Note**: AWS credentials must be configured as GitHub Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ACCOUNT_ID`) for workflows to function.
 
-### Code Tests - [ci-pr.yaml](ci-pr.yaml)
+### Master Pipeline - [MASTER-PIPELINE.yaml](MASTER-PIPELINE.yaml)
 
-These tests run on every commit for every open PR, as well as any commit to main / any release branch. Currently, this workflow runs only Go unit tests.
+The main orchestration workflow that runs on pushes to main/develop and pull requests. Executes all stages:
 
+1. **Pipeline Initialization** - Determines environment, enforces branch policies
+2. **Code Quality & Security** - Validates code, runs security scans, unit tests
+3. **Infrastructure Management** - Terraform plan/apply (if infrastructure changed)
+4. **Build Docker Images** - Smart change detection, multi-arch builds, Trivy scanning
+5. **Deploy Application** - Environment-specific deployment with Kustomize
+6. **Post-Deployment Validation** - Smoke tests, health checks
+7. **Pipeline Summary** - Comprehensive results report
 
-### Deploy Tests- [ci-pr.yaml](ci-pr.yaml)
+### Unit Tests - [unit-tests.yaml](unit-tests.yaml)
 
-These tests run on every commit for every open PR, as well as any commit to main / any release branch. This workflow:
+Runs unit tests for all 11 microservices across 5 programming languages:
 
-1. Creates a dedicated GKE namespace for that PR, if it doesn't already exist, in the PR GKE cluster.
-2. Uses `skaffold run` to build and push the images specific to that PR commit. Then skaffold deploys those images, via `kubernetes-manifests`, to the PR namespace in the test cluster.
-3. Tests to make sure all the pods start up and become ready.
-4. Gets the LoadBalancer IP for the frontend service.
-5. Comments that IP in the pull request, for staging.
+- **Go Services** (4): frontend, productcatalog, shipping, checkout
+- **Python Services** (2): email, recommendation
+- **Java Services** (2): adservice, shoppingassistant
+- **Node.js Services** (2): currency, payment
+- **C# Services** (1): cartservice
 
-### Push and Deploy Latest - [push-deploy](push-deploy.yml)
+Features:
+- Parallel test execution by language
+- Coverage reporting with artifacts (30-day retention)
+- Creates placeholder tests if none exist (real tests should replace them)
+- Fails pipeline if any tests fail
+- Comprehensive test summary with pass/fail counts
 
-This is the Continuous Deployment workflow, and it runs on every commit to the main branch. This workflow:
+### Security Scanning - [security-scan.yaml](security-scan.yaml)
 
-1. Builds the container images for every service, tagging as `latest`.
-2. Pushes those images to Google Container Registry.
+Comprehensive security scanning across multiple dimensions:
 
-Note that this workflow does not update the image tags used in `release/kubernetes-manifests.yaml` - these release manifests are tied to a stable `v0.x.x` release.
+- **SAST**: CodeQL (5 languages) + Semgrep
+- **Dependency Scanning**: GitHub Dependency Review + OWASP Dependency Check + Grype
+- **Container Scanning**: Trivy filesystem scan
+- **IaC Security**: Checkov + tfsec for Terraform
+- **Kubernetes Manifests**: Kubesec + Polaris
+- **License Compliance**: pip-licenses + license-checker
+- **SBOM Generation**: CycloneDX format for compliance
 
-### Cleanup - [cleanup.yaml](cleanup.yaml)
+All results uploaded to GitHub Security tab for centralized visibility.
 
-This workflow runs when a PR closes, regardless of whether it was merged into main. This workflow deletes the PR-specific GKE namespace in the test cluster.
+### Build Images - [build-images.yaml](build-images.yaml)
 
-## Appendix - Creating a new Actions runner
+Smart image building workflow with change detection:
 
-Should one of the two self-hosted Github Actions runners (GCE instances) fail, or you want to add more runner capacity, this is how to provision a new runner. Note that you need IAM access to the admin Online Boutique GCP project in order to do this.
+1. **Change Detection** - Uses `dorny/paths-filter` to detect which services changed
+2. **Multi-arch Builds** - Builds for amd64 and arm64
+3. **Security Scanning** - Trivy scans before push (SARIF + table formats)
+4. **ECR Push** - Pushes to AWS ECR with multiple tags (environment, commit SHA, branch)
+5. **SBOM Generation** - Creates Software Bill of Materials per service
+6. **Cache Optimization** - GitHub Actions cache for faster rebuilds
 
-1. Create a GCE instance.
-    - VM should be at least n1-standard-4 with 50GB persistent disk
-    - VM should use custom service account with permissions to: access a GKE cluster, create GCS storage buckets, and push to GCR.
-2. SSH into new VM through the Google Cloud Console.
-3. Install project-specific dependencies, including go, docker, skaffold, and kubectl:
+Outputs: Services built, build success status
+
+### Deploy Environment - [deploy-environment.yaml](deploy-environment.yaml)
+
+Environment-specific deployment using Kustomize:
+
+1. **Configure kubectl** - Connects to AWS EKS cluster
+2. **Apply Kustomize Overlay** - Deploys to namespace (microservices-dev/qa/prod)
+3. **Wait for Ready** - Monitors rollout status with configurable timeout
+4. **Health Verification** - Checks all pods reach Ready state
+5. **Deployment Summary** - Reports success/failure with details
+
+Supports: wait_for_ready flag, configurable timeout (default: 10 min)
+
+### Terraform Workflows
+
+#### [terraform-plan.yaml](terraform-plan.yaml)
+Runs on pull requests to preview infrastructure changes:
+- Validates Terraform syntax
+- Runs terraform plan
+- Posts plan output as PR comment
+- Runs Terraform tests
+- Security scanning (Checkov, tfsec)
+
+#### [terraform-apply.yaml](terraform-apply.yaml)
+Applies infrastructure changes on merge to main:
+- Validates configuration
+- Applies changes with auto-approve
+- Runs post-deployment verification
+- Supports manual destroy action
+
+### AWS Infrastructure Discovery - [aws-infrastructure-discovery.yaml](aws-infrastructure-discovery.yaml)
+
+Discovers and documents existing AWS resources (currently disabled, manual trigger only).
+
+## Environment Strategy
+
+The pipeline supports three environments with namespace isolation:
+
+| Environment | Namespace | Trigger | Purpose |
+|-------------|-----------|---------|---------|
+| **dev** | microservices-dev | Push to main/develop | Development and testing |
+| **qa** | microservices-qa | Manual dispatch | QA validation |
+| **prod** | microservices-prod | Manual dispatch from release/* branch | Production |
+
+## Branch Policy
+
+- **dev/qa**: Can deploy from any branch
+- **prod**: Must deploy from `release/*` branches only
+
+## Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS access key for authentication |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
+| `AWS_ACCOUNT_ID` | AWS account ID for ECR |
+
+## Testing Your Changes
+
+To test workflows locally before pushing:
+
+```bash
+# Validate Kustomize configs
+kubectl kustomize kustomize/overlays/dev
+
+# Run Terraform validation
+just tf-validate
+
+# Run security scans locally
+just security-scan-all
+
+# Build images locally
+just docker-build <service-name>
+
+# Run unit tests locally
+cd src/<service-name>
+# Go: go test ./...
+# Python: pytest
+# Java: ./gradlew test
+# Node.js: npm test
+# C#: dotnet test
+```
+
+## Workflow Outputs
+
+Key workflows provide outputs for downstream jobs:
+
+- **unit-tests**: test_result, tests_run, tests_passed, tests_failed, summary
+- **security-scans**: dependency scan results, vulnerability counts
+- **build-images**: services_built, build_success
+- **deploy-environment**: deployment status, namespace info
+
+## Adding New Tests
+
+To add unit tests to a service:
+
+1. **Go**: Create `*_test.go` files, tests will run automatically
+2. **Python**: Create `tests/` directory with `test_*.py` files
+3. **Java**: Add tests to `src/test/java/`, Gradle will discover them
+4. **Node.js**: Add `test` script to package.json
+5. **C#**: Create `*.Tests.csproj` test project
+
+The workflow creates placeholder tests if none exist, but real tests should replace them.
+
+## Troubleshooting
+
+### Tests Failing
+
+Check the test logs in the workflow run:
+```
+Actions → Unit Tests → <language>-services → Run Tests
+```
+
+View test artifacts:
+```
+Actions → Workflow Run → Artifacts → coverage-<service>
+```
+
+### Build Failures
+
+1. Check if service code changed
+2. Review Trivy scan results for vulnerabilities
+3. Verify Dockerfile builds locally: `just docker-build <service>`
+
+### Deployment Failures
+
+1. Check kubectl rollout status
+2. Review pod logs: `kubectl logs -l app=<service> -n microservices-<env>`
+3. Verify resource quotas: `kubectl describe resourcequota -n microservices-<env>`
+4. Check Istio sidecar injection: `kubectl get pods -n microservices-<env> -o jsonpath='{.items[*].spec.containers[*].name}'`
+
+### Security Scan Failures
+
+Review findings in GitHub Security tab:
+```
+Security → Code Scanning Alerts
+```
+
+Filter by tool (CodeQL, Trivy, Checkov, etc.) to investigate specific findings.
+
+### Terraform Errors
+
+1. Check Terraform state: `terraform state list`
+2. Review plan output in workflow logs
+3. Verify AWS credentials are valid
+4. Check for resource conflicts or quota limits
+
+## Workflow Inputs (Manual Dispatch)
+
+When manually triggering the Master Pipeline:
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `environment` | Target environment (dev/qa/prod) | dev |
+| `skip_terraform` | Skip infrastructure deployment | false |
+| `skip_security` | Skip security scans (NOT recommended for prod) | false |
+| `skip_deploy` | Skip application deployment (infrastructure only) | false |
+| `force_build_all` | Force build all services (ignore change detection) | false |
+
+## Pipeline Stages Diagram
 
 ```
-wget -O - https://raw.githubusercontent.com/GoogleCloudPlatform/microservices-demo/main/.github/workflows/install-dependencies.sh | bash
+┌─────────────────────────────────────────────────────────┐
+│  Stage 0: Pipeline Initialization                       │
+│  - Determine environment, branch policy checks          │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 1: Code Quality & Security (Parallel)            │
+│  ├─ Code Validation (Kustomize, YAML lint)             │
+│  ├─ Security Scans (CodeQL, Semgrep, Trivy, etc.)      │
+│  └─ Unit Tests (Go, Python, Java, Node.js, C#)         │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 2: Infrastructure (Conditional)                  │
+│  - Terraform Plan (on PR)                              │
+│  - Terraform Apply (on merge to main)                  │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 3: Build Docker Images                           │
+│  - Change detection (smart builds)                      │
+│  - Multi-arch builds (amd64, arm64)                     │
+│  - Trivy vulnerability scanning                         │
+│  - Push to ECR with multiple tags                      │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 4: Deploy Application                            │
+│  - Apply Kustomize overlay to namespace                │
+│  - Wait for pods ready (timeout: 10-15 min)            │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 5: Post-Deployment Validation                    │
+│  - Smoke tests (frontend health check)                 │
+│  - Verify all pods running                             │
+└───────────────┬─────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 6: Pipeline Summary                              │
+│  - Generate comprehensive results report                │
+│  - Display success/failure for all stages               │
+└─────────────────────────────────────────────────────────┘
 ```
 
-The instance will restart when the script completes in order to finish the Docker install.
+## Related Documentation
 
-4. SSH back into the VM.
-
-5. Follow the instructions to add a new runner on the [Actions Settings page](https://github.com/GoogleCloudPlatform/microservices-demo/settings/actions) to authenticate the new runner
-6. Start GitHub Actions as a background service:
-```
-sudo ~/actions-runner/svc.sh install ; sudo ~/actions-runner/svc.sh start
-```
+- [CLAUDE.md](../../CLAUDE.md) - Project overview and commands
+- [docs/COMPLETE-DEPLOYMENT-WORKFLOW.md](../../docs/COMPLETE-DEPLOYMENT-WORKFLOW.md) - Detailed deployment guide
+- [kustomize/overlays/README.md](../../kustomize/overlays/README.md) - Multi-environment deployment with Kustomize

@@ -224,6 +224,17 @@ jobs:
 
 
   # ============================================================================
+  # STAGE 2.5: Unit Testing
+  # ============================================================================
+
+  unit-tests:
+    name: "🧪 Unit Tests"
+    needs: [pipeline-init, validate-code]
+    if: ${{ !inputs.skip_security }}
+    uses: ./.github/workflows/unit-tests.yaml
+    secrets: inherit
+
+  # ============================================================================
   # STAGE 3: Build Docker Images (Smart Change Detection)
   # ============================================================================
 
@@ -273,7 +284,7 @@ jobs:
 
   build-and-push:
     name: "🐳 Build Docker Images"
-    needs: [pipeline-init, detect-service-changes, security-scans]
+    needs: [pipeline-init, detect-service-changes, security-scans, unit-tests]
     if: |
       needs.detect-service-changes.outputs.has_changes == 'true' ||
       inputs.force_build_all
@@ -483,6 +494,7 @@ jobs:
     needs:
       - pipeline-init
       - security-scans
+      - unit-tests
       - detect-terraform-changes
       - detect-service-changes
       - build-and-push
@@ -509,7 +521,9 @@ jobs:
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scans | ${{ needs.security-scans.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
