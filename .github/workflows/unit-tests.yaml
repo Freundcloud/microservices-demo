@@ -178,8 +178,30 @@ jobs:
           ./gradlew test --no-daemon --stacktrace
           ./gradlew jacocoTestReport --no-daemon
 
-      - name: ServiceNow DevOps Unit Test Results
+      - name: Find Test Result Files
         if: always()
+        id: find-test-results
+        working-directory: src/${{ matrix.service }}
+        run: |
+          # Find all XML test result files and combine them
+          if [ -d "build/test-results/test" ]; then
+            # Combine all XML files into a single file for ServiceNow
+            echo '<?xml version="1.0" encoding="UTF-8"?>' > combined-test-results.xml
+            echo '<testsuites>' >> combined-test-results.xml
+            for file in build/test-results/test/*.xml; do
+              if [ -f "$file" ]; then
+                # Extract testsuite content (skip XML declaration and testsuites wrapper)
+                sed -n '/<testsuite/,/<\/testsuite>/p' "$file" >> combined-test-results.xml
+              fi
+            done
+            echo '</testsuites>' >> combined-test-results.xml
+            echo "test_results_exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "test_results_exist=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always() && steps.find-test-results.outputs.test_results_exist == 'true'
         uses: ServiceNow/servicenow-devops-test-report@v6.0.0
         with:
           devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
@@ -188,7 +210,7 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Test Java Services - ${{ matrix.service }}'
-          xml-report-filename: src/${{ matrix.service }}/build/test-results/test/*.xml
+          xml-report-filename: src/${{ matrix.service }}/combined-test-results.xml
           test-summary-name: 'Java-${{ matrix.service }}-TestSummary'
 
       - name: Upload Test Results
