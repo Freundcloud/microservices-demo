@@ -1,0 +1,203 @@
+---
+name: "ServiceNow Change Request (REST API)"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment (dev/qa/prod)'
+        required: true
+        type: string
+      change_type:
+        description: 'Type of change (kubernetes/terraform/configuration)'
+        required: false
+        type: string
+        default: 'kubernetes'
+      short_description:
+        description: 'Short description of the change'
+        required: true
+        type: string
+      description:
+        description: 'Detailed description of the change'
+        required: false
+        type: string
+      implementation_plan:
+        description: 'Implementation plan'
+        required: false
+        type: string
+      backout_plan:
+        description: 'Backout plan'
+        required: false
+        type: string
+      test_plan:
+        description: 'Test plan'
+        required: false
+        type: string
+      assignment_group:
+        description: 'Assignment group for the change'
+        required: false
+        type: string
+        default: 'DevOps Engineering'
+    outputs:
+      change_number:
+        description: "ServiceNow Change Request Number"
+        value: ${{ jobs.create-change.outputs.change_number }}
+      change_sys_id:
+        description: "ServiceNow Change Request Sys ID"
+        value: ${{ jobs.create-change.outputs.change_sys_id }}
+
+permissions:
+  contents: read
+
+jobs:
+  create-change:
+    name: "Create Change Request (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    outputs:
+      change_number: ${{ steps.create-cr.outputs.change_number }}
+      change_sys_id: ${{ steps.create-cr.outputs.change_sys_id }}
+
+    steps:
+      - name: Prepare Change Request Data
+        id: prepare
+        run: |
+          # Determine state based on environment
+          if [ "${{ inputs.environment }}" = "dev" ]; then
+            STATE="implement"  # Auto-approved
+            PRIORITY="3"       # Low priority
+          elif [ "${{ inputs.environment }}" = "qa" ]; then
+            STATE="assess"     # Awaiting approval
+            PRIORITY="3"       # Medium priority
+          else
+            STATE="assess"     # Awaiting approval
+            PRIORITY="2"       # High priority (production)
+          fi
+
+          echo "state=$STATE" >> $GITHUB_OUTPUT
+          echo "priority=$PRIORITY" >> $GITHUB_OUTPUT
+
+      - name: Create Change Request via REST API
+        id: create-cr
+        continue-on-error: true
+        run: |
+          # Build the JSON payload
+          PAYLOAD=$(cat <<'EOF'
+          {
+            "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
+            "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}",
+            "type": "standard",
+            "state": "${{ steps.prepare.outputs.state }}",
+            "priority": "${{ steps.prepare.outputs.priority }}",
+            "assignment_group": "${{ inputs.assignment_group }}",
+            "implementation_plan": "${{ inputs.implementation_plan || '1. Apply changes\n2. Monitor rollout\n3. Verify health' }}",
+            "backout_plan": "${{ inputs.backout_plan || '1. Rollback deployment\n2. Verify previous version\n3. Monitor stability' }}",
+            "test_plan": "${{ inputs.test_plan || '1. Run tests\n2. Verify functionality\n3. Monitor metrics' }}",
+            "u_source": "GitHub Actions",
+            "u_environment": "${{ inputs.environment }}",
+            "u_change_type": "${{ inputs.change_type }}"
+          }
+          EOF
+          )
+
+          echo "Creating change request in ServiceNow..."
+
+          # Make the API call
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request")
+
+          # Extract HTTP code and body
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          echo "HTTP Status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.number')
+            CHANGE_SYSID=$(echo "$BODY" | jq -r '.result.sys_id')
+
+            echo "✅ Change Request Created: $CHANGE_NUMBER"
+            echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+            echo "change_sys_id=$CHANGE_SYSID" >> $GITHUB_OUTPUT
+
+            # Add to job summary
+            {
+              echo "## 📝 ServiceNow Change Request Created"
+              echo ""
+              echo "**Change Number:** $CHANGE_NUMBER"
+              echo "**Environment:** ${{ inputs.environment }}"
+              echo "**State:** ${{ steps.prepare.outputs.state }}"
+              echo ""
+              echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
+            } >> $GITHUB_STEP_SUMMARY
+
+            exit 0
+          else
+            echo "❌ Change Request Creation Failed (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+
+            # Add to job summary
+            {
+              echo "## ❌ ServiceNow Change Request Failed"
+              echo ""
+              echo "**Environment:** ${{ inputs.environment }}"
+              echo "**HTTP Status:** $HTTP_CODE"
+              echo ""
+              echo "**Error:** See job logs for details"
+            } >> $GITHUB_STEP_SUMMARY
+
+            # Don't fail the workflow for dev environment
+            if [ "${{ inputs.environment }}" = "dev" ]; then
+              echo "⚠️  Continuing despite failure (dev environment)"
+              exit 0
+            else
+              exit 1
+            fi
+          fi
+
+      - name: Wait for Change Approval (QA/PROD)
+        if: inputs.environment != 'dev' && steps.create-cr.outputs.change_number != ''
+        run: |
+          CHANGE_SYSID="${{ steps.create-cr.outputs.change_sys_id }}"
+          CHANGE_NUMBER="${{ steps.create-cr.outputs.change_number }}"
+
+          echo "⏳ Waiting for approval of Change Request: $CHANGE_NUMBER"
+          echo "🔗 View: ${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID}"
+
+          MAX_WAIT=3600  # 1 hour
+          ELAPSED=0
+          INTERVAL=60    # Check every 60 seconds
+
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            # Get current state
+            RESPONSE=$(curl -s \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${CHANGE_SYSID}?sysparm_fields=state,approval")
+
+            STATE=$(echo "$RESPONSE" | jq -r '.result.state')
+            APPROVAL=$(echo "$RESPONSE" | jq -r '.result.approval')
+
+            echo "Current state: $STATE, Approval: $APPROVAL"
+
+            # State values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed
+            # Approval values: not_requested, requested, approved, rejected
+
+            if [ "$STATE" = "-1" ] || [ "$STATE" = "0" ]; then
+              echo "✅ Change Request approved and ready for implementation"
+              exit 0
+            elif [ "$APPROVAL" = "rejected" ]; then
+              echo "❌ Change Request was rejected"
+              exit 1
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waited ${ELAPSED}s / ${MAX_WAIT}s..."
+          done
+
+          echo "⏱️  Timeout waiting for approval after ${MAX_WAIT}s"
+          exit 1

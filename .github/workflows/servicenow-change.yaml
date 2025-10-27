@@ -89,6 +89,7 @@ jobs:
       - name: Create Change Request (DEV - Auto-Approve)
         id: change-dev
         if: inputs.environment == 'dev'
+        continue-on-error: true
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
@@ -97,25 +98,7 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create Change Request (${{ inputs.environment }})'
-          change-request: >-
-            {
-              "setCloseCode": "true",
-              "autoCloseChange": true,
-              "attributes": {
-                "short_description": ${{ toJSON(format('{0} [{1}]', inputs.short_description, inputs.environment)) }},
-                "description": ${{ toJSON(inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment)) }},
-                "assignment_group": ${{ toJSON(inputs.assignment_group) }},
-                "implementation_plan": ${{ toJSON(inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health') }},
-                "backout_plan": ${{ toJSON(inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability') }},
-                "test_plan": ${{ toJSON(inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics') }},
-                "type": "standard",
-                "state": "implement",
-                "priority": "3",
-                "u_source": "GitHub Actions",
-                "u_environment": ${{ toJSON(inputs.environment) }},
-                "u_change_type": ${{ toJSON(inputs.change_type) }}
-              }
-            }
+          change-request: '{"setCloseCode":"true","autoCloseChange":true,"attributes":{"short_description":"${{ inputs.short_description }} [${{ inputs.environment }}]","description":"Automated deployment to ${{ inputs.environment }} environment via GitHub Actions","assignment_group":"${{ inputs.assignment_group }}","implementation_plan":"Software deployment is automated. Deployment happens within the change window.","backout_plan":"Rollback deployment using kubectl rollout undo command.","test_plan":"Verify all pods running and services responding correctly.","type":"standard","state":"implement","priority":"3","u_source":"GitHub Actions","u_environment":"${{ inputs.environment }}","u_change_type":"${{ inputs.change_type }}"}}'
           interval: '30'
           timeout: '600'
           changeCreationTimeOut: '300'
@@ -136,25 +119,7 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Create Change Request (${{ inputs.environment }})'
-          change-request: >-
-            {
-              "setCloseCode": "true",
-              "autoCloseChange": true,
-              "attributes": {
-                "short_description": ${{ toJSON(format('{0} [{1}]', inputs.short_description, inputs.environment)) }},
-                "description": ${{ toJSON(inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment)) }},
-                "assignment_group": ${{ toJSON(inputs.assignment_group) }},
-                "implementation_plan": ${{ toJSON(inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health') }},
-                "backout_plan": ${{ toJSON(inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability') }},
-                "test_plan": ${{ toJSON(inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics') }},
-                "type": "standard",
-                "state": "assess",
-                "priority": ${{ toJSON(inputs.environment == 'prod' && '2' || '3') }},
-                "u_source": "GitHub Actions",
-                "u_environment": ${{ toJSON(inputs.environment) }},
-                "u_change_type": ${{ toJSON(inputs.change_type) }}
-              }
-            }
+          change-request: '{"setCloseCode":"true","autoCloseChange":true,"attributes":{"short_description":"${{ inputs.short_description }} [${{ inputs.environment }}]","description":"Automated deployment to ${{ inputs.environment }} environment via GitHub Actions. Requires manual approval.","assignment_group":"${{ inputs.assignment_group }}","implementation_plan":"Software deployment is automated. Deployment happens within the change window after approval.","backout_plan":"Rollback deployment using kubectl rollout undo command.","test_plan":"Verify all pods running and services responding correctly.","type":"standard","state":"assess","priority":"${{ inputs.environment == 'prod' && '2' || '3' }}","u_source":"GitHub Actions","u_environment":"${{ inputs.environment }}","u_change_type":"${{ inputs.change_type }}"}}'
           interval: '100'
           timeout: '3600'
           changeCreationTimeOut: '600'
