@@ -291,13 +291,21 @@ jobs:
           TEST_FILE=""
           IS_DIRECTORY="false"
 
-          if [ -f "$SERVICE_DIR/test-results.xml" ]; then
+          # Check for test results in various locations (order matters - most specific first)
+          if [ -f "$SERVICE_DIR/tests/TestResults/test-results.xml" ]; then
+            # C# tests (cartservice) - dotnet test puts results in tests/TestResults/
+            TEST_FILE="$SERVICE_DIR/tests/TestResults/test-results.xml"
+            IS_DIRECTORY="false"
+          elif [ -f "$SERVICE_DIR/test-results.xml" ]; then
+            # Go, Python, Placeholder services - test-results.xml in service root
             TEST_FILE="$SERVICE_DIR/test-results.xml"
             IS_DIRECTORY="false"
           elif [ -d "$SERVICE_DIR/test-results" ]; then
+            # Java (after copy step) - test-results directory
             TEST_FILE="$SERVICE_DIR/test-results"
             IS_DIRECTORY="true"
           elif [ -d "$SERVICE_DIR/build/test-results/test" ]; then
+            # Java (original location) - build/test-results/test directory
             TEST_FILE="$SERVICE_DIR/build/test-results/test"
             IS_DIRECTORY="true"
           fi
