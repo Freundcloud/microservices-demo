@@ -806,6 +806,139 @@ demo-close-issue ISSUE:
     gh issue close {{ISSUE}} -c "Deployment successful; closing work item."
 
 # ==============================================================================
+# Service-Specific Versioning and Deployment
+# ==============================================================================
+
+# Bump version for a single service (creates PR with ServiceNow integration)
+service-deploy ENV SERVICE VERSION:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{ENV}}" ] || [ -z "{{SERVICE}}" ] || [ -z "{{VERSION}}" ]; then
+        echo "Usage: just service-deploy ENV=<dev|qa|prod> SERVICE=<service-name> VERSION=<version>"
+        echo ""
+        echo "Examples:"
+        echo "  just service-deploy dev paymentservice 1.1.5.1"
+        echo "  just service-deploy qa cartservice 2.0.1"
+        echo "  just service-deploy prod adservice 1.2.0"
+        exit 1
+    fi
+
+    # Preflight checks
+    command -v gh >/dev/null 2>&1 || { echo "❌ gh CLI is required"; exit 1; }
+    command -v jq >/dev/null 2>&1 || { echo "❌ jq is required"; exit 1; }
+    git fetch origin main >/dev/null 2>&1 || true
+
+    # Create feature branch
+    BRANCH="feat/deploy-{{SERVICE}}-{{ENV}}-{{VERSION}}"
+    echo "📌 Creating service-specific branch: $BRANCH"
+    git checkout -b "$BRANCH" || git checkout "$BRANCH"
+
+    echo "🧾 Creating GitHub issue (ServiceNow work item)"
+    ISSUE_JSON=$(gh issue create \
+        --title "Deploy {{SERVICE}} {{VERSION}} to {{ENV}}" \
+        --body "**Service**: {{SERVICE}}\n**Version**: {{VERSION}}\n**Environment**: {{ENV}}\n\nThis change updates only the {{SERVICE}} microservice to version {{VERSION}} in the {{ENV}} environment. This demonstrates independent service deployment for ServiceNow change request integration." \
+        --label enhancement,service-update --json number,url 2>/dev/null || true)
+    ISSUE_NUM=$(echo "$ISSUE_JSON" | jq -r '.number // empty')
+
+    if [ -z "$ISSUE_NUM" ]; then
+        echo "ℹ️  Could not create issue. Proceeding without issue linkage."
+    else
+        echo "✅ Created work item #$ISSUE_NUM"
+    fi
+
+    echo "🔧 Bumping {{SERVICE}} to {{VERSION}} in {{ENV}}"
+    ./scripts/bump-service-version.sh "{{ENV}}" "{{SERVICE}}" "{{VERSION}}"
+
+    echo "📝 Committing changes"
+    git add -A
+    if [ -n "$ISSUE_NUM" ]; then
+        git commit -m "feat({{ENV}}): deploy {{SERVICE}} {{VERSION}} (refs #$ISSUE_NUM)"
+    else
+        git commit -m "feat({{ENV}}): deploy {{SERVICE}} {{VERSION}}"
+    fi
+
+    echo "📤 Pushing branch"
+    git push -u origin "$BRANCH"
+
+    echo "🔀 Creating pull request"
+    PR_BODY="## Service Deployment\n\n"
+    PR_BODY+="**Service**: \`{{SERVICE}}\`\n"
+    PR_BODY+="**Version**: \`{{VERSION}}\`\n"
+    PR_BODY+="**Environment**: \`{{ENV}}\`\n\n"
+    PR_BODY+="This PR updates only the {{SERVICE}} microservice, demonstrating independent service deployment.\n\n"
+    PR_BODY+="### Changes\n"
+    PR_BODY+="- Updated \`{{SERVICE}}\` image tag to \`{{VERSION}}\` in \`kustomize/overlays/{{ENV}}/\`\n\n"
+    if [ -n "$ISSUE_NUM" ]; then
+        PR_BODY+="Ref: #$ISSUE_NUM"
+    fi
+
+    gh pr create --fill -t "Deploy {{SERVICE}} {{VERSION}} to {{ENV}}" -b "$PR_BODY" || true
+
+    echo ""
+    echo "✅ Service deployment PR created!"
+    echo "📋 Summary:"
+    echo "   Service: {{SERVICE}}"
+    echo "   Version: {{VERSION}}"
+    echo "   Environment: {{ENV}}"
+    if [ -n "$ISSUE_NUM" ]; then
+        echo "   Work Item: #$ISSUE_NUM"
+    fi
+    echo ""
+    echo "Next steps:"
+    echo "  1. Review the PR in GitHub"
+    echo "  2. Merge the PR to trigger deployment"
+    echo "  3. ServiceNow change request will be created automatically"
+    echo "  4. Approve change in ServiceNow to proceed with deployment"
+
+# Show current versions of all services in an environment
+service-versions ENV:
+    #!/usr/bin/env bash
+    if [ -z "{{ENV}}" ]; then
+        echo "Usage: just service-versions ENV=<dev|qa|prod>"
+        exit 1
+    fi
+
+    FILE="kustomize/overlays/{{ENV}}/kustomization.yaml"
+    if [ ! -f "$FILE" ]; then
+        echo "❌ Environment not found: {{ENV}}"
+        exit 1
+    fi
+
+    echo "📦 Service Versions in {{ENV}}"
+    echo "=============================="
+    echo ""
+
+    # Extract service names and versions
+    awk '/^  - name:/ {service=$3} /^    newTag:/ {print service": "$2}' "$FILE" | \
+        column -t -s: | \
+        sed 's/^/  /'
+
+# List all available services
+service-list:
+    @echo "📦 Available Services"
+    @echo "===================="
+    @echo ""
+    @echo "Core Services:"
+    @echo "  • adservice              - Contextual ads service (Java)"
+    @echo "  • cartservice            - Shopping cart service (C#)"
+    @echo "  • checkoutservice        - Checkout orchestration (Go)"
+    @echo "  • currencyservice        - Currency conversion (Node.js)"
+    @echo "  • emailservice           - Email notifications (Python)"
+    @echo "  • frontend               - Web UI (Go)"
+    @echo "  • paymentservice         - Payment processing (Node.js)"
+    @echo "  • productcatalogservice  - Product inventory (Go)"
+    @echo "  • recommendationservice  - ML recommendations (Python)"
+    @echo "  • shippingservice        - Shipping calculations (Go)"
+    @echo "  • shoppingassistantservice - AI assistant (Python)"
+    @echo ""
+    @echo "Supporting Services:"
+    @echo "  • loadgenerator          - Traffic simulator (Python/Locust)"
+    @echo ""
+    @echo "Usage:"
+    @echo "  just service-deploy ENV SERVICE VERSION"
+    @echo "  Example: just service-deploy dev paymentservice 1.1.5.1"
+
+# ==============================================================================
 # Cluster Management & Monitoring
 # ==============================================================================
 
