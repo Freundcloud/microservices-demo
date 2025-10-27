@@ -8,11 +8,6 @@ name: "Deploy to Environment (Reusable)"
         description: 'Environment to deploy to (dev/qa/prod)'
         required: true
         type: string
-      change_request_sys_id:
-        description: 'ServiceNow change request sys_id (optional)'
-        required: false
-        type: string
-        default: ''
       wait_for_ready:
         description: 'Wait for all deployments to be ready'
         required: false
@@ -265,9 +260,6 @@ jobs:
           echo "| Running Pods | ${{ steps.health-check.outputs.running_pods }} / ${{ steps.health-check.outputs.total_pods }} |" >> $GITHUB_STEP_SUMMARY
           if [ "${{ steps.get-url.outputs.url }}" != "pending" ]; then
             echo "| Frontend URL | ${{ steps.get-url.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -n "${{ inputs.change_request_sys_id }}" ]; then
-            echo "| Change Request | [${{ inputs.change_request_sys_id }}](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ inputs.change_request_sys_id }}) |" >> $GITHUB_STEP_SUMMARY
           fi
           echo "| Trigger | ${{ github.event_name }} by @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
