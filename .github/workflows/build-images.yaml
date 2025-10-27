@@ -254,7 +254,15 @@ jobs:
         run: |
           pip install -q -r requirements.txt
           pip install -q pytest pytest-cov pytest-xdist
-          pytest --junitxml=test-results.xml --cov=. --cov-report=xml -v
+          # Run pytest - allow exit code 5 (no tests collected) but fail on test failures
+          pytest --junitxml=test-results.xml --cov=. --cov-report=xml -v || EXIT_CODE=$?
+          if [ "${EXIT_CODE:-0}" -eq 5 ]; then
+            echo "⚠️ No tests found for ${{ matrix.service }} - creating empty test results"
+            exit 0
+          elif [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "❌ Tests failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
 
       - name: Create Placeholder Test Results
         if: |
