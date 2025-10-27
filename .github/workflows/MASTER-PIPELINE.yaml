@@ -282,6 +282,11 @@ jobs:
     if: |
       needs.detect-service-changes.outputs.has_changes == 'true' ||
       inputs.force_build_all
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+      checks: write
     uses: ./.github/workflows/build-images.yaml
     secrets: inherit
     with:
