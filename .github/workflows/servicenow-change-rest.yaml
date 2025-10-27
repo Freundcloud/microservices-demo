@@ -79,39 +79,89 @@ jobs:
       - name: Create Change Request via REST API
         id: create-cr
         continue-on-error: true
+        env:
+          SHORT_DESC: ${{ inputs.short_description }} [${{ inputs.environment }}]
+          DESCRIPTION: ${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}
+          STATE: ${{ steps.prepare.outputs.state }}
+          PRIORITY: ${{ steps.prepare.outputs.priority }}
+          ASSIGNMENT_GROUP: ${{ inputs.assignment_group }}
+          IMPL_PLAN: ${{ inputs.implementation_plan || '1. Configure kubectl access to EKS cluster\n2. Apply Kustomize overlays\n3. Monitor rollout status\n4. Verify all pods healthy\n5. Test application endpoints' }}
+          BACKOUT_PLAN: ${{ inputs.backout_plan || '1. Execute kubectl rollout undo\n2. Verify rollback completed\n3. Monitor pod status\n4. Test application functionality\n5. Notify stakeholders' }}
+          TEST_PLAN: ${{ inputs.test_plan || '1. Verify deployments rolled out\n2. Check all pods Running\n3. Verify service endpoints\n4. Test frontend accessibility\n5. Monitor application metrics' }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          CHANGE_TYPE: ${{ inputs.change_type }}
         run: |
-          # Build the JSON payload with comprehensive ITIL fields
-          PAYLOAD=$(cat <<'EOF'
-          {
-            "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-            "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nRepository: ${{ github.repository }}",
-            "type": "standard",
-            "state": "${{ steps.prepare.outputs.state }}",
-            "priority": "${{ steps.prepare.outputs.priority }}",
-            "assignment_group": "${{ inputs.assignment_group }}",
-            "category": "DevOps",
-            "subcategory": "Deployment",
-            "risk": "${{ inputs.environment == 'prod' && '2' || '3' }}",
-            "impact": "${{ inputs.environment == 'prod' && '2' || '3' }}",
-            "urgency": "3",
-            "justification": "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow.",
-            "implementation_plan": "${{ inputs.implementation_plan || '1. Configure kubectl access to EKS cluster\n2. Apply Kustomize overlays\n3. Monitor rollout status\n4. Verify all pods healthy\n5. Test application endpoints' }}",
-            "backout_plan": "${{ inputs.backout_plan || '1. Execute kubectl rollout undo\n2. Verify rollback completed\n3. Monitor pod status\n4. Test application functionality\n5. Notify stakeholders' }}",
-            "test_plan": "${{ inputs.test_plan || '1. Verify deployments rolled out\n2. Check all pods Running\n3. Verify service endpoints\n4. Test frontend accessibility\n5. Monitor application metrics' }}",
-            "cab_required": "${{ inputs.environment == 'prod' }}",
-            "production_system": "${{ inputs.environment == 'prod' }}",
-            "outside_maintenance_schedule": "false",
-            "u_source": "GitHub Actions",
-            "u_environment": "${{ inputs.environment }}",
-            "u_change_type": "${{ inputs.change_type }}",
-            "u_github_repo": "${{ github.repository }}",
-            "u_github_workflow": "${{ github.workflow }}",
-            "u_github_run_id": "${{ github.run_id }}",
-            "u_github_actor": "${{ github.actor }}",
-            "u_github_ref": "${{ github.ref }}",
-            "u_github_sha": "${{ github.sha }}"
-          }
-          EOF
+          # Determine risk/impact based on environment
+          if [ "$ENVIRONMENT" = "prod" ]; then
+            RISK="2"
+            IMPACT="2"
+            CAB_REQUIRED="true"
+            PROD_SYSTEM="true"
+          else
+            RISK="3"
+            IMPACT="3"
+            CAB_REQUIRED="false"
+            PROD_SYSTEM="false"
+          fi
+
+          # Build the JSON payload using jq
+          PAYLOAD=$(jq -n \
+            --arg short_desc "$SHORT_DESC" \
+            --arg description "$DESCRIPTION\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nRepository: ${{ github.repository }}" \
+            --arg type "standard" \
+            --arg state "$STATE" \
+            --arg priority "$PRIORITY" \
+            --arg assignment_group "$ASSIGNMENT_GROUP" \
+            --arg category "DevOps" \
+            --arg subcategory "Deployment" \
+            --arg risk "$RISK" \
+            --arg impact "$IMPACT" \
+            --arg urgency "3" \
+            --arg justification "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow." \
+            --arg impl_plan "$IMPL_PLAN" \
+            --arg backout_plan "$BACKOUT_PLAN" \
+            --arg test_plan "$TEST_PLAN" \
+            --argjson cab_required "$CAB_REQUIRED" \
+            --argjson prod_system "$PROD_SYSTEM" \
+            --arg outside_maint "false" \
+            --arg u_source "GitHub Actions" \
+            --arg u_env "$ENVIRONMENT" \
+            --arg u_type "$CHANGE_TYPE" \
+            --arg u_repo "${{ github.repository }}" \
+            --arg u_workflow "${{ github.workflow }}" \
+            --arg u_run_id "${{ github.run_id }}" \
+            --arg u_actor "${{ github.actor }}" \
+            --arg u_ref "${{ github.ref }}" \
+            --arg u_sha "${{ github.sha }}" \
+            '{
+              short_description: $short_desc,
+              description: $description,
+              type: $type,
+              state: $state,
+              priority: $priority,
+              assignment_group: $assignment_group,
+              category: $category,
+              subcategory: $subcategory,
+              risk: $risk,
+              impact: $impact,
+              urgency: $urgency,
+              justification: $justification,
+              implementation_plan: $impl_plan,
+              backout_plan: $backout_plan,
+              test_plan: $test_plan,
+              cab_required: $cab_required,
+              production_system: $prod_system,
+              outside_maintenance_schedule: $outside_maint,
+              u_source: $u_source,
+              u_environment: $u_env,
+              u_change_type: $u_type,
+              u_github_repo: $u_repo,
+              u_github_workflow: $u_workflow,
+              u_github_run_id: $u_run_id,
+              u_github_actor: $u_actor,
+              u_github_ref: $u_ref,
+              u_github_sha: $u_sha
+            }'
           )
 
           echo "Creating change request in ServiceNow..."
