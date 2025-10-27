@@ -89,7 +89,7 @@ jobs:
             "attributes": {
               "short_description": "Deployment to ${{ inputs.environment }} environment - microservices-demo",
               "description": "Automated deployment of microservices application to ${{ inputs.environment }} environment via GitHub Actions.\n\nCommit: ${{ github.sha }}\nBranch: ${{ github.ref_name }}\nTriggered by: ${{ github.actor }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_number }}\n\nLinked Work Items: ${{ steps.extract-work-items.outputs.work_items || ''None'' }}",
-              "assignment_group": "DevOps",
+              "assignment_group": "CAB Approval",
               "implementation_plan": "1. Verify cluster access\n2. Ensure namespace exists\n3. Deploy with Kustomize overlays\n4. Wait for pods to be ready\n5. Verify deployment health\n6. Test frontend URL",
               "backout_plan": "1. Roll back to previous deployment\n2. Verify pod health\n3. Monitor application logs\n4. Notify team if issues persist",
               "test_plan": "1. Verify all pods are running\n2. Check Istio sidecar injection\n3. Test frontend endpoint\n4. Validate service mesh connectivity",
