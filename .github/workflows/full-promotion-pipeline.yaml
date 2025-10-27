@@ -1,7 +1,7 @@
 ---
 name: "🚀 Full Promotion Pipeline (Dev → QA → Prod)"
 
-on:
+'on':
   workflow_dispatch:
     inputs:
       version:
