@@ -225,7 +225,6 @@ jobs:
         run: |
           go install gotest.tools/gotestsum@latest
           gotestsum --junitfile test-results.xml --format testname -- -v ./...
-        continue-on-error: true
 
       - name: Run C# Tests (xunit)
         id: csharp-tests
@@ -235,7 +234,6 @@ jobs:
           dotnet test tests/cartservice.tests.csproj \
             --logger "junit;LogFilePath=test-results.xml" \
             --verbosity normal
-        continue-on-error: true
 
       - name: Run Java Tests (JUnit)
         id: java-tests
@@ -245,7 +243,6 @@ jobs:
           ./gradlew test --no-daemon
           mkdir -p test-results
           cp build/test-results/test/*.xml test-results/ 2>/dev/null || true
-        continue-on-error: true
 
       - name: Run Python Tests (pytest)
         id: python-tests
@@ -257,8 +254,7 @@ jobs:
         run: |
           pip install -q -r requirements.txt
           pip install -q pytest pytest-cov pytest-xdist
-          pytest --junitxml=test-results.xml --cov=. --cov-report=xml -v || true
-        continue-on-error: true
+          pytest --junitxml=test-results.xml --cov=. --cov-report=xml -v
 
       - name: Create Placeholder Test Results
         if: |
