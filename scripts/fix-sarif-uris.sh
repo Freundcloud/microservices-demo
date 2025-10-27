@@ -32,11 +32,22 @@ for SARIF_FILE in "$@"; do
 
     # Replace git:// with file:// in URIs
     # This handles artifactLocation.uri, physicalLocation.artifactLocation.uri, and any other URI fields
+    # Strategy:
+    # 1. If URI starts with git://, replace with file://
+    # 2. If URI contains git:// anywhere, replace ALL occurrences with file://
+    # 3. Also handle git: scheme without // (some tools use this)
     jq '
         walk(
             if type == "object" and has("uri") then
-                if .uri | type == "string" and (startswith("git://") or contains("git://")) then
-                    .uri |= gsub("git://"; "file://")
+                if .uri | type == "string" then
+                    .uri |= (
+                        # Replace git:// with file://
+                        gsub("git://"; "file://") |
+                        # Also handle git: without // (less common but seen in some tools)
+                        gsub("^git:"; "file://") |
+                        # Remove any duplicate file:// that might result
+                        gsub("file://file://"; "file://")
+                    )
                 else
                     .
                 end
