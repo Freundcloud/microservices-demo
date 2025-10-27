@@ -123,14 +123,22 @@ This project includes **full ServiceNow Change Management integration** via REST
 
 ### Complete Audit Trail
 
+**Total Fields: 33**
+
 Every change request includes:
-- ✅ Who triggered the deployment
-- ✅ What was deployed (commit SHA)
-- ✅ When it was deployed (timestamp)
-- ✅ Which workflow ran (with direct link)
-- ✅ Complete deployment plans
-- ✅ Risk assessment
-- ✅ Impact analysis
+- ✅ **18 Standard ITIL Fields**: type, state, priority, assignment_group, assigned_to, category, subcategory, risk, impact, urgency, justification, implementation_plan, backout_plan, test_plan, cab_required, production_system, outside_maintenance_schedule, business_service
+- ✅ **12 GitHub Traceability Fields**: u_source, u_environment, u_change_type, u_github_repo, u_github_workflow, u_github_run_id, u_github_actor, u_github_ref, u_github_sha, u_github_branch, u_github_pr_number, u_commit_message
+- ✅ **4 Deployment Context Fields**: u_services_deployed, u_infrastructure_changes, u_security_scanners, u_previous_version
+- ✅ Who triggered the deployment (u_github_actor)
+- ✅ What was deployed (u_github_sha, u_services_deployed)
+- ✅ When it was deployed (timestamp in description)
+- ✅ Which workflow ran (u_github_run_id with direct link)
+- ✅ Complete deployment plans (implementation, backout, test)
+- ✅ Risk assessment (risk, impact, urgency)
+- ✅ Impact analysis (production_system, cab_required)
+- ✅ Security evidence (u_security_scanners)
+- ✅ Service identification (business_service)
+- ✅ Team & individual assignment (assignment_group, assigned_to)
 
 ## Approval Workflow
 
