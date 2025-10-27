@@ -90,13 +90,33 @@ Outputs: Services built, build success status
 
 ### Deploy Environment - [deploy-environment.yaml](deploy-environment.yaml)
 
-Environment-specific deployment using Kustomize:
+Environment-specific deployment using Kustomize with ServiceNow Change Management:
 
-1. **Configure kubectl** - Connects to AWS EKS cluster
-2. **Apply Kustomize Overlay** - Deploys to namespace (microservices-dev/qa/prod)
-3. **Wait for Ready** - Monitors rollout status with configurable timeout
-4. **Health Verification** - Checks all pods reach Ready state
-5. **Deployment Summary** - Reports success/failure with details
+1. **Create Change Request** - Automatically creates ServiceNow change request for deployment
+2. **Wait for Approval** - Pauses deployment until change is approved in ServiceNow
+3. **Configure kubectl** - Connects to AWS EKS cluster
+4. **Apply Kustomize Overlay** - Deploys to namespace (microservices-dev/qa/prod)
+5. **Wait for Ready** - Monitors rollout status with configurable timeout
+6. **Health Verification** - Checks all pods reach Ready state
+7. **Update Change Status** - Marks change as implemented/closed
+8. **Deployment Summary** - Reports success/failure with details
+
+**ServiceNow Change Automation**:
+- Uses `ServiceNow/servicenow-devops-change@v4.0.0` action
+- **Automatically creates change requests** for each deployment
+- **Environment-specific risk levels**:
+  - **Dev**: Low risk, low impact, priority 4 (auto-approved)
+  - **QA**: Low risk, low impact, priority 4 (requires approval)
+  - **Prod**: Moderate risk, medium impact, priority 3 (requires CAB approval)
+- **Change request includes**:
+  - Implementation plan (deployment steps)
+  - Backout plan (rollback procedure)
+  - Test plan (verification steps)
+  - Complete metadata (commit, branch, actor, etc.)
+  - Links to test results and packages
+- **Polling**: Checks approval status every 30 seconds
+- **Timeout**: 30 minutes for approval (configurable)
+- **Change Creation**: 10 minutes timeout for CR creation
 
 Supports: wait_for_ready flag, configurable timeout (default: 10 min)
 
@@ -270,6 +290,80 @@ When manually triggering the Master Pipeline:
 | `skip_deploy` | Skip application deployment (infrastructure only) | false |
 | `force_build_all` | Force build all services (ignore change detection) | false |
 
+## Complete ServiceNow Integration Flow
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  DEVELOPMENT PHASE                                           │
+└──────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Stage 1: Unit Tests → Upload to ServiceNow                 │
+│  - Run tests for all 11 services                            │
+│  - Generate JUnit/TRX XML reports                           │
+│  - Upload test results to ServiceNow DevOps                 │
+│  ✅ Test Results visible in ServiceNow                      │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Stage 2: Build Images → Register Packages                  │
+│  - Build Docker images (12 services)                        │
+│  - Scan with Trivy                                          │
+│  - Push to ECR                                              │
+│  - Register packages in ServiceNow                          │
+│  ✅ Packages visible in ServiceNow                          │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  DEPLOYMENT PHASE (Dev/QA/Prod)                             │
+└──────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Stage 3: ServiceNow Change Request Creation                │
+│  - Create change request for deployment                     │
+│  - Environment-specific risk/impact/priority                │
+│  - Link test results + packages to CR                       │
+│  - Include implementation/backout/test plans                │
+│  ⏸️  Deployment PAUSED - Waiting for approval               │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  APPROVAL IN SERVICENOW (Human Decision)                    │
+│  - Reviewer sees:                                           │
+│    • Test results (11 services)                             │
+│    • Packages (12 Docker images with versions)              │
+│    • Implementation plan                                    │
+│    • Backout plan                                           │
+│    • Commit details, branch, author                         │
+│  - Decision: Approve or Reject                              │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                    ✅ APPROVED
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Stage 4: Deploy to Environment                             │
+│  - Apply Kustomize manifests                                │
+│  - Wait for pods ready                                      │
+│  - Verify health                                            │
+│  - Update change request status: "Implemented"              │
+│  ✅ Deployment Complete                                     │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Stage 5: Post-Deployment                                   │
+│  - Smoke tests                                              │
+│  - Update change request status: "Closed"                   │
+│  ✅ Complete audit trail in ServiceNow                      │
+└──────────────────────────────────────────────────────────────┘
+```
+
 ## Pipeline Stages Diagram
 
 ```
@@ -284,6 +378,7 @@ When manually triggering the Master Pipeline:
 │  ├─ Code Validation (Kustomize, YAML lint)             │
 │  ├─ Security Scans (CodeQL, Semgrep, Trivy, etc.)      │
 │  └─ Unit Tests (Go, Python, Java, Node.js, C#)         │
+│     └→ Upload test results to ServiceNow ✅            │
 └───────────────┬─────────────────────────────────────────┘
                 │
                 ▼
@@ -300,25 +395,39 @@ When manually triggering the Master Pipeline:
 │  - Multi-arch builds (amd64, arm64)                     │
 │  - Trivy vulnerability scanning                         │
 │  - Push to ECR with multiple tags                      │
+│  └→ Register packages in ServiceNow ✅                 │
 └───────────────┬─────────────────────────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Stage 4: Deploy Application                            │
+│  Stage 4: ServiceNow Change Request                     │
+│  - Create change request for deployment                │
+│  - Link test results + packages                        │
+│  - Wait for approval (polls every 30 sec)              │
+│  ⏸️ DEPLOYMENT PAUSED UNTIL APPROVED                   │
+└───────────────┬─────────────────────────────────────────┘
+                │
+            ✅ APPROVED
+                │
+                ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 5: Deploy Application                            │
 │  - Apply Kustomize overlay to namespace                │
 │  - Wait for pods ready (timeout: 10-15 min)            │
+│  └→ Update change status: "Implemented" ✅             │
 └───────────────┬─────────────────────────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Stage 5: Post-Deployment Validation                    │
+│  Stage 6: Post-Deployment Validation                    │
 │  - Smoke tests (frontend health check)                 │
 │  - Verify all pods running                             │
+│  └→ Update change status: "Closed" ✅                  │
 └───────────────┬─────────────────────────────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Stage 6: Pipeline Summary                              │
+│  Stage 7: Pipeline Summary                              │
 │  - Generate comprehensive results report                │
 │  - Display success/failure for all stages               │
 └─────────────────────────────────────────────────────────┘
