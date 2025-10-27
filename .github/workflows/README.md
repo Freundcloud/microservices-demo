@@ -35,11 +35,16 @@ Runs unit tests for all 11 microservices across 5 programming languages:
 - **C# Services** (1): cartservice
 
 Features:
-- Parallel test execution by language
+- Parallel test execution by language (matrix strategy)
 - Coverage reporting with artifacts (30-day retention)
 - Creates placeholder tests if none exist (real tests should replace them)
 - Fails pipeline if any tests fail
 - Comprehensive test summary with pass/fail counts
+- **ServiceNow Integration**: Automatically uploads test results to ServiceNow for approval evidence
+  - Uses `ServiceNow/servicenow-devops-test-report@v6.0.0` action
+  - Generates JUnit/TRX XML reports for each service
+  - Test results visible in ServiceNow DevOps workspace
+  - Linked to change requests for approval workflow
 
 ### Security Scanning - [security-scan.yaml](security-scan.yaml)
 
@@ -118,11 +123,24 @@ The pipeline supports three environments with namespace isolation:
 
 ## Required GitHub Secrets
 
+### AWS Secrets
+
 | Secret | Description |
 |--------|-------------|
 | `AWS_ACCESS_KEY_ID` | AWS access key for authentication |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key |
 | `AWS_ACCOUNT_ID` | AWS account ID for ECR |
+
+### ServiceNow Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `SN_DEVOPS_USER` | ServiceNow DevOps integration username |
+| `SN_DEVOPS_PASSWORD` | ServiceNow DevOps integration password |
+| `SN_INSTANCE_URL` | ServiceNow instance URL (e.g., https://your-instance.service-now.com) |
+| `SN_ORCHESTRATION_TOOL_ID` | ServiceNow orchestration tool sys_id (from sn_devops_tool table) |
+
+**Note**: ServiceNow secrets are optional. If not configured, test results will not be uploaded to ServiceNow, but tests will still run and report in GitHub Actions.
 
 ## Testing Your Changes
 

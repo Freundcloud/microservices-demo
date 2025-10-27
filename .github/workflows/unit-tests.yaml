@@ -53,8 +53,26 @@ jobs:
       - name: Run Tests
         working-directory: src/${{ matrix.service }}
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          # Run tests with JSON output for ServiceNow
+          go test -v -race -coverprofile=coverage.out -covermode=atomic -json ./... > test-results.json || true
           go tool cover -func=coverage.out
+
+          # Convert JSON to JUnit XML format for ServiceNow
+          go install github.com/jstemmer/go-junit-report/v2@latest
+          cat test-results.json | go-junit-report -set-exit-code > test-results.xml
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always()
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Test Go Services - ${{ matrix.service }}'
+          xml-report-filename: src/${{ matrix.service }}/test-results.xml
+          test-summary-name: 'Go-${{ matrix.service }}-TestSummary'
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
@@ -107,8 +125,21 @@ jobs:
           EOF
           fi
 
-          # Run pytest with coverage
-          pytest --cov=. --cov-report=xml --cov-report=term -v || true
+          # Run pytest with coverage and JUnit XML output for ServiceNow
+          pytest --cov=. --cov-report=xml --cov-report=term --junitxml=test-results.xml -v || true
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always()
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Test Python Services - ${{ matrix.service }}'
+          xml-report-filename: src/${{ matrix.service }}/test-results.xml
+          test-summary-name: 'Python-${{ matrix.service }}-TestSummary'
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
@@ -146,6 +177,19 @@ jobs:
           chmod +x gradlew
           ./gradlew test --no-daemon --stacktrace
           ./gradlew jacocoTestReport --no-daemon
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always()
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Test Java Services - ${{ matrix.service }}'
+          xml-report-filename: src/${{ matrix.service }}/build/test-results/test/*.xml
+          test-summary-name: 'Java-${{ matrix.service }}-TestSummary'
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
@@ -194,7 +238,15 @@ jobs:
         run: |
           # Check if test script exists
           if npm run | grep -q "test"; then
-            npm test -- --coverage --coverageReporters=text --coverageReporters=cobertura || true
+            # Install junit reporter for ServiceNow
+            npm install --save-dev jest-junit mocha-junit-reporter
+
+            # Run tests with JUnit XML output
+            if npm run | grep -q "jest"; then
+              JEST_JUNIT_OUTPUT_DIR=. JEST_JUNIT_OUTPUT_NAME=test-results.xml npm test -- --coverage --coverageReporters=text --coverageReporters=cobertura --reporters=default --reporters=jest-junit || true
+            else
+              npm test -- --coverage --coverageReporters=text --coverageReporters=cobertura --reporter mocha-junit-reporter --reporter-options mochaFile=test-results.xml || true
+            fi
           else
             echo "No test script found in package.json for ${{ matrix.service }}"
             echo "Creating placeholder test..."
@@ -209,9 +261,22 @@ jobs:
           });
           EOF
             # Add test script to package.json if missing
-            npm install --save-dev mocha
-            npm test || true
+            npm install --save-dev mocha mocha-junit-reporter
+            npx mocha test/placeholder.test.js --reporter mocha-junit-reporter --reporter-options mochaFile=test-results.xml || true
           fi
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always()
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Test Node.js Services - ${{ matrix.service }}'
+          xml-report-filename: src/${{ matrix.service }}/test-results.xml
+          test-summary-name: 'NodeJS-${{ matrix.service }}-TestSummary'
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
@@ -246,12 +311,40 @@ jobs:
           if [ -d "../tests" ] || ls *.Tests.csproj 2>/dev/null; then
             dotnet test --no-restore --verbosity normal \
               --collect:"XPlat Code Coverage" \
-              --results-directory ./TestResults
+              --results-directory ./TestResults \
+              --logger:"trx;LogFileName=test-results.trx"
           else
             echo "No test project found for cartservice"
             echo "Tests should be added to src/cartservice/tests/"
+            # Create placeholder test results
+            mkdir -p ./TestResults
+            cat > ./TestResults/test-results.trx << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <TestRun id="00000000-0000-0000-0000-000000000000" name="Placeholder" runUser="GitHub Actions">
+            <Results>
+              <UnitTestResult testName="Placeholder Test" outcome="NotExecuted">
+                <Output>
+                  <StdOut>No tests found - tests should be added to src/cartservice/tests/</StdOut>
+                </Output>
+              </UnitTestResult>
+            </Results>
+          </TestRun>
+          EOF
           fi
         continue-on-error: true
+
+      - name: ServiceNow DevOps Unit Test Results
+        if: always()
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Test C# Services - cartservice'
+          xml-report-filename: src/cartservice/src/TestResults/test-results.trx
+          test-summary-name: 'CSharp-cartservice-TestSummary'
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
