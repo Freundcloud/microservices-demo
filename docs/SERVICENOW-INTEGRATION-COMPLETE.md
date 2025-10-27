@@ -46,7 +46,8 @@ This project includes **full ServiceNow Change Management integration** via REST
 | **type** | "standard" | Standard change type |
 | **state** | "implement" (dev) / "assess" (qa/prod) | Auto-approved for dev |
 | **priority** | "2" (prod) / "3" (dev/qa) | Higher for production |
-| **assignment_group** | "DevOps Engineering" | Configurable |
+| **assignment_group** | "GitHubARC DevOps Admin" | Team responsible |
+| **assigned_to** | "Olaf Krasicki-Freund" | Individual assignee |
 | **category** | "DevOps" | For filtering/reporting |
 | **subcategory** | "Deployment" | Specific classification |
 | **risk** | "2" (prod) / "3" (dev/qa) | Medium/Low risk |
@@ -99,6 +100,26 @@ This project includes **full ServiceNow Change Management integration** via REST
 | **u_github_actor** | "olafkfreund" | Who triggered |
 | **u_github_ref** | "refs/heads/main" | Branch/tag |
 | **u_github_sha** | "d3c9ba74..." | Commit SHA |
+| **u_github_branch** | "main" | Branch name (clean) |
+| **u_github_pr_number** | "123" or "" | Pull request number |
+| **u_commit_message** | "feat: Add new feature" | Full commit message |
+
+### Service Identification
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| **business_service** | "Online Boutique (DEV)" | Service name + environment |
+|  | "Online Boutique (QA)" | For QA environment |
+|  | "Online Boutique (PROD)" | For production |
+
+### Deployment Context Fields
+
+| Field | Example Value | Purpose |
+|-------|---------------|---------|
+| **u_services_deployed** | `["frontend","cartservice"]` | Which services changed |
+| **u_infrastructure_changes** | "true" / "false" | Terraform changes included |
+| **u_security_scanners** | "CodeQL, Trivy, Semgrep, ..." | Security tools that ran |
+| **u_previous_version** | "dev" or "v1.2.3" | Version being replaced |
 
 ### Complete Audit Trail
 

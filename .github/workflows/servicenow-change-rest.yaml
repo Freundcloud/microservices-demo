@@ -37,7 +37,12 @@ on:
         description: 'Assignment group for the change'
         required: false
         type: string
-        default: 'DevOps Engineering'
+        default: 'GitHubARC DevOps Admin'
+      assigned_to:
+        description: 'User assigned to the change'
+        required: false
+        type: string
+        default: 'Olaf Krasicki-Freund'
       # Additional deployment context
       services_deployed:
         description: 'JSON array of services being deployed'
@@ -111,6 +116,7 @@ jobs:
           STATE: ${{ steps.prepare.outputs.state }}
           PRIORITY: ${{ steps.prepare.outputs.priority }}
           ASSIGNMENT_GROUP: ${{ inputs.assignment_group }}
+          ASSIGNED_TO: ${{ inputs.assigned_to }}
           IMPL_PLAN: ${{ inputs.implementation_plan || '1. Configure kubectl access to EKS cluster\n2. Apply Kustomize overlays\n3. Monitor rollout status\n4. Verify all pods healthy\n5. Test application endpoints' }}
           BACKOUT_PLAN: ${{ inputs.backout_plan || '1. Execute kubectl rollout undo\n2. Verify rollback completed\n3. Monitor pod status\n4. Test application functionality\n5. Notify stakeholders' }}
           TEST_PLAN: ${{ inputs.test_plan || '1. Verify deployments rolled out\n2. Check all pods Running\n3. Verify service endpoints\n4. Test frontend accessibility\n5. Monitor application metrics' }}
@@ -164,6 +170,7 @@ jobs:
             --arg state "$STATE" \
             --arg priority "$PRIORITY" \
             --arg assignment_group "$ASSIGNMENT_GROUP" \
+            --arg assigned_to "$ASSIGNED_TO" \
             --arg category "DevOps" \
             --arg subcategory "Deployment" \
             --arg risk "$RISK" \
@@ -200,6 +207,7 @@ jobs:
               state: $state,
               priority: $priority,
               assignment_group: $assignment_group,
+              assigned_to: $assigned_to,
               category: $category,
               subcategory: $subcategory,
               risk: $risk,
