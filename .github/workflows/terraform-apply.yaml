@@ -40,8 +40,46 @@ env:
   AWS_REGION: eu-west-2
 
 jobs:
+  # Create ServiceNow Change Request before infrastructure changes
+  servicenow-change:
+    name: ServiceNow Change Request
+    uses: ./.github/workflows/servicenow-change.yaml
+    with:
+      environment: ${{ inputs.environment }}
+      change_type: 'terraform'
+      short_description: 'Terraform ${{ inputs.action }} - ${{ inputs.environment }} infrastructure'
+      description: |
+        Infrastructure change via Terraform ${{ inputs.action }} command.
+
+        Environment: ${{ inputs.environment }}
+        Action: ${{ inputs.action }}
+        Terraform Version: ${{ inputs.tf_version }}
+        Triggered by: ${{ github.actor }}
+        Commit: ${{ github.sha }}
+        Workflow: ${{ github.workflow }}
+      implementation_plan: |
+        1. Initialize Terraform with remote backend
+        2. Validate configuration syntax
+        3. Generate and review execution plan
+        4. ${{ inputs.action == 'apply' && 'Apply infrastructure changes' || 'Destroy infrastructure resources' }}
+        5. Verify EKS cluster accessibility
+        6. Update kubeconfig for kubectl access
+      backout_plan: |
+        1. Review terraform state backup
+        2. Execute terraform apply with previous configuration
+        3. Verify infrastructure rolled back successfully
+        4. Validate all services operational
+      test_plan: |
+        1. Verify terraform validation passed
+        2. Review terraform plan for expected changes
+        3. Confirm EKS cluster accessible via kubectl
+        4. Verify node groups healthy
+        5. Check all AWS resources created/updated correctly
+    secrets: inherit
+
   terraform-apply:
     name: Terraform ${{ inputs.action }} (${{ inputs.environment }})
+    needs: servicenow-change
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     outputs:
@@ -49,6 +87,7 @@ jobs:
       cluster_endpoint: ${{ steps.eks-info.outputs.cluster_endpoint }}
       region: ${{ steps.eks-info.outputs.region }}
       apply_outcome: ${{ steps.apply.outcome || steps.destroy.outcome }}
+      change_request: ${{ needs.servicenow-change.outputs.change_request_number }}
 
     defaults:
       run:
@@ -133,6 +172,19 @@ jobs:
         run: |
           echo "## Terraform Deployment Summary (${{ inputs.environment }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ServiceNow Change Request
+          if [ -n "${{ needs.servicenow-change.outputs.change_request_number }}" ]; then
+            echo "### 📋 ServiceNow Change Request" >> $GITHUB_STEP_SUMMARY
+            echo "- **Change Number**: [\`${{ needs.servicenow-change.outputs.change_request_number }}\`](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sysparm_query=number=${{ needs.servicenow-change.outputs.change_request_number }})" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ inputs.environment }}" == "dev" ]; then
+              echo "- **Approval**: ✅ Auto-Approved (DEV)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Approval**: ✅ Approved via ServiceNow" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "### Status" >> $GITHUB_STEP_SUMMARY
           echo "| Step | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY

@@ -101,6 +101,23 @@
 - **[Release Process](RELEASE-PROCESS.md)** - How to cut releases
 - **[Release Automation](RELEASE-AUTOMATION.md)** - Automated release workflows
 
+### 🔗 ServiceNow Integration
+
+**Complete DevOps Change Management Suite**:
+- **[Package Registration](SERVICENOW-PACKAGE-REGISTRATION.md)** - Automatic Docker image registration
+  - Register all 12 microservices as packages
+  - Track container deployments
+  - Link to change requests
+- **[Test Results Integration](SERVICENOW-TEST-INTEGRATION.md)** - Unit test results upload
+  - Automated test result tracking
+  - Support for all test frameworks (Go, Python, Java, C#, Node.js)
+  - Evidence for change approvals
+- **[Change Automation](SERVICENOW-CHANGE-AUTOMATION.md)** - Automated change requests
+  - Auto-approve for DEV
+  - Manual approval for QA/PROD
+  - Integration with Terraform and Kubernetes deployments
+  - Complete audit trail
+
 ## Technology Stack
 
 ### Infrastructure

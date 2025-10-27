@@ -41,8 +41,46 @@ env:
   CLUSTER_NAME: microservices
 
 jobs:
+  # Create ServiceNow Change Request before Kubernetes deployment
+  servicenow-change:
+    name: ServiceNow Change Request
+    uses: ./.github/workflows/servicenow-change.yaml
+    with:
+      environment: ${{ inputs.environment }}
+      change_type: 'kubernetes'
+      short_description: 'Deploy microservices to ${{ inputs.environment }} (Kubernetes)'
+      description: |
+        Kubernetes deployment of microservices application to ${{ inputs.environment }} environment.
+
+        Environment: ${{ inputs.environment }}
+        Namespace: microservices-${{ inputs.environment }}
+        Deployment Method: Kustomize overlays
+        Triggered by: ${{ github.actor }}
+        Commit: ${{ github.sha }}
+        Workflow: ${{ github.workflow }}
+      implementation_plan: |
+        1. Configure kubectl access to EKS cluster
+        2. Ensure namespace microservices-${{ inputs.environment }} exists
+        3. Apply Kustomize overlays for ${{ inputs.environment }}
+        4. Monitor rollout status for all deployments
+        5. Verify all pods healthy and running
+        6. Test frontend application endpoint
+      backout_plan: |
+        1. kubectl rollout undo -n microservices-${{ inputs.environment }} --all
+        2. Verify all services rolled back to previous version
+        3. Monitor pod status and logs
+        4. Test application functionality
+      test_plan: |
+        1. Verify all deployments rolled out successfully
+        2. Check all pods are in Running state
+        3. Verify service endpoints responding
+        4. Test frontend URL accessibility
+        5. Monitor application metrics and logs
+    secrets: inherit
+
   deploy:
     name: Deploy to ${{ inputs.environment }}
+    needs: servicenow-change
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     outputs:
@@ -50,6 +88,7 @@ jobs:
       running_pods: ${{ steps.health-check.outputs.running_pods }}
       total_pods: ${{ steps.health-check.outputs.total_pods }}
       frontend_url: ${{ steps.get-url.outputs.url }}
+      change_request: ${{ needs.servicenow-change.outputs.change_request_number }}
 
     steps:
       - name: Checkout Code
@@ -113,6 +152,43 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "</details>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+      # Upload Kubernetes deployment manifests to ServiceNow as evidence
+      - name: Upload Deployment Config to ServiceNow
+        id: config-validate
+        uses: ServiceNow/servicenow-devops-config-validate@v1.0.0-beta
+        with:
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          devops-integration-username: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          application-name: 'microservices-demo'
+          target: 'deployable'
+          deployable-name: '${{ inputs.environment }}'
+          name-path: 'deployment-${{ github.run_number }}'
+          auto-commit: true
+          auto-validate: true
+          auto-publish: true
+          config-file-path: 'kustomize/overlays/${{ inputs.environment }}/*.yaml'
+          data-format: 'yaml'
+          snapshot-validation-timeout: 30
+          terminate-on-policy-validation-failures: false
+        continue-on-error: true
+
+      - name: Config Upload Summary
+        if: always()
+        run: |
+          if [ "${{ steps.config-validate.outcome }}" == "success" ]; then
+            echo "### ✅ Configuration Uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Snapshot**: \`${{ steps.config-validate.outputs.snapshot-name }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Validation Status**: \`${{ steps.config-validate.outputs.validation-status }}\`" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ steps.config-validate.outputs.changeset-number }}" ]; then
+              echo "- **Changeset**: \`${{ steps.config-validate.outputs.changeset-number }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Config upload to ServiceNow failed (non-blocking)" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Deploy with Kustomize
         id: deploy
