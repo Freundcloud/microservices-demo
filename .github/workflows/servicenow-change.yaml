@@ -1,0 +1,253 @@
+---
+name: "ServiceNow Change Automation (Reusable)"
+
+'on':
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment (dev/qa/prod)'
+        required: true
+        type: string
+      change_type:
+        description: 'Type of change (terraform/kubernetes/application)'
+        required: true
+        type: string
+      short_description:
+        description: 'Brief description of the change'
+        required: true
+        type: string
+      description:
+        description: 'Detailed description of changes'
+        required: false
+        type: string
+        default: ''
+      implementation_plan:
+        description: 'How the change will be implemented'
+        required: false
+        type: string
+        default: ''
+      backout_plan:
+        description: 'How to rollback if needed'
+        required: false
+        type: string
+        default: ''
+      test_plan:
+        description: 'Testing approach'
+        required: false
+        type: string
+        default: ''
+      assignment_group:
+        description: 'ServiceNow assignment group'
+        required: false
+        type: string
+        default: 'DevOps Engineering'
+    outputs:
+      change_request_number:
+        description: "ServiceNow change request number"
+        value: ${{ jobs.create-change.outputs.change_number }}
+      change_request_sys_id:
+        description: "ServiceNow change request sys_id"
+        value: ${{ jobs.create-change.outputs.change_sys_id }}
+      change_approved:
+        description: "Whether change was approved"
+        value: ${{ jobs.create-change.outputs.approved }}
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  # Auto-approve for dev, manual approval for qa/prod
+  AUTO_APPROVE: ${{ inputs.environment == 'dev' }}
+
+jobs:
+  create-change:
+    name: Create Change Request (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    outputs:
+      change_number: ${{ steps.change.outputs.change-request-number }}
+      change_sys_id: ${{ steps.change.outputs.change-request-sys-id }}
+      approved: ${{ steps.check-approval.outputs.approved }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # =====================================================================
+      # Prepare Change Request Details
+      # =====================================================================
+      - name: Prepare Change Details
+        id: prepare
+        run: |
+          # Build comprehensive description
+          DESCRIPTION="${{ inputs.description }}"
+          if [ -z "$DESCRIPTION" ]; then
+            DESCRIPTION="Automated deployment to ${{ inputs.environment }} environment via GitHub Actions."
+            DESCRIPTION="${DESCRIPTION}\n\nChange Type: ${{ inputs.change_type }}"
+            DESCRIPTION="${DESCRIPTION}\nTriggered by: ${{ github.actor }}"
+            DESCRIPTION="${DESCRIPTION}\nCommit: ${{ github.sha }}"
+            DESCRIPTION="${DESCRIPTION}\nBranch: ${{ github.ref_name }}"
+            DESCRIPTION="${DESCRIPTION}\nWorkflow: ${{ github.workflow }}"
+            DESCRIPTION="${DESCRIPTION}\nRun: ${{ github.run_number }}"
+          fi
+          echo "description=$DESCRIPTION" >> $GITHUB_OUTPUT
+
+          # Build implementation plan
+          IMPL_PLAN="${{ inputs.implementation_plan }}"
+          if [ -z "$IMPL_PLAN" ]; then
+            if [ "${{ inputs.change_type }}" == "terraform" ]; then
+              IMPL_PLAN="1. Review terraform plan output\n2. Execute terraform apply\n3. Verify infrastructure state\n4. Update documentation"
+            elif [ "${{ inputs.change_type }}" == "kubernetes" ]; then
+              IMPL_PLAN="1. Apply Kustomize overlays for ${{ inputs.environment }}\n2. Monitor rollout status\n3. Verify pod health\n4. Check service endpoints"
+            else
+              IMPL_PLAN="1. Build and test application\n2. Deploy to ${{ inputs.environment }}\n3. Run smoke tests\n4. Monitor metrics"
+            fi
+          fi
+          echo "impl_plan=$IMPL_PLAN" >> $GITHUB_OUTPUT
+
+          # Build backout plan
+          BACKOUT_PLAN="${{ inputs.backout_plan }}"
+          if [ -z "$BACKOUT_PLAN" ]; then
+            if [ "${{ inputs.change_type }}" == "terraform" ]; then
+              BACKOUT_PLAN="1. Review previous terraform state\n2. Execute terraform apply with previous configuration\n3. Verify rollback successful"
+            elif [ "${{ inputs.change_type }}" == "kubernetes" ]; then
+              BACKOUT_PLAN="1. kubectl rollout undo deployment/{service} -n microservices-${{ inputs.environment }}\n2. Verify previous version running\n3. Monitor for stability"
+            else
+              BACKOUT_PLAN="1. Revert to previous Docker image tag\n2. Redeploy previous version\n3. Verify rollback successful"
+            fi
+          fi
+          echo "backout_plan=$BACKOUT_PLAN" >> $GITHUB_OUTPUT
+
+          # Build test plan
+          TEST_PLAN="${{ inputs.test_plan }}"
+          if [ -z "$TEST_PLAN" ]; then
+            TEST_PLAN="1. Verify all unit tests passed\n2. Run integration tests\n3. Smoke test critical paths\n4. Monitor error rates and latency\n5. Verify ServiceNow registration"
+          fi
+          echo "test_plan=$TEST_PLAN" >> $GITHUB_OUTPUT
+
+      # =====================================================================
+      # DEV Environment: Auto-Approve Change
+      # =====================================================================
+      - name: Create Change Request (DEV - Auto-Approve)
+        id: change-dev
+        if: inputs.environment == 'dev'
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        with:
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Create Change Request (${{ inputs.environment }})'
+          change-request: |
+            {
+              "setCloseCode": "true",
+              "autoCloseChange": true,
+              "attributes": {
+                "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
+                "description": "${{ steps.prepare.outputs.description }}",
+                "assignment_group": "${{ inputs.assignment_group }}",
+                "implementation_plan": "${{ steps.prepare.outputs.impl_plan }}",
+                "backout_plan": "${{ steps.prepare.outputs.backout_plan }}",
+                "test_plan": "${{ steps.prepare.outputs.test_plan }}",
+                "type": "standard",
+                "state": "implement",
+                "priority": "3",
+                "u_source": "GitHub Actions",
+                "u_environment": "${{ inputs.environment }}",
+                "u_change_type": "${{ inputs.change_type }}"
+              }
+            }
+          interval: '30'
+          timeout: '600'
+          changeCreationTimeOut: '300'
+          abortOnChangeCreationFailure: false
+          abortOnChangeStepTimeout: false
+
+      # =====================================================================
+      # QA/PROD Environment: Manual Approval Required
+      # =====================================================================
+      - name: Create Change Request (QA/PROD - Manual Approval)
+        id: change-prod
+        if: inputs.environment != 'dev'
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        with:
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Create Change Request (${{ inputs.environment }})'
+          change-request: |
+            {
+              "setCloseCode": "true",
+              "autoCloseChange": true,
+              "attributes": {
+                "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
+                "description": "${{ steps.prepare.outputs.description }}",
+                "assignment_group": "${{ inputs.assignment_group }}",
+                "implementation_plan": "${{ steps.prepare.outputs.impl_plan }}",
+                "backout_plan": "${{ steps.prepare.outputs.backout_plan }}",
+                "test_plan": "${{ steps.prepare.outputs.test_plan }}",
+                "type": "standard",
+                "state": "assess",
+                "priority": "${{ inputs.environment == 'prod' && '2' || '3' }}",
+                "u_source": "GitHub Actions",
+                "u_environment": "${{ inputs.environment }}",
+                "u_change_type": "${{ inputs.change_type }}"
+              }
+            }
+          interval: '100'
+          timeout: '3600'
+          changeCreationTimeOut: '600'
+          abortOnChangeCreationFailure: true
+          abortOnChangeStepTimeout: true
+
+      # =====================================================================
+      # Consolidate Outputs
+      # =====================================================================
+      - name: Consolidate Change Outputs
+        id: change
+        run: |
+          if [ "${{ inputs.environment }}" == "dev" ]; then
+            echo "change-request-number=${{ steps.change-dev.outputs.change-request-number }}" >> $GITHUB_OUTPUT
+            echo "change-request-sys-id=${{ steps.change-dev.outputs.change-request-sys-id }}" >> $GITHUB_OUTPUT
+          else
+            echo "change-request-number=${{ steps.change-prod.outputs.change-request-number }}" >> $GITHUB_OUTPUT
+            echo "change-request-sys-id=${{ steps.change-prod.outputs.change-request-sys-id }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check Approval Status
+        id: check-approval
+        run: |
+          if [ "${{ inputs.environment }}" == "dev" ]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+            echo "✅ DEV: Auto-approved"
+          else
+            echo "approved=true" >> $GITHUB_OUTPUT
+            echo "✅ ${{ inputs.environment }}: Change approved by ServiceNow"
+          fi
+
+      # =====================================================================
+      # Summary
+      # =====================================================================
+      - name: Change Request Summary
+        if: always()
+        run: |
+          echo "## 📋 ServiceNow Change Request" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Change Type** | \`${{ inputs.change_type }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Change Number** | [\`${{ steps.change.outputs.change-request-number }}\`](${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sysparm_query=number=${{ steps.change.outputs.change-request-number }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Description** | ${{ inputs.short_description }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.environment }}" == "dev" ]; then
+            echo "| **Approval** | ✅ Auto-Approved (DEV) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Approval** | ✅ Approved via ServiceNow |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps**: Deployment will proceed" >> $GITHUB_STEP_SUMMARY
