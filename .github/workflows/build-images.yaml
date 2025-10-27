@@ -267,6 +267,50 @@ jobs:
           retention-days: 90
         continue-on-error: true
 
+      - name: Get Image Digest
+        if: inputs.push_images
+        id: image-digest
+        run: |
+          # Get the image digest from ECR
+          IMAGE_DIGEST=$(docker inspect ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }} --format='{{index .RepoDigests 0}}' 2>/dev/null || echo "")
+          if [ -z "$IMAGE_DIGEST" ]; then
+            # Fallback: query ECR directly
+            IMAGE_DIGEST=$(aws ecr describe-images \
+              --repository-name ${{ matrix.service }} \
+              --image-ids imageTag=${{ inputs.environment }} \
+              --region ${{ env.AWS_REGION }} \
+              --query 'imageDetails[0].imageDigest' \
+              --output text 2>/dev/null || echo "unknown")
+          fi
+          echo "digest=$IMAGE_DIGEST" >> $GITHUB_OUTPUT
+          echo "Image digest: $IMAGE_DIGEST"
+
+      - name: ServiceNow DevOps Register Package
+        if: inputs.push_images
+        uses: ServiceNow/servicenow-devops-register-package@v3.1.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Build ${{ matrix.service }}'
+          package-name: ${{ matrix.service }}
+          artifacts: '[
+            {
+              "name": "${{ matrix.service }}",
+              "version": "${{ inputs.environment }}-${{ github.sha }}",
+              "semanticVersion": "${{ inputs.environment }}.0.${{ github.run_number }}",
+              "repositoryName": "${{ env.ECR_REGISTRY }}/${{ matrix.service }}",
+              "imageTag": "${{ inputs.environment }}",
+              "imageDigest": "${{ steps.image-digest.outputs.digest }}",
+              "commitSHA": "${{ github.sha }}",
+              "branch": "${{ github.ref_name }}",
+              "buildNumber": "${{ github.run_number }}",
+              "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+          ]'
+
       - name: Service Build Summary
         if: always()
         run: |
