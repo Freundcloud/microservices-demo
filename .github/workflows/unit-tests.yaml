@@ -1,7 +1,7 @@
 ---
 name: "Unit Tests (Reusable)"
 
-on:
+'on':
   workflow_call:
     outputs:
       test_result:
@@ -216,19 +216,32 @@ jobs:
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.find-test-results.outputs.test_results_exist == 'true'
         with:
           name: test-results-${{ matrix.service }}
-          path: src/${{ matrix.service }}/build/test-results/test/*.xml
+          path: src/${{ matrix.service }}/combined-test-results.xml
           retention-days: 30
+
+      - name: Check Coverage Exists
+        if: always()
+        id: check-coverage
+        working-directory: src/${{ matrix.service }}
+        run: |
+          if [ -f "build/reports/jacoco/test/jacocoTestReport.xml" ]; then
+            echo "coverage_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Coverage report found"
+          else
+            echo "coverage_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No coverage report - JaCoCo plugin may not be configured"
+          fi
 
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
+        if: always() && steps.check-coverage.outputs.coverage_exists == 'true'
         with:
           name: coverage-${{ matrix.service }}
           path: src/${{ matrix.service }}/build/reports/jacoco/test/jacocoTestReport.xml
           retention-days: 30
-        continue-on-error: true
 
   # Node.js services testing (currency, payment)
   test-nodejs-services:
@@ -260,20 +273,24 @@ jobs:
         working-directory: src/${{ matrix.service }}
         run: |
           # Check if test script exists
-          if npm run | grep -q "test"; then
+          if npm run | grep -q "test" && ! grep -q "Error: no test specified" package.json; then
+            echo "✅ Test script found in package.json"
             # Install junit reporter for ServiceNow
-            npm install --save-dev jest-junit mocha-junit-reporter
+            npm install --save-dev jest-junit mocha-junit-reporter nyc
 
-            # Run tests with JUnit XML output
+            # Run tests with JUnit XML output and coverage
             if npm run | grep -q "jest"; then
               JEST_JUNIT_OUTPUT_DIR=. JEST_JUNIT_OUTPUT_NAME=test-results.xml npm test -- --coverage --coverageReporters=text --coverageReporters=cobertura --reporters=default --reporters=jest-junit || true
             else
-              npm test -- --coverage --coverageReporters=text --coverageReporters=cobertura --reporter mocha-junit-reporter --reporter-options mochaFile=test-results.xml || true
+              # Mocha with NYC for coverage
+              npx nyc --reporter=cobertura --reporter=text npm test -- --reporter mocha-junit-reporter --reporter-options mochaFile=test-results.xml || true
             fi
           else
-            echo "No test script found in package.json for ${{ matrix.service }}"
-            echo "Creating placeholder test..."
-            mkdir -p test
+            echo "⚠️ No test script found in package.json for ${{ matrix.service }}"
+            echo "Creating placeholder test with coverage..."
+            mkdir -p test coverage
+
+            # Create placeholder test
             cat > test/placeholder.test.js << 'EOF'
           const assert = require('assert');
 
@@ -283,9 +300,15 @@ jobs:
             });
           });
           EOF
-            # Add test script to package.json if missing
-            npm install --save-dev mocha mocha-junit-reporter
-            npx mocha test/placeholder.test.js --reporter mocha-junit-reporter --reporter-options mochaFile=test-results.xml || true
+
+            # Install test dependencies
+            npm install --save-dev mocha mocha-junit-reporter nyc
+
+            # Run tests with coverage using NYC
+            npx nyc --reporter=cobertura --reporter=text --report-dir=coverage \
+              npx mocha test/placeholder.test.js \
+              --reporter mocha-junit-reporter \
+              --reporter-options mochaFile=test-results.xml || true
           fi
 
       - name: Check Test Results Exist
@@ -395,13 +418,29 @@ jobs:
           xml-report-filename: src/cartservice/src/TestResults/test-results.trx
           test-summary-name: 'CSharp-cartservice-TestSummary'
 
+      - name: Check Coverage Exists
+        if: always()
+        id: check-coverage
+        working-directory: src/cartservice/src
+        run: |
+          # Find coverage files
+          COVERAGE_FILE=$(find TestResults -name "coverage.cobertura.xml" 2>/dev/null | head -1)
+          if [ -n "$COVERAGE_FILE" ]; then
+            echo "coverage_exists=true" >> $GITHUB_OUTPUT
+            echo "coverage_path=$COVERAGE_FILE" >> $GITHUB_OUTPUT
+            echo "✅ Coverage file found: $COVERAGE_FILE"
+          else
+            echo "coverage_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No coverage file found - tests may not have run or coverage not collected"
+          fi
+
       - name: Upload Coverage
         uses: actions/upload-artifact@v4
+        if: always() && steps.check-coverage.outputs.coverage_exists == 'true'
         with:
           name: coverage-cartservice
-          path: src/cartservice/src/TestResults/**/coverage.cobertura.xml
+          path: src/cartservice/src/${{ steps.check-coverage.outputs.coverage_path }}
           retention-days: 30
-        continue-on-error: true
 
   # Load generator - skip tests (it's a test tool itself)
   # No tests needed for loadgenerator
