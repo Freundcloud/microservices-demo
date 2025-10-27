@@ -409,6 +409,121 @@ kubectl get pods -n microservices-prod -l version=v1.2.2
 
 ---
 
-**Last Updated**: 2025-10-22
+## Recent Implementation Updates (2025-10-27)
+
+### Semantic Versioning Pipeline Fixes
+
+Three critical bugs were fixed in the semantic versioning implementation:
+
+#### Bug #1: Version Parameter Not Passed from Script to Workflow
+**Problem**: `scripts/promote-version.sh` captured the version in `$VERSION` variable and updated kustomization files, but wasn't passing the version to the GitHub Actions workflow triggers.
+
+**Fix** (Commit 57192946):
+```bash
+# Added -f version=$VERSION to workflow triggers
+gh workflow run MASTER-PIPELINE.yaml \
+  -f environment=dev \
+  -f force_build_all=true \
+  -f version=$VERSION  # ← Added this parameter
+```
+
+#### Bug #2: Build Job Referenced Non-Existent Output
+**Problem**: The `build-and-push` job in MASTER-PIPELINE.yaml was trying to use `needs.pipeline-init.outputs.version`, but this output doesn't exist. The `pipeline-init` job only outputs: `environment`, `should_deploy`, `is_production`, `policy_ok`, `policy_reason`.
+
+**Fix** (Commit 4daa2012):
+```yaml
+build-and-push:
+  needs: [pipeline-init, detect-service-changes, security-scans, get-deployed-version]  # Added get-deployed-version
+  uses: ./.github/workflows/build-images.yaml
+  with:
+    version: ${{ needs.get-deployed-version.outputs.previous_version }}  # Changed from pipeline-init.outputs.version
+```
+
+**Impact**: Before these fixes, images were being tagged with `dev`, `dev-<commit-sha>`, `main` but NOT `v1.2.3`. After fixes, semantic version tags are correctly applied.
+
+#### Bug #3: Circular Dependency in Version Detection
+**Problem**: The workflow tried to read the currently deployed version from the cluster to determine what version to build next, creating a circular dependency on first deployment.
+
+**Solution**: Added optional `version` input to `get-deployed-version` job:
+```yaml
+- name: Get Current Deployed Version
+  run: |
+    # Use input version if provided, otherwise read from cluster
+    if [ -n "${{ github.event.inputs.version }}" ]; then
+      VERSION="${{ github.event.inputs.version }}"
+      echo "✅ Using provided version: $VERSION"
+    else
+      # Read from cluster...
+    fi
+```
+
+**Result**: Manual version input breaks the circular dependency, enabling first-time deployments and version resets.
+
+### Test Execution Quality Gates
+
+#### Test Failures Now Properly Fail Workflows
+**Problem**: All test execution steps had `continue-on-error: true`, hiding test failures. Tests could fail but workflows would still pass and deploy.
+
+**Fix** (Commit 19b8ba8d): Removed `continue-on-error: true` from all test steps:
+- Go tests (frontend, checkoutservice, productcatalogservice, shippingservice)
+- C# tests (cartservice)
+- Java tests (adservice)
+- Python tests (emailservice, recommendationservice, shoppingassistantservice)
+
+**Impact**: Workflows now FAIL immediately when tests fail. No more hidden problems.
+
+### C# Test Logger Integration
+
+#### JUnit XML Output for .NET Tests
+**Problem**: C# tests configured to use `--logger "junit;LogFilePath=test-results.xml"` but .NET doesn't have built-in JUnit logger. Tests failed with: "Could not find a test logger... 'junit'"
+
+**Fix** (Commit 3cd27b2c): Added `JunitXml.TestLogger` NuGet package to `cartservice.tests.csproj`:
+```xml
+<PackageReference Include="JunitXml.TestLogger" Version="3.1.11" />
+```
+
+**Benefit**: C# test results now publishable in JUnit XML format, consistent with other services.
+
+### GitHub Actions Permissions for Reusable Workflows
+
+#### Test Results Publishing
+**Problem**: `build-images.yaml` reusable workflow declared `checks: write` permission but the caller workflow (MASTER-PIPELINE.yaml) didn't grant it. Result: "The workflow is requesting 'checks: write', but is only allowed 'checks: none'"
+
+**Fix** (Commit 9b5d12b1): Added permissions block to build-and-push job:
+```yaml
+build-and-push:
+  permissions:
+    contents: read
+    security-events: write
+    id-token: write
+    checks: write  # ← Required for test results publishing
+  uses: ./.github/workflows/build-images.yaml
+```
+
+**Benefit**: Test results can now be published as GitHub Check Runs, visible in PR UI.
+
+### Verification Commands
+
+```bash
+# Verify semantic version tags in ECR
+aws ecr describe-images \
+  --repository-name frontend \
+  --region eu-west-2 \
+  --query 'imageDetails[?contains(imageTags, `v1.2.3`)]'
+
+# Verify deployment using semantic version
+kubectl get deployment frontend -n microservices-dev \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Expected output:
+533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend:v1.2.3
+
+# Check test results in GitHub Actions
+gh run view <run-id> --log | grep -A5 "Run.*Tests"
+```
+
+---
+
+**Last Updated**: 2025-10-27
 **Owner**: DevOps Team
 **Review Cycle**: Quarterly

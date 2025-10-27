@@ -4,6 +4,19 @@
 
 **New to this project?** Start with **[DEMO-OVERVIEW.md](../DEMO-OVERVIEW.md)** to understand what this demo does.
 
+## 🆕 Recent Updates (2025-10-27)
+
+**Critical Pipeline Fixes**:
+- ✅ **Semantic Versioning Fixed** - Images now correctly tagged with `v1.2.3` format
+  - Fixed version parameter passing from promote script to workflows
+  - Fixed build job referencing non-existent outputs
+  - See [VERSION-TRACKING-STRATEGY.md](VERSION-TRACKING-STRATEGY.md#recent-implementation-updates-2025-10-27)
+- ✅ **Test Quality Gates Enforced** - Removed `continue-on-error` flags from all test steps
+  - Go, C#, Java, Python tests now properly fail workflows when tests fail
+  - No more hidden test failures
+- ✅ **C# Test Logger Added** - JunitXml.TestLogger package for .NET test results
+- ✅ **GitHub Actions Permissions** - Fixed reusable workflow permissions for test result publishing
+
 ## Quick Start Guides
 
 ### For Developers
