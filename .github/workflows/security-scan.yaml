@@ -427,4 +427,3 @@ jobs:
         with:
           sarif_file: dependency-check-report/dependency-check-report.sarif
           category: owasp-dependency-check
-
