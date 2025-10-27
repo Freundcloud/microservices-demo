@@ -166,9 +166,13 @@ just service-deploy dev paymentservice 1.1.5.1
 1. ✅ Creates feature branch: `feat/deploy-paymentservice-dev-1.1.5.1`
 2. ✅ Creates GitHub issue as ServiceNow work item
 3. ✅ Updates ONLY paymentservice in `kustomize/overlays/dev/kustomization.yaml`
-4. ✅ Commits changes with reference to work item
-5. ✅ Pushes branch to GitHub
-6. ✅ Creates pull request with service details
+4. ✅ **Triggers Docker image rebuild** by updating service source files:
+   - Creates/updates `src/paymentservice/VERSION.txt` with new version
+   - Updates version label comment in `src/paymentservice/Dockerfile`
+   - This ensures GitHub Actions detects source changes and rebuilds the image
+5. ✅ Commits changes with reference to work item
+6. ✅ Pushes branch to GitHub
+7. ✅ Creates pull request with service details
 
 **Output**:
 ```
@@ -199,12 +203,242 @@ Next steps:
 
 When you merge the PR, the MASTER-PIPELINE workflow automatically:
 1. Runs unit tests (only for paymentservice)
-2. Builds new Docker image: `paymentservice:1.1.5.1`
+2. **Builds new Docker image**: `paymentservice:1.1.5.1`
 3. Pushes to ECR
 4. Creates ServiceNow change request
 5. Waits for ServiceNow approval
 6. Deploys ONLY paymentservice to dev namespace
 7. Closes GitHub work item
+
+---
+
+## Docker Image Build Triggering
+
+### How Version Bumps Trigger Builds
+
+When you run `just service-deploy`, the system ensures a Docker image is built for the new version through **two detection mechanisms**:
+
+#### **Method 1: Source File Changes** (Primary)
+
+The `bump-service-version.sh` script automatically updates files in the service source directory:
+
+```bash
+# Example: Deploying paymentservice 1.1.5.1
+
+# Creates/updates VERSION.txt
+src/paymentservice/VERSION.txt
+Content: 1.1.5.1
+
+# Updates Dockerfile version label
+src/paymentservice/Dockerfile
+Added/Updated: # Service Version: 1.1.5.1
+```
+
+**Why this works**:
+- GitHub Actions path filter detects changes in `src/paymentservice/**`
+- Triggers build workflow for paymentservice
+- Image is tagged with the new version (1.1.5.1)
+
+#### **Method 2: Kustomize Overlay Changes** (Fallback)
+
+The build workflow also detects version changes in Kustomize overlays:
+
+```yaml
+# .github/workflows/build-images.yaml
+
+- name: Check Changed Files
+  uses: dorny/paths-filter@v3
+  with:
+    filters: |
+      paymentservice:
+        - 'src/paymentservice/**'              # Method 1
+        - 'kustomize/overlays/*/kustomization.yaml'  # Method 2
+
+- name: Detect Version Changes in Kustomize Overlays
+  run: |
+    # Parses git diff to find services with newTag changes
+    # Merges with source-changed services
+    # Ensures all version-bumped services are built
+```
+
+**Why both methods**:
+- **Source changes** = Primary trigger (most reliable, tracks in git)
+- **Kustomize changes** = Backup trigger (catches edge cases)
+- **Combined** = Guarantees build even if source update fails
+
+---
+
+### Build Detection Logic
+
+```
+┌─────────────────────────────────────────────┐
+│ GitHub Actions: build-images.yaml          │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ├─► Step 1: Check changed files (dorny/paths-filter)
+                  │   ├─► src/paymentservice/** changed? → YES ✅
+                  │   └─► Result: paymentservice in build matrix
+                  │
+                  ├─► Step 2: Detect Kustomize version changes
+                  │   ├─► Parse git diff of kustomization.yaml
+                  │   ├─► Extract services with newTag changes
+                  │   └─► Result: paymentservice in version-changed list
+                  │
+                  └─► Step 3: Merge both lists
+                      ├─► Combine source-changed + version-changed
+                      ├─► Remove duplicates
+                      └─► Result: ["paymentservice"]
+
+                      ▼
+┌─────────────────────────────────────────────┐
+│ Build Matrix: ["paymentservice"]            │
+│ → Builds ONLY paymentservice               │
+│ → Tags image with 1.1.5.1                  │
+│ → Pushes to ECR                            │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+### What Gets Updated
+
+When deploying `paymentservice 1.1.5.1` to dev:
+
+**Files Modified** (committed to git):
+```
+kustomize/overlays/dev/kustomization.yaml
+src/paymentservice/VERSION.txt
+src/paymentservice/Dockerfile
+```
+
+**Git Diff Example**:
+```diff
+diff --git a/kustomize/overlays/dev/kustomization.yaml b/kustomize/overlays/dev/kustomization.yaml
+@@ -45,7 +45,7 @@
+ images:
+ - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
+   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/paymentservice
+-  newTag: 1.1.5
++  newTag: 1.1.5.1
+
+diff --git a/src/paymentservice/VERSION.txt b/src/paymentservice/VERSION.txt
+@@ -1 +1 @@
+-1.1.5
++1.1.5.1
+
+diff --git a/src/paymentservice/Dockerfile b/src/paymentservice/Dockerfile
+@@ -1,4 +1,5 @@
+ FROM node:20-alpine
++# Service Version: 1.1.5.1
+
+ WORKDIR /app
+```
+
+---
+
+### ECR Image Tags
+
+After the build, the Docker image in ECR has multiple tags:
+
+```
+ECR Repository: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/paymentservice
+
+Image Digest: sha256:abc123...
+├── Tags:
+│   ├── 1.1.5.1           ← Service-specific version
+│   ├── dev               ← Environment tag
+│   └── c323c8e5          ← Git commit SHA
+```
+
+**The same image** can have multiple tags. Kubernetes pulls the image by the tag specified in Kustomize (`newTag: 1.1.5.1`).
+
+---
+
+### Demo Flow Summary
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Developer Action: just service-deploy dev paymentservice 1.1.5.1    │
+└──────────────────────┬───────────────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ Script Updates:                                                       │
+│ 1. kustomize/overlays/dev/kustomization.yaml (newTag: 1.1.5.1)      │
+│ 2. src/paymentservice/VERSION.txt (1.1.5.1)                         │
+│ 3. src/paymentservice/Dockerfile (# Service Version: 1.1.5.1)       │
+└──────────────────────┬───────────────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ Git Commit + Push → PR Created                                       │
+└──────────────────────┬───────────────────────────────────────────────┘
+                       │
+                       ▼ (PR Merged)
+┌──────────────────────────────────────────────────────────────────────┐
+│ GitHub Actions: Master Pipeline                                      │
+│ ├─► Detect Changes                                                   │
+│ │   ├─► Source: src/paymentservice/** ✅                            │
+│ │   └─► Kustomize: overlays/dev/kustomization.yaml ✅              │
+│ ├─► Build Docker Image: paymentservice:1.1.5.1                      │
+│ ├─► Security Scan (Trivy)                                           │
+│ ├─► Push to ECR                                                     │
+│ └─► Trigger Deployment                                              │
+└──────────────────────┬───────────────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ ServiceNow DevOps Change Automation                                  │
+│ ├─► Create Change Request                                           │
+│ │   ├─► Service: paymentservice                                     │
+│ │   ├─► Version: 1.1.5.1                                            │
+│ │   ├─► Environment: dev                                            │
+│ │   └─► Work Item: #24                                              │
+│ └─► Wait for Approval (auto-approved for dev)                       │
+└──────────────────────┬───────────────────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ Kubernetes Deployment                                                 │
+│ ├─► kubectl apply -k kustomize/overlays/dev                         │
+│ ├─► Pull image: paymentservice:1.1.5.1 from ECR                     │
+│ ├─► Rolling update (only paymentservice pod)                        │
+│ ├─► Health check ✅                                                 │
+│ └─► Update ServiceNow CR: Deployed successfully                     │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Troubleshooting Build Triggers
+
+**Issue**: Version bump didn't trigger a build
+
+**Check 1: Source files updated?**
+```bash
+git log -1 --name-status
+```
+Expected output:
+```
+M    kustomize/overlays/dev/kustomization.yaml
+A    src/paymentservice/VERSION.txt
+M    src/paymentservice/Dockerfile
+```
+
+**Check 2: Build workflow detected changes?**
+- Open GitHub Actions workflow run
+- Check "Detect Services to Build" step
+- Verify paymentservice is in the build matrix
+
+**Check 3: Path filter configured correctly?**
+```yaml
+# .github/workflows/build-images.yaml
+paymentservice:
+  - 'src/paymentservice/**'
+  - 'kustomize/overlays/*/kustomization.yaml'
+```
+
+**Fix**: Re-run the `just service-deploy` command or manually update source files.
 
 ---
 
