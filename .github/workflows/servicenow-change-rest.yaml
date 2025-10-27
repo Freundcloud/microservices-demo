@@ -122,6 +122,7 @@ jobs:
           TEST_PLAN: ${{ inputs.test_plan || '1. Verify deployments rolled out\n2. Check all pods Running\n3. Verify service endpoints\n4. Test frontend accessibility\n5. Monitor application metrics' }}
           ENVIRONMENT: ${{ inputs.environment }}
           CHANGE_TYPE: ${{ inputs.change_type }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           # Determine risk/impact based on environment
           if [ "$ENVIRONMENT" = "prod" ]; then
@@ -151,11 +152,12 @@ jobs:
 
           # Try to extract PR number from merge commit message (e.g., "Merge pull request #123")
           if [ -z "$PR_NUM" ]; then
-            COMMIT_MSG="${{ github.event.head_commit.message }}"
-            if [[ "$COMMIT_MSG" =~ Merge\ pull\ request\ \#([0-9]+) ]]; then
+            # Extract from first line only to avoid parsing entire commit body
+            COMMIT_FIRST_LINE="$(echo "$COMMIT_MESSAGE" | head -1)"
+            if [[ "$COMMIT_FIRST_LINE" =~ Merge\ pull\ request\ \#([0-9]+) ]]; then
               PR_NUM="${BASH_REMATCH[1]}"
               echo "Extracted PR number from commit message: #$PR_NUM"
-            elif [[ "$COMMIT_MSG" =~ \(#([0-9]+)\) ]]; then
+            elif [[ "$COMMIT_FIRST_LINE" =~ \(#([0-9]+)\) ]]; then
               # Also handle squash merge format: "feat: description (#123)"
               PR_NUM="${BASH_REMATCH[1]}"
               echo "Extracted PR number from squash commit: #$PR_NUM"
@@ -214,7 +216,7 @@ jobs:
             --arg u_infrastructure_changes "${{ inputs.infrastructure_changes }}" \
             --arg u_security_scanners "$SCANNERS" \
             --arg u_previous_version "${{ inputs.previous_version }}" \
-            --arg u_commit_message "${{ github.event.head_commit.message }}" \
+            --arg u_commit_message "$COMMIT_MESSAGE" \
             '{
               short_description: $short_desc,
               description: $description,
