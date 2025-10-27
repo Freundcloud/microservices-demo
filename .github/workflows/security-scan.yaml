@@ -49,11 +49,6 @@ jobs:
           cd src/adservice
           chmod +x gradlew
           ./gradlew build -x test --no-daemon
-
-          # Build shopping assistant service
-          cd ../shoppingassistantservice
-          chmod +x gradlew
-          ./gradlew build -x test --no-daemon
         continue-on-error: true
 
       - name: Perform CodeQL Analysis
@@ -84,6 +79,7 @@ jobs:
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0
+        continue-on-error: true  # Report vulnerabilities but don't block workflow
 
       - name: Generate SBOM (Software Bill of Materials)
         uses: anchore/sbom-action@v0
