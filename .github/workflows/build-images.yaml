@@ -9,6 +9,11 @@ name: "Build and Push Docker Images (Reusable)"
         required: false
         type: string
         default: 'dev'
+      version:
+        description: 'Semantic version tag (e.g., 1.2.0). If provided, uses v{version} instead of environment'
+        required: false
+        type: string
+        default: ''
       services:
         description: 'Services to build (JSON array or "all")'
         required: false
@@ -369,10 +374,10 @@ jobs:
         with:
           images: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}
           tags: |
-            type=raw,value=${{ inputs.environment }}
-            type=raw,value=${{ inputs.environment }}-${{ github.sha }}
-            type=raw,value=${{ steps.release.outputs.tag }}
-            type=raw,value=latest,enable=${{ inputs.environment == 'prod' }}
+            type=raw,value=${{ inputs.version != '' && format('v{0}', inputs.version) || inputs.environment }}
+            type=raw,value=${{ inputs.version != '' && format('v{0}-{1}', inputs.version, github.sha) || format('{0}-{1}', inputs.environment, github.sha) }}
+            type=raw,value=${{ steps.release.outputs.tag }},enable=${{ steps.release.outputs.tag != '' }}
+            type=raw,value=latest,enable=${{ inputs.environment == 'prod' && inputs.version == '' }}
             type=sha,prefix={{branch}}-
             type=ref,event=branch
             type=ref,event=pr
