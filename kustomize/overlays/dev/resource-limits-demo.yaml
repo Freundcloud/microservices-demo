@@ -1,18 +1,17 @@
-# Minimal Demo Resource Limits
-# Purpose: Reduce resource requests to fit entire stack on 2x t3.large nodes
-# For: Demo/Development environment only (NOT for production)
+# Ultra-Minimal Demo Resource Limits
+# Purpose: Absolute minimum resource requests for demo purposes only
+# For: Demo/Development environment ONLY (NOT for production or load testing)
 #
 # Total Resources Available:
-# - 2x t3.large nodes = 4 vCPU, 16 GB RAM total
-# - System pods (CoreDNS, kube-proxy, aws-node, etc.) use ~800m CPU, ~2GB RAM
-# - Istio (istiod + ingress gateway) uses ~500m CPU, ~1GB RAM
-# - Available for workloads: ~2.7 vCPU, ~13 GB RAM
+# - 4x t3.large nodes = 8 vCPU, ~28 GB RAM total
+# - Current usage: Only 3-5% CPU, 15-19% memory per node
+# - Plenty of headroom for ultra-minimal settings
 #
-# Strategy: Reduce CPU requests, keep memory at namespace minimum (64Mi)
-# Note: LimitRange enforces minimum 64Mi memory per container
+# Strategy: Ultra-low CPU (10-25m), minimal memory (32Mi)
+# Note: LimitRange will be adjusted to allow 32Mi minimum
 #
-# Baseline Total: 1900m CPU, 1.3GB RAM
-# Demo Total:      600m CPU, ~1GB RAM (respects 64Mi minimum)
+# Previous Total: 600m CPU, ~1GB RAM
+# New Total:      ~200m CPU, ~400MB RAM (70% reduction)
 
 apiVersion: apps/v1
 kind: Deployment
@@ -25,10 +24,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 25m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -43,10 +42,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 100m       # Was: 200m
-            memory: 64Mi    # Namespace minimum
+            cpu: 20m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 300m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -61,10 +60,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 15m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -79,10 +78,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 15m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -97,10 +96,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 15m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -115,10 +114,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 15m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -133,10 +132,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 15m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -151,10 +150,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 64Mi    # Namespace minimum
+            cpu: 15m        # Ultra-minimal for demo
+            memory: 32Mi    # Absolute minimum
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
 
 ---
@@ -169,10 +168,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 50m        # Was: 100m
-            memory: 110Mi   # Was: 220Mi
+            cpu: 20m        # Ultra-minimal for demo (Python needs slightly more)
+            memory: 48Mi    # Python service needs a bit more
           limits:
-            cpu: 200m
+            cpu: 150m
             memory: 256Mi
 
 ---
@@ -187,10 +186,10 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 100m       # Was: 200m
-            memory: 90Mi    # Was: 180Mi
+            cpu: 25m        # Ultra-minimal for demo (Java needs slightly more)
+            memory: 48Mi    # Java service needs a bit more
           limits:
-            cpu: 300m
+            cpu: 150m
             memory: 256Mi
 
 ---
@@ -205,8 +204,8 @@ spec:
       - name: redis
         resources:
           requests:
-            cpu: 35m        # Was: 70m
-            memory: 100Mi   # Was: 200Mi
+            cpu: 10m        # Ultra-minimal for demo (Redis is very efficient)
+            memory: 32Mi    # Redis can run on very little
           limits:
-            cpu: 150m
-            memory: 256Mi
+            cpu: 100m
+            memory: 128Mi

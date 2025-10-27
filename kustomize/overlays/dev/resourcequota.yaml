@@ -34,12 +34,12 @@ spec:
       cpu: "2"
       memory: 2Gi
     min:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 10m       # Ultra-minimal for demo (was 50m)
+      memory: 32Mi   # Ultra-minimal for demo (was 64Mi)
     default:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 200m      # Reduced default (was 500m)
+      memory: 256Mi  # Reduced default (was 512Mi)
     defaultRequest:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 50m       # Reduced default request (was 200m)
+      memory: 64Mi   # Reduced default request (was 256Mi)
     type: Container
