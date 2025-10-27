@@ -86,20 +86,23 @@ jobs:
           deny-licenses: GPL-2.0, GPL-3.0
 
       - name: Generate SBOM (Software Bill of Materials)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.17.2
         with:
           path: ./
           format: cyclonedx-json
           output-file: sbom.cyclonedx.json
+          upload-artifact: true
+          upload-artifact-retention: 90
 
-      - name: Scan SBOM for vulnerabilities with Grype
+      - name: Scan directory for vulnerabilities with Grype
         id: grype-scan
-        uses: anchore/scan-action@v3
+        uses: anchore/scan-action@v4.1.2
         with:
-          sbom: sbom.cyclonedx.json
+          path: ./
           fail-build: false
           severity-cutoff: medium
           output-format: sarif
+          add-cpes-if-none: true
         continue-on-error: true
 
       - name: Fix Grype SARIF URI Schemes and Validate
