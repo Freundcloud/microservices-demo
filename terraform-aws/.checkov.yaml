@@ -1,0 +1,37 @@
+# Checkov configuration for microservices-demo Terraform
+# Suppress specific checks that are false positives or intentional design choices
+
+skip-check:
+  # CKV_AWS_290 and CKV_AWS_355: AWS Load Balancer Controller IAM Policy
+  # The ALB controller REQUIRES Resource="*" for many describe/list operations
+  # These are read-only operations that cannot be scoped to specific resources
+  # AWS official policy: https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
+  - id: CKV_AWS_290
+    comment: "AWS Load Balancer Controller requires Resource='*' for describe operations - AWS official policy"
+  - id: CKV_AWS_355
+    comment: "AWS Load Balancer Controller requires Resource='*' for describe operations - AWS official policy"
+
+  # CKV_AWS_382: Security Group Egress Rules
+  # EKS cluster security groups need unrestricted egress for:
+  # - Pulling container images from ECR
+  # - Accessing AWS services (EC2, ELB, etc.)
+  # - Pod-to-pod communication across availability zones
+  # Ingress is strictly controlled, egress is standard for Kubernetes clusters
+  - id: CKV_AWS_382
+    comment: "EKS clusters require unrestricted egress for ECR, AWS services, and pod communication"
+
+  # CKV2_AWS_5: Security Groups Attached to Resources
+  # EKS module creates security groups that are automatically attached by AWS
+  # These groups are managed by the EKS control plane, not directly by Terraform
+  - id: CKV2_AWS_5
+    comment: "EKS-managed security groups are attached automatically by AWS control plane"
+
+  # CKV_TF_1: Terraform Module Sources
+  # We intentionally use version constraints (~> 5.0) instead of commit hashes
+  # Reasons:
+  # - Allows automatic patch updates for security fixes
+  # - terraform-aws-modules are official, well-maintained, and stable
+  # - Version constraints provide balance between stability and updates
+  # - Lock file (terraform.lock.hcl) provides reproducibility
+  - id: CKV_TF_1
+    comment: "Using semantic versioning for official AWS modules with lock file for reproducibility"

@@ -158,6 +158,110 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
   }
 }
 
+# S3 bucket notification to SNS topic (CKV2_AWS_62)
+# Notifies when state files are created/updated
+resource "aws_s3_bucket_notification" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  topic {
+    topic_arn = aws_sns_topic.s3_notifications.arn
+    events    = ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
+    filter_prefix = "microservices/"
+  }
+
+  depends_on = [aws_sns_topic_policy.s3_notifications]
+}
+
+# SNS topic for S3 notifications
+resource "aws_sns_topic" "s3_notifications" {
+  name              = "${var.state_bucket_name}-notifications"
+  kms_master_key_id = aws_kms_key.sns.id
+
+  tags = {
+    Name        = "Terraform State S3 Notifications"
+    Environment = "shared"
+  }
+}
+
+# KMS key for SNS encryption
+resource "aws_kms_key" "sns" {
+  description             = "KMS key for SNS topic encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow SNS to use the key"
+        Effect = "Allow"
+        Principal = {
+          Service = "sns.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow S3 to use the key"
+        Effect = "Allow"
+        Principal = {
+          Service = "s3.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "terraform-state-sns-encryption"
+  }
+}
+
+resource "aws_kms_alias" "sns" {
+  name          = "alias/${var.state_bucket_name}-sns"
+  target_key_id = aws_kms_key.sns.key_id
+}
+
+# SNS topic policy to allow S3 to publish
+resource "aws_sns_topic_policy" "s3_notifications" {
+  arn = aws_sns_topic.s3_notifications.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "s3.amazonaws.com"
+        }
+        Action   = "SNS:Publish"
+        Resource = aws_sns_topic.s3_notifications.arn
+        Condition = {
+          ArnLike = {
+            "aws:SourceArn" = aws_s3_bucket.terraform_state.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
 # KMS key for DynamoDB encryption
 resource "aws_kms_key" "dynamodb" {
   description             = "KMS key for DynamoDB table encryption"
