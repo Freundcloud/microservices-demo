@@ -282,7 +282,8 @@ jobs:
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
       version: ${{ needs.pipeline-init.outputs.version }}
-      services: ${{ inputs.force_build_all && 'all' || needs.detect-service-changes.outputs.services_changed }}
+      # Always pass 'all' when force_build_all is true or when services_changed is empty
+      services: ${{ (inputs.force_build_all || needs.detect-service-changes.outputs.services_changed == '' || needs.detect-service-changes.outputs.services_changed == '[]') && 'all' || needs.detect-service-changes.outputs.services_changed }}
       push_images: ${{ github.event_name != 'pull_request' }}
 
   # ============================================================================
