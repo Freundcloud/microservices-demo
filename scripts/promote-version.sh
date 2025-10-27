@@ -198,9 +198,10 @@ echo ""
 # 9. Trigger MASTER-PIPELINE for DEV with force build
 echo "🟢 Triggering DEV deployment (with force build)..."
 echo "   ServiceNow CR: Auto-approved for dev"
+echo "   Version: $VERSION"
 echo ""
 
-gh workflow run MASTER-PIPELINE.yaml -f environment=dev -f force_build_all=true
+gh workflow run MASTER-PIPELINE.yaml -f environment=dev -f force_build_all=true -f version=$VERSION
 
 sleep 15  # Let workflow start
 
@@ -232,9 +233,10 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "🟡 Triggering QA deployment (with force build)..."
     echo "   ServiceNow CR: Requires manual approval in ServiceNow"
+    echo "   Version: $VERSION"
     echo ""
 
-    gh workflow run MASTER-PIPELINE.yaml -f environment=qa -f force_build_all=true
+    gh workflow run MASTER-PIPELINE.yaml -f environment=qa -f force_build_all=true -f version=$VERSION
 
     sleep 10  # Let workflow start
 
@@ -267,9 +269,10 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "🔴 Triggering PROD deployment (with force build)..."
     echo "   ServiceNow CR: Requires manual approval in ServiceNow"
+    echo "   Version: $VERSION"
     echo ""
 
-    gh workflow run MASTER-PIPELINE.yaml -f environment=prod -f force_build_all=true
+    gh workflow run MASTER-PIPELINE.yaml -f environment=prod -f force_build_all=true -f version=$VERSION
 
     sleep 10  # Let workflow start
 
