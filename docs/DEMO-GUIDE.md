@@ -195,14 +195,40 @@ just promote-all 1.1.8
 ```
 
 **What this does**:
-1. ✅ Creates version bump PR (auto-merges)
-2. ✅ Deploys to DEV automatically
-3. ✅ Waits for DEV success
-4. ✅ Auto-promotes to QA
-5. ⚠️ Waits for manual approval for PROD
-6. ✅ Creates GitHub release tag
+1. ✅ Updates dev kustomization.yaml with version 1.1.8
+2. ✅ Commits version change to git (automated)
+3. ✅ Deploys to DEV automatically
+4. ✅ Waits for DEV success
+5. ✅ Auto-promotes to QA (updates qa kustomization.yaml)
+6. ⚠️ Waits for manual approval for PROD
+7. ✅ Deploys to PROD (updates prod kustomization.yaml)
+8. ✅ Creates GitHub release tag (v1.1.8)
 
 ### Step 2: Monitor Progress
+
+**In GitHub Actions** (watch in real-time):
+
+1. **Update Dev Kustomization** (< 30 seconds)
+   - Updates `kustomize/overlays/dev/kustomization.yaml`
+   - Commits: `chore: Update dev to version 1.1.8 - Automated promotion pipeline`
+   - Pushes to main branch
+
+2. **Deploy to DEV** (5-10 minutes)
+   - ServiceNow Change Request created (auto-approved)
+   - All 12 services deployed with version 1.1.8
+   - Config uploaded to ServiceNow
+
+3. **Promote to QA** (5-10 minutes)
+   - Validates version exists in dev
+   - Updates `kustomize/overlays/qa/kustomization.yaml`
+   - ServiceNow CR created (requires approval)
+   - Deploys after ServiceNow approval
+
+4. **Wait for PROD Approval** (manual step)
+   - Shows: "Manual Approval Required for PROD" message
+   - Waits for ServiceNow CR approval
+
+**Check status via CLI**:
 
 ```bash
 # Check deployment status across environments
@@ -210,30 +236,36 @@ just promotion-status 1.1.8
 
 # Output shows:
 # - DEV: ✅ Deployed
-# - QA: ⏳ In Progress
-# - PROD: ⏸️ Waiting for approval
+# - QA: ✅ Deployed
+# - PROD: ⏸️ Waiting for ServiceNow approval
 ```
 
 **In GitHub Actions**:
 - Show: "Full Promotion Pipeline" workflow
-- Show: Each environment deployment in real-time
-- Show: Manual approval step for production
+- Show: Each job completing sequentially
+- Show: ServiceNow approval pause before PROD
 
 ### Step 3: Approve Production Deployment
 
-**Option 1: GitHub UI**
-1. Go to: https://github.com/Freundcloud/microservices-demo/actions
-2. Find "Full Promotion Pipeline" workflow
-3. Click on the run
-4. Click "Review deployments"
-5. Select "production" environment
-6. Click "Approve and deploy"
+**ServiceNow Approval** (Required)
+1. QA deployment completes successfully
+2. ServiceNow Change Request created automatically for PROD
+3. Workflow **pauses** waiting for ServiceNow approval
+4. Approver reviews in ServiceNow:
+   - Test results from all 12 services
+   - Security scan results (SBOM, vulnerabilities)
+   - Deployment configurations
+5. Approver approves the Change Request in ServiceNow
+6. GitHub Actions detects approval and continues automatically
+7. PROD deployment proceeds
 
-**Option 2: ServiceNow** (if configured)
-1. Open ServiceNow Change Request
-2. Review test results and security scans
-3. Approve the change
-4. GitHub Actions continues automatically
+**Note**: With `auto_promote_prod=false`, the workflow creates the CR but waits for ServiceNow approval before deploying. This is the **recommended** approach for production deployments.
+
+**Alternative - Manual GitHub Trigger**:
+If you want to approve via GitHub instead of ServiceNow:
+1. Re-run the workflow with `auto_promote_prod=true`
+2. ServiceNow CR will still be created and must be approved
+3. Use this only if ServiceNow integration is not configured
 
 ### Step 4: Verify Production Deployment
 
