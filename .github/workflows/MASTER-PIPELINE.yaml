@@ -316,7 +316,7 @@ jobs:
         run: |
           if [ -d "test-results" ] && [ "$(find test-results -name '*.xml' | wc -l)" -gt 0 ]; then
             echo "found=true" >> $GITHUB_OUTPUT
-            echo "Found $(find test-results -name '*.xml' | wc -l') test result files"
+            echo "Found $(find test-results -name '*.xml' | wc -l) test result files"
           else
             echo "found=false" >> $GITHUB_OUTPUT
             echo "No test result files found"
