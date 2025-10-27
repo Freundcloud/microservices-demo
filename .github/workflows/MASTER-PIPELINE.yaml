@@ -278,7 +278,7 @@ jobs:
 
   build-and-push:
     name: "🐳 Build Docker Images"
-    needs: [pipeline-init, detect-service-changes, security-scans]
+    needs: [pipeline-init, detect-service-changes, security-scans, get-deployed-version]
     if: |
       needs.detect-service-changes.outputs.has_changes == 'true' ||
       inputs.force_build_all
@@ -286,7 +286,7 @@ jobs:
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
-      version: ${{ needs.pipeline-init.outputs.version }}
+      version: ${{ needs.get-deployed-version.outputs.previous_version }}
       # Always pass 'all' when force_build_all is true or when services_changed is empty
       services: ${{ (inputs.force_build_all || needs.detect-service-changes.outputs.services_changed == '' || needs.detect-service-changes.outputs.services_changed == '[]') && 'all' || needs.detect-service-changes.outputs.services_changed }}
       push_images: ${{ github.event_name != 'pull_request' }}
