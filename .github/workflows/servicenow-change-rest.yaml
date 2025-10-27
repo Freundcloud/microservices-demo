@@ -80,21 +80,36 @@ jobs:
         id: create-cr
         continue-on-error: true
         run: |
-          # Build the JSON payload
+          # Build the JSON payload with comprehensive ITIL fields
           PAYLOAD=$(cat <<'EOF'
           {
             "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-            "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}",
+            "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nRepository: ${{ github.repository }}",
             "type": "standard",
             "state": "${{ steps.prepare.outputs.state }}",
             "priority": "${{ steps.prepare.outputs.priority }}",
             "assignment_group": "${{ inputs.assignment_group }}",
-            "implementation_plan": "${{ inputs.implementation_plan || '1. Apply changes\n2. Monitor rollout\n3. Verify health' }}",
-            "backout_plan": "${{ inputs.backout_plan || '1. Rollback deployment\n2. Verify previous version\n3. Monitor stability' }}",
-            "test_plan": "${{ inputs.test_plan || '1. Run tests\n2. Verify functionality\n3. Monitor metrics' }}",
+            "category": "DevOps",
+            "subcategory": "Deployment",
+            "risk": "${{ inputs.environment == 'prod' && '2' || '3' }}",
+            "impact": "${{ inputs.environment == 'prod' && '2' || '3' }}",
+            "urgency": "3",
+            "justification": "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow.",
+            "implementation_plan": "${{ inputs.implementation_plan || '1. Configure kubectl access to EKS cluster\n2. Apply Kustomize overlays\n3. Monitor rollout status\n4. Verify all pods healthy\n5. Test application endpoints' }}",
+            "backout_plan": "${{ inputs.backout_plan || '1. Execute kubectl rollout undo\n2. Verify rollback completed\n3. Monitor pod status\n4. Test application functionality\n5. Notify stakeholders' }}",
+            "test_plan": "${{ inputs.test_plan || '1. Verify deployments rolled out\n2. Check all pods Running\n3. Verify service endpoints\n4. Test frontend accessibility\n5. Monitor application metrics' }}",
+            "cab_required": "${{ inputs.environment == 'prod' }}",
+            "production_system": "${{ inputs.environment == 'prod' }}",
+            "outside_maintenance_schedule": "false",
             "u_source": "GitHub Actions",
             "u_environment": "${{ inputs.environment }}",
-            "u_change_type": "${{ inputs.change_type }}"
+            "u_change_type": "${{ inputs.change_type }}",
+            "u_github_repo": "${{ github.repository }}",
+            "u_github_workflow": "${{ github.workflow }}",
+            "u_github_run_id": "${{ github.run_id }}",
+            "u_github_actor": "${{ github.actor }}",
+            "u_github_ref": "${{ github.ref }}",
+            "u_github_sha": "${{ github.sha }}"
           }
           EOF
           )
