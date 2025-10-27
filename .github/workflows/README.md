@@ -69,7 +69,22 @@ Smart image building workflow with change detection:
 3. **Security Scanning** - Trivy scans before push (SARIF + table formats)
 4. **ECR Push** - Pushes to AWS ECR with multiple tags (environment, commit SHA, branch)
 5. **SBOM Generation** - Creates Software Bill of Materials per service
-6. **Cache Optimization** - GitHub Actions cache for faster rebuilds
+6. **ServiceNow Package Registration** - Registers Docker images as packages in ServiceNow
+7. **Cache Optimization** - GitHub Actions cache for faster rebuilds
+
+**ServiceNow Package Registration**:
+- Uses `ServiceNow/servicenow-devops-register-package@v3.1.0` action
+- Registers every Docker image pushed to ECR
+- Package metadata includes:
+  - Package name (service name)
+  - Version (environment-commitSHA)
+  - Semantic version (environment.0.buildNumber)
+  - ECR repository URL
+  - Image tag and digest
+  - Commit SHA, branch, build number
+  - Link to GitHub Actions build
+- Packages visible in ServiceNow DevOps workspace
+- Linked to change requests for deployment approval
 
 Outputs: Services built, build success status
 
@@ -174,8 +189,19 @@ Key workflows provide outputs for downstream jobs:
 
 - **unit-tests**: test_result, tests_run, tests_passed, tests_failed, summary
 - **security-scans**: dependency scan results, vulnerability counts
-- **build-images**: services_built, build_success
+- **build-images**: services_built, build_success, registered_packages (in ServiceNow)
 - **deploy-environment**: deployment status, namespace info
+
+### ServiceNow Outputs
+
+Data registered in ServiceNow DevOps:
+
+| Type | Description | Location in ServiceNow |
+|------|-------------|------------------------|
+| **Test Results** | Unit test execution results per service | DevOps → Testing → Test Results |
+| **Packages** | Docker images with metadata (tags, digests, versions) | DevOps → Packages |
+| **Artifacts** | Package artifacts with ECR links | Linked to packages |
+| **Change Requests** | Test results and packages linked to CRs | Change Management → Change Requests |
 
 ## Adding New Tests
 
