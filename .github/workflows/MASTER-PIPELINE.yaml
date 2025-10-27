@@ -392,7 +392,7 @@ jobs:
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       needs.pipeline-init.outputs.policy_ok == 'true' &&
       !inputs.skip_deploy
-    uses: ./.github/workflows/servicenow-change.yaml
+    uses: ./.github/workflows/servicenow-change-rest.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
