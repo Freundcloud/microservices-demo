@@ -55,6 +55,42 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: ServiceNow DevOps Change Automation
+        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Deploy to ${{ inputs.environment }}'
+          change-request: '{
+            "attributes": {
+              "short_description": "Deployment to ${{ inputs.environment }} environment - microservices-demo",
+              "description": "Automated deployment of microservices application to ${{ inputs.environment }} environment via GitHub Actions.\n\nCommit: ${{ github.sha }}\nBranch: ${{ github.ref_name }}\nTriggered by: ${{ github.actor }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_number }}",
+              "assignment_group": "DevOps",
+              "implementation_plan": "1. Verify cluster access\n2. Ensure namespace exists\n3. Deploy with Kustomize overlays\n4. Wait for pods to be ready\n5. Verify deployment health\n6. Test frontend URL",
+              "backout_plan": "1. Roll back to previous deployment\n2. Verify pod health\n3. Monitor application logs\n4. Notify team if issues persist",
+              "test_plan": "1. Verify all pods are running\n2. Check Istio sidecar injection\n3. Test frontend endpoint\n4. Validate service mesh connectivity",
+              "type": "standard",
+              "risk": "${{ inputs.environment == ''prod'' && ''moderate'' || ''low'' }}",
+              "impact": "${{ inputs.environment == ''prod'' && ''medium'' || ''low'' }}",
+              "priority": "${{ inputs.environment == ''prod'' && ''3'' || ''4'' }}",
+              "category": "Software",
+              "subcategory": "Application",
+              "u_environment": "${{ inputs.environment }}",
+              "u_source": "GitHub Actions",
+              "u_correlation_id": "${{ github.run_id }}-${{ inputs.environment }}",
+              "u_repository": "${{ github.repository }}",
+              "u_branch": "${{ github.ref_name }}",
+              "u_commit_sha": "${{ github.sha }}",
+              "u_actor": "${{ github.actor }}"
+            }
+          }'
+          interval: '30'
+          timeout: '1800'
+          changeCreationTimeOut: '600'
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
