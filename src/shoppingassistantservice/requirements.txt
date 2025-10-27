@@ -4,6 +4,7 @@
 #
 #    pip-compile --cert=None --client-cert=None --index-url=None --output-file=requirements.txt --pip-args=None requirements.in
 #
+# Test results: pytest with exit code 5 handling (no actual tests)
 aiofiles==24.1.0
     # via google-cloud-alloydb-connector
 annotated-types==0.7.0

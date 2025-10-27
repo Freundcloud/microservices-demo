@@ -4,6 +4,7 @@
 #
 #    pip-compile --cert=None --client-cert=None --index-url=None --output-file=requirements.txt --pip-args=None requirements.in
 #
+# Test results: placeholder XML (no actual tests)
 bidict==0.23.1
     # via python-socketio
 blinker==1.9.0
