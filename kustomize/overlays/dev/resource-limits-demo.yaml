@@ -42,11 +42,11 @@ spec:
       - name: server
         resources:
           requests:
-            cpu: 20m        # Ultra-minimal for demo
-            memory: 32Mi    # Absolute minimum
+            cpu: 50m        # .NET needs more CPU for health checks (was 20m)
+            memory: 64Mi    # .NET runtime needs more memory (was 32Mi)
           limits:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 200m
+            memory: 256Mi
 
 ---
 apiVersion: apps/v1
