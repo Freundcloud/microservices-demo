@@ -281,6 +281,7 @@ jobs:
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
+      version: ${{ needs.pipeline-init.outputs.version }}
       services: ${{ inputs.force_build_all && 'all' || needs.detect-service-changes.outputs.services_changed }}
       push_images: ${{ github.event_name != 'pull_request' }}
 
