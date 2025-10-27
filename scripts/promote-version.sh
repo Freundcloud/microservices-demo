@@ -195,10 +195,12 @@ sleep 5  # Give GitHub Actions time to start
 
 echo ""
 
-# 9. Wait for MASTER-PIPELINE to start for DEV
-echo "🟢 DEV deployment starting automatically (push to main)..."
+# 9. Trigger MASTER-PIPELINE for DEV with force build
+echo "🟢 Triggering DEV deployment (with force build)..."
 echo "   ServiceNow CR: Auto-approved for dev"
 echo ""
+
+gh workflow run MASTER-PIPELINE.yaml -f environment=dev -f force_build_all=true
 
 sleep 15  # Let workflow start
 
@@ -228,11 +230,11 @@ echo ""
 read -p "🟡 Deploy to QA? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🟡 Triggering QA deployment..."
+    echo "🟡 Triggering QA deployment (with force build)..."
     echo "   ServiceNow CR: Requires manual approval in ServiceNow"
     echo ""
 
-    gh workflow run MASTER-PIPELINE.yaml -f environment=qa
+    gh workflow run MASTER-PIPELINE.yaml -f environment=qa -f force_build_all=true
 
     sleep 10  # Let workflow start
 
@@ -263,11 +265,11 @@ fi
 read -p "🔴 Deploy to PROD? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🔴 Triggering PROD deployment..."
+    echo "🔴 Triggering PROD deployment (with force build)..."
     echo "   ServiceNow CR: Requires manual approval in ServiceNow"
     echo ""
 
-    gh workflow run MASTER-PIPELINE.yaml -f environment=prod
+    gh workflow run MASTER-PIPELINE.yaml -f environment=prod -f force_build_all=true
 
     sleep 10  # Let workflow start
 
