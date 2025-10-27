@@ -9,6 +9,11 @@ name: "Build and Push Docker Images (Reusable)"
         required: false
         type: string
         default: 'dev'
+      version:
+        description: 'Semantic version tag (e.g., 1.2.0). If provided, uses v{version} instead of environment'
+        required: false
+        type: string
+        default: ''
       services:
         description: 'Services to build (JSON array or "all")'
         required: false
