@@ -79,51 +79,9 @@ jobs:
       - name: Prepare Change Details
         id: prepare
         run: |
-          # Build comprehensive description
-          DESCRIPTION="${{ inputs.description }}"
-          if [ -z "$DESCRIPTION" ]; then
-            DESCRIPTION="Automated deployment to ${{ inputs.environment }} environment via GitHub Actions."
-            DESCRIPTION="${DESCRIPTION}\n\nChange Type: ${{ inputs.change_type }}"
-            DESCRIPTION="${DESCRIPTION}\nTriggered by: ${{ github.actor }}"
-            DESCRIPTION="${DESCRIPTION}\nCommit: ${{ github.sha }}"
-            DESCRIPTION="${DESCRIPTION}\nBranch: ${{ github.ref_name }}"
-            DESCRIPTION="${DESCRIPTION}\nWorkflow: ${{ github.workflow }}"
-            DESCRIPTION="${DESCRIPTION}\nRun: ${{ github.run_number }}"
-          fi
-          echo "description=$DESCRIPTION" >> $GITHUB_OUTPUT
-
-          # Build implementation plan
-          IMPL_PLAN="${{ inputs.implementation_plan }}"
-          if [ -z "$IMPL_PLAN" ]; then
-            if [ "${{ inputs.change_type }}" == "terraform" ]; then
-              IMPL_PLAN="1. Review terraform plan output\n2. Execute terraform apply\n3. Verify infrastructure state\n4. Update documentation"
-            elif [ "${{ inputs.change_type }}" == "kubernetes" ]; then
-              IMPL_PLAN="1. Apply Kustomize overlays for ${{ inputs.environment }}\n2. Monitor rollout status\n3. Verify pod health\n4. Check service endpoints"
-            else
-              IMPL_PLAN="1. Build and test application\n2. Deploy to ${{ inputs.environment }}\n3. Run smoke tests\n4. Monitor metrics"
-            fi
-          fi
-          echo "impl_plan=$IMPL_PLAN" >> $GITHUB_OUTPUT
-
-          # Build backout plan
-          BACKOUT_PLAN="${{ inputs.backout_plan }}"
-          if [ -z "$BACKOUT_PLAN" ]; then
-            if [ "${{ inputs.change_type }}" == "terraform" ]; then
-              BACKOUT_PLAN="1. Review previous terraform state\n2. Execute terraform apply with previous configuration\n3. Verify rollback successful"
-            elif [ "${{ inputs.change_type }}" == "kubernetes" ]; then
-              BACKOUT_PLAN="1. kubectl rollout undo deployment/{service} -n microservices-${{ inputs.environment }}\n2. Verify previous version running\n3. Monitor for stability"
-            else
-              BACKOUT_PLAN="1. Revert to previous Docker image tag\n2. Redeploy previous version\n3. Verify rollback successful"
-            fi
-          fi
-          echo "backout_plan=$BACKOUT_PLAN" >> $GITHUB_OUTPUT
-
-          # Build test plan
-          TEST_PLAN="${{ inputs.test_plan }}"
-          if [ -z "$TEST_PLAN" ]; then
-            TEST_PLAN="1. Verify all unit tests passed\n2. Run integration tests\n3. Smoke test critical paths\n4. Monitor error rates and latency\n5. Verify ServiceNow registration"
-          fi
-          echo "test_plan=$TEST_PLAN" >> $GITHUB_OUTPUT
+          # We don't need to output these to GITHUB_OUTPUT since we use them directly
+          # in the ServiceNow action below. This avoids multi-line output issues.
+          echo "Change details prepared for ${{ inputs.environment }} environment"
 
       # =====================================================================
       # DEV Environment: Auto-Approve Change
@@ -145,11 +103,11 @@ jobs:
               "autoCloseChange": true,
               "attributes": {
                 "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-                "description": "${{ steps.prepare.outputs.description }}",
+                "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}",
                 "assignment_group": "${{ inputs.assignment_group }}",
-                "implementation_plan": "${{ steps.prepare.outputs.impl_plan }}",
-                "backout_plan": "${{ steps.prepare.outputs.backout_plan }}",
-                "test_plan": "${{ steps.prepare.outputs.test_plan }}",
+                "implementation_plan": "${{ inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health' }}",
+                "backout_plan": "${{ inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability' }}",
+                "test_plan": "${{ inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics' }}",
                 "type": "standard",
                 "state": "implement",
                 "priority": "3",
@@ -184,11 +142,11 @@ jobs:
               "autoCloseChange": true,
               "attributes": {
                 "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-                "description": "${{ steps.prepare.outputs.description }}",
+                "description": "${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}",
                 "assignment_group": "${{ inputs.assignment_group }}",
-                "implementation_plan": "${{ steps.prepare.outputs.impl_plan }}",
-                "backout_plan": "${{ steps.prepare.outputs.backout_plan }}",
-                "test_plan": "${{ steps.prepare.outputs.test_plan }}",
+                "implementation_plan": "${{ inputs.implementation_plan || '1. Apply changes 2. Monitor rollout 3. Verify health' }}",
+                "backout_plan": "${{ inputs.backout_plan || '1. Rollback deployment 2. Verify previous version 3. Monitor stability' }}",
+                "test_plan": "${{ inputs.test_plan || '1. Run tests 2. Verify functionality 3. Monitor metrics' }}",
                 "type": "standard",
                 "state": "assess",
                 "priority": "${{ inputs.environment == 'prod' && '2' || '3' }}",
