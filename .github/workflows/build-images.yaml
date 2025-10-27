@@ -121,16 +121,19 @@ jobs:
             echo "DEBUG: CHANGED='$CHANGED'"
             echo "DEBUG: Length: ${#CHANGED}"
 
+            # Use jq to check if it's an empty array - most reliable method
+            CHANGE_COUNT=$(echo "$CHANGED" | jq 'length' 2>/dev/null || echo "999")
+            echo "DEBUG: CHANGE_COUNT=$CHANGE_COUNT"
+
             # If no changes detected or workflow_dispatch, build all
-            # Check if CHANGED is empty, [], [""], or very short (length <= 2 means [] only)
-            if [ -z "$CHANGED" ] || [ "$CHANGED" == "[]" ] || [ "$CHANGED" == '[""]' ] || [ "${#CHANGED}" -le 2 ]; then
+            if [ "$CHANGE_COUNT" -eq 0 ] || [ -z "$CHANGED" ]; then
               echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
-              echo "🔨 Building all services (no changes detected or force build)"
+              echo "🔨 Building all services (no changes detected: count=$CHANGE_COUNT)"
             else
               echo "matrix=$CHANGED" >> $GITHUB_OUTPUT
               echo 'has_services=true' >> $GITHUB_OUTPUT
-              echo "📦 Building changed services: $CHANGED"
+              echo "📦 Building changed services (count=$CHANGE_COUNT): $CHANGED"
             fi
           elif [ "$SERVICES_INPUT" == "none" ]; then
             # Build nothing
