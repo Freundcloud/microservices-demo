@@ -1259,11 +1259,11 @@ promote-all VERSION:
     echo "✅ Full promotion pipeline started!"
     echo ""
     echo "Track progress:"
-    echo "  gh run list --workflow='Full Promotion Pipeline'"
+    echo "  gh run list --workflow=full-promotion-pipeline.yaml"
     echo "  gh run watch"
     echo ""
     echo "View in browser:"
-    gh run list --workflow="Full Promotion Pipeline" --limit 1 --json url --jq '.[0].url' | \
+    gh run list --workflow=full-promotion-pipeline.yaml --limit 1 --json url --jq '.[0].url' | \
         xargs -I {} echo "  {}"
 
 # Promote version with full automation (including prod - use with caution!)
