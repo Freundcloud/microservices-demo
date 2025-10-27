@@ -35,3 +35,14 @@ skip-check:
   # - Lock file (terraform.lock.hcl) provides reproducibility
   - id: CKV_TF_1
     comment: "Using semantic versioning for official AWS modules with lock file for reproducibility"
+
+  # CKV_AWS_144: S3 Cross-Region Replication
+  # Cross-region replication not needed for demo/dev environment
+  # Reasons:
+  # - This is a demo environment, not production
+  # - Single region deployment is sufficient for demo purposes
+  # - Terraform state S3 bucket has versioning enabled for protection
+  # - DynamoDB lock table prevents concurrent modifications
+  # - Would add unnecessary cost (~$0.02/GB replication + storage in second region)
+  - id: CKV_AWS_144
+    comment: "Cross-region replication not required for demo environment - versioning enabled for protection"
