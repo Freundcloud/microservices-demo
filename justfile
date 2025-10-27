@@ -719,34 +719,6 @@ cut-release VERSION:
             echo "👀 Watching run..."
             gh run watch || true
 
-# Promote an already cut release to production
-promote-to-prod VERSION:
-            #!/usr/bin/env bash
-            set -euo pipefail
-            if [ -z "{{VERSION}}" ]; then echo "Usage: just promote-to-prod VERSION=<x.y.z>"; exit 1; fi
-            RELEASE_BRANCH="release/{{VERSION}}"
-            echo "🚢 Promoting {{VERSION}} to production from $RELEASE_BRANCH"
-
-            # Ensure release branch exists locally
-            git fetch origin "$RELEASE_BRANCH" --quiet || true
-            git checkout "$RELEASE_BRANCH" || { echo "Release branch $RELEASE_BRANCH not found"; exit 1; }
-
-            echo "🔧 Bump Prod overlay to {{VERSION}}"
-            ./scripts/bump-env-version.sh prod "{{VERSION}}"
-            git add -A
-            git commit -m "release: promote {{VERSION}} to production"
-            git push
-
-            echo "🔀 Update or create PR for tracking"
-            if ! gh pr list --base main --head "$RELEASE_BRANCH" --state open --json number | jq -e 'length>0' >/dev/null; then
-                gh pr create --base main --head "$RELEASE_BRANCH" -t "Release {{VERSION}} (Prod)" -b "Promote {{VERSION}} to production from $RELEASE_BRANCH."
-            fi
-
-            echo "🚀 Trigger Prod deployment from release branch"
-            gh workflow run MASTER-PIPELINE.yaml -r "$RELEASE_BRANCH" -f environment=prod
-            echo "👀 Watching run... Approve change in ServiceNow when prompted."
-            gh run watch || true
-
 # Bump image version in an environment overlay and open a PR with a linked work item
 demo-release ENV TAG="":
     #!/usr/bin/env bash
