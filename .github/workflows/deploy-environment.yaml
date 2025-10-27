@@ -44,7 +44,7 @@ jobs:
   # Create ServiceNow Change Request before Kubernetes deployment
   servicenow-change:
     name: ServiceNow Change Request
-    uses: ./.github/workflows/servicenow-change.yaml
+    uses: ./.github/workflows/servicenow-change-rest.yaml
     with:
       environment: ${{ inputs.environment }}
       change_type: 'kubernetes'
