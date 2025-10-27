@@ -20,6 +20,11 @@ name: "🚀 Master CI/CD Pipeline"
           - qa
           - prod
         default: 'dev'
+      version:
+        description: 'Semantic version for images (e.g., 1.2.3 - without v prefix)'
+        required: false
+        type: string
+        default: ''
       skip_terraform:
         description: 'Skip infrastructure deployment'
         type: boolean
@@ -433,17 +438,23 @@ jobs:
       - name: Get Current Deployed Version
         id: get-version
         run: |
-          NAMESPACE="microservices-${{ needs.pipeline-init.outputs.environment }}"
-
-          # Try to get image tag from frontend deployment (most likely to exist)
-          VERSION=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -oP '(?<=:)[^:]+$' || echo "")
-
-          # Fallback to environment name if deployment doesn't exist yet
-          if [ -z "$VERSION" ]; then
-            VERSION="${{ needs.pipeline-init.outputs.environment }}"
-            echo "⚠️ No deployment found, using environment name as version"
+          # Use input version if provided, otherwise read from cluster
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "✅ Using provided version: $VERSION"
           else
-            echo "✅ Current deployed version: $VERSION"
+            NAMESPACE="microservices-${{ needs.pipeline-init.outputs.environment }}"
+
+            # Try to get image tag from frontend deployment (most likely to exist)
+            VERSION=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -oP '(?<=:)[^:]+$' || echo "")
+
+            # Fallback to environment name if deployment doesn't exist yet
+            if [ -z "$VERSION" ]; then
+              VERSION="${{ needs.pipeline-init.outputs.environment }}"
+              echo "⚠️ No deployment found, using environment name as version"
+            else
+              echo "✅ Current deployed version: $VERSION"
+            fi
           fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
