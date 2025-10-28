@@ -718,7 +718,7 @@ jobs:
       total_pods: ${{ needs.deploy-to-environment.outputs.total_pods }}
       frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url }}
       auto_close: false
-      use_token_auth: true
+      use_token_auth: false
 
   # ============================================================================
   # STAGE 9: Pipeline Summary
