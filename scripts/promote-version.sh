@@ -57,6 +57,21 @@ done
 
 # 3. Commit changes
 echo "✅ Committing version update"
+
+# Check if there are any changes to commit
+if git diff --cached --quiet; then
+    echo "⚠️  No changes detected - version already at v${VERSION}"
+    echo ""
+    echo "All kustomization files are already using v${VERSION}."
+    echo "Nothing to do. Exiting successfully."
+
+    # Clean up branch
+    git checkout main 2>/dev/null || true
+    git branch -D "$BRANCH" 2>/dev/null || true
+
+    exit 0
+fi
+
 git commit -m "chore: Promote to version ${VERSION}
 
 Automated version promotion via scripts/promote-version.sh
