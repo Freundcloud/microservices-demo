@@ -83,11 +83,13 @@ jobs:
           cd src/adservice
           chmod +x gradlew
           ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon
+          cd ../..
 
           # Build shopping assistant service
-          cd ../shoppingassistantservice
+          cd src/shoppingassistantservice
           chmod +x gradlew
           ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon
+          cd ../..
         continue-on-error: true
 
       - name: Build .NET service
