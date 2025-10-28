@@ -398,7 +398,7 @@ jobs:
 
       - name: Register Docker Images
         if: steps.package-metadata.outputs.artifacts != '[]'
-        uses: ServiceNow/servicenow-devops-register-package@v2.0.0
+        uses: ServiceNow/servicenow-devops-register-package@v3.1.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
