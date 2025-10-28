@@ -41,17 +41,19 @@ jobs:
         id: determine-state
         run: |
           # Map deployment status to ServiceNow change request states
-          # State values: -5=New, 0=Assess, 1=Authorize, 2=Scheduled, 3=Implement, 4=Review, 7=Closed
+          # State 3 = Closed (both successful and unsuccessful use this state)
+          # close_code determines success vs failure: "successful" or "unsuccessful"
+          # State 4 = Canceled (requires 'reason' field, not used for deployment outcomes)
 
           if [ "${{ inputs.deployment_status }}" == "success" ]; then
-            # Deployment successful - mark as Implemented (3) or Closed Complete (3)
+            # Deployment successful - Close with successful code
             echo "state=3" >> $GITHUB_OUTPUT
             echo "close_code=successful" >> $GITHUB_OUTPUT
             echo "close_notes=Deployment completed successfully. All services running." >> $GITHUB_OUTPUT
             echo "status_label=✅ Successful" >> $GITHUB_OUTPUT
           else
-            # Deployment failed - mark as Closed Incomplete (4) or keep in Implement with notes
-            echo "state=4" >> $GITHUB_OUTPUT
+            # Deployment failed - Close with unsuccessful code (still state 3, not 4)
+            echo "state=3" >> $GITHUB_OUTPUT
             echo "close_code=unsuccessful" >> $GITHUB_OUTPUT
             echo "close_notes=Deployment failed. Review logs for details." >> $GITHUB_OUTPUT
             echo "status_label=❌ Failed" >> $GITHUB_OUTPUT
