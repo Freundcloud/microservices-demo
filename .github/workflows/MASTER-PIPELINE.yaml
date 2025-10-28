@@ -522,7 +522,9 @@ jobs:
   deploy-to-environment:
     name: "🚀 Deploy Application"
     needs: [pipeline-init, servicenow-change]
-    if: needs.servicenow-change.result == 'success'
+    if: |
+      needs.servicenow-change.result == 'success' ||
+      (needs.servicenow-change.result == 'skipped' && needs.pipeline-init.outputs.is_production != 'true')
     uses: ./.github/workflows/deploy-environment.yaml
     secrets: inherit
     with:
