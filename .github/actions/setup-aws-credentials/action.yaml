@@ -1,0 +1,22 @@
+---
+name: 'Setup AWS Credentials'
+description: >-
+  Configure AWS credentials for accessing EKS, ECR, and other AWS services
+author: 'Microservices Demo Team'
+
+inputs:
+  aws-region:
+    description: 'AWS region to configure'
+    required: false
+    default: 'eu-west-2'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ inputs.aws-region }}
+      shell: bash

@@ -111,12 +111,14 @@ jobs:
           echo "DEBUG: SERVICES_INPUT='$SERVICES_INPUT'"
           echo "========================================="
 
+          # Load canonical service list from centralized JSON file
+          ALL_SERVICES=$(jq -c '.services' scripts/service-list.json)
+
           if [ "$SERVICES_INPUT" == "all" ]; then
-            # SIMPLIFIED: Always build all 12 services when "all" is specified
-            # No smart detection - just build everything
-            echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
+            # Use canonical service list from scripts/service-list.json
+            echo "matrix=$ALL_SERVICES" >> $GITHUB_OUTPUT
             echo 'has_services=true' >> $GITHUB_OUTPUT
-            echo "🔨 Building ALL 12 services (SERVICES_INPUT='all')"
+            echo "🔨 Building ALL services from scripts/service-list.json"
           elif [ "$SERVICES_INPUT" == "none" ]; then
             # Build nothing
             echo 'matrix=[]' >> $GITHUB_OUTPUT
@@ -131,7 +133,7 @@ jobs:
 
               if [ "$SERVICE_COUNT" -eq 0 ]; then
                 echo "⚠️ Received empty services array, building all services instead"
-                echo 'matrix=["emailservice","productcatalogservice","recommendationservice","shippingservice","checkoutservice","paymentservice","currencyservice","cartservice","frontend","adservice","loadgenerator","shoppingassistantservice"]' >> $GITHUB_OUTPUT
+                echo "matrix=$ALL_SERVICES" >> $GITHUB_OUTPUT
                 echo 'has_services=true' >> $GITHUB_OUTPUT
               else
                 echo "matrix=$SERVICES_INPUT" >> $GITHUB_OUTPUT
@@ -195,6 +197,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '19'
+          cache: 'gradle'
+          cache-dependency-path: 'src/adservice/*.gradle*'
 
       - name: Setup Python (for Python services)
         if: |
@@ -212,6 +216,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'  # Use LTS for better compatibility with native modules
+          cache: 'npm'
+          cache-dependency-path: 'src/${{ matrix.service }}/package-lock.json'
 
       # Run tests based on service type
       - name: Run Go Tests
@@ -415,12 +421,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup AWS Credentials
+        uses: ./.github/actions/setup-aws-credentials
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Login to Amazon ECR
         id: login-ecr

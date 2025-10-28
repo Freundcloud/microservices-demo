@@ -1,0 +1,34 @@
+---
+name: 'Configure kubectl'
+description: 'Configure kubectl to access EKS cluster'
+author: 'Microservices Demo Team'
+
+inputs:
+  cluster-name:
+    description: 'EKS cluster name to connect to'
+    required: true
+  aws-region:
+    description: 'AWS region where the cluster is located'
+    required: false
+    default: 'eu-west-2'
+  verify-connection:
+    description: 'Verify kubectl connection after configuration'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig \
+          --name ${{ inputs.cluster-name }} \
+          --region ${{ inputs.aws-region }}
+      shell: bash
+
+    - name: Verify kubectl connection
+      if: ${{ inputs.verify-connection == 'true' }}
+      run: |
+        kubectl version --client
+        kubectl cluster-info
+      shell: bash

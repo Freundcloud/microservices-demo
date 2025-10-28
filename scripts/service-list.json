@@ -1,0 +1,74 @@
+{
+  "services": [
+    "emailservice",
+    "productcatalogservice",
+    "recommendationservice",
+    "shippingservice",
+    "checkoutservice",
+    "paymentservice",
+    "currencyservice",
+    "cartservice",
+    "frontend",
+    "adservice",
+    "loadgenerator",
+    "shoppingassistantservice"
+  ],
+  "metadata": {
+    "total_count": 12,
+    "description": "Canonical list of all microservices in the demo application",
+    "last_updated": "2025-01-28"
+  },
+  "service_details": {
+    "emailservice": {
+      "language": "python",
+      "test_framework": "pytest"
+    },
+    "productcatalogservice": {
+      "language": "go",
+      "test_framework": "go test"
+    },
+    "recommendationservice": {
+      "language": "python",
+      "test_framework": "pytest"
+    },
+    "shippingservice": {
+      "language": "go",
+      "test_framework": "go test"
+    },
+    "checkoutservice": {
+      "language": "go",
+      "test_framework": "go test"
+    },
+    "paymentservice": {
+      "language": "nodejs",
+      "test_framework": "jest",
+      "package_manager": "npm"
+    },
+    "currencyservice": {
+      "language": "nodejs",
+      "test_framework": "jest",
+      "package_manager": "npm"
+    },
+    "cartservice": {
+      "language": "csharp",
+      "test_framework": "dotnet test"
+    },
+    "frontend": {
+      "language": "go",
+      "test_framework": "go test"
+    },
+    "adservice": {
+      "language": "java",
+      "test_framework": "junit",
+      "build_tool": "gradle"
+    },
+    "loadgenerator": {
+      "language": "python",
+      "test_framework": "none"
+    },
+    "shoppingassistantservice": {
+      "language": "python",
+      "test_framework": "pytest"
+    }
+  }
+}

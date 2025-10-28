@@ -93,6 +93,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '19'
+          cache: 'gradle'
+          cache-dependency-path: 'src/${{ inputs.service }}/*.gradle*'
 
       - name: Run Java Tests
         id: java-tests
@@ -150,6 +152,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'  # Use LTS for better compatibility with native modules
+          cache: 'npm'
+          cache-dependency-path: 'src/${{ inputs.service }}/package-lock.json'
 
       - name: Run Node.js Tests (Placeholder)
         id: nodejs-tests

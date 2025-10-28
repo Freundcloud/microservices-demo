@@ -41,6 +41,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+          cache: 'gradle'
+          cache-dependency-path: 'src/adservice/*.gradle*'
 
       - name: Build Java services
         if: matrix.language == 'java'
@@ -420,6 +422,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'  # Use LTS for better compatibility with native modules like pprof
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('src/paymentservice/package-lock.json', 'src/currencyservice/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Install Node.js Dependencies
         run: |
