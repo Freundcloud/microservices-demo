@@ -178,6 +178,13 @@ jobs:
     uses: ./.github/workflows/security-scan.yaml
     secrets: inherit
 
+  sonarcloud-scan:
+    name: "☁️ SonarCloud Quality"
+    needs: pipeline-init
+    if: ${{ !inputs.skip_security }}
+    uses: ./.github/workflows/sonarcloud-scan.yaml
+    secrets: inherit
+
   # ============================================================================
   # STAGE 2: Infrastructure Management (Conditional)
   # ============================================================================

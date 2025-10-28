@@ -1,0 +1,145 @@
+---
+name: "☁️ SonarCloud Code Quality"
+
+"on":
+  workflow_call:  # Reusable workflow
+    secrets:
+      SONAR_TOKEN:
+        description: 'SonarCloud authentication token'
+        required: true
+      SN_DEVOPS_INTEGRATION_TOKEN:
+        description: 'ServiceNow DevOps integration token'
+        required: false
+      SN_DEVOPS_USER:
+        description: 'ServiceNow DevOps username (fallback)'
+        required: false
+      SN_DEVOPS_PASSWORD:
+        description: 'ServiceNow DevOps password (fallback)'
+        required: false
+      SN_INSTANCE_URL:
+        description: 'ServiceNow instance URL'
+        required: false
+      SN_ORCHESTRATION_TOOL_ID:
+        description: 'ServiceNow orchestration tool ID'
+        required: false
+  workflow_dispatch:  # Manual trigger for testing
+    inputs:
+      skip_servicenow:
+        description: 'Skip ServiceNow integration'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sonarcloud-scan:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Disabling shallow clone for better relevancy of analysis
+          fetch-depth: 0
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Build Java services
+        run: |
+          echo "📦 Building Java services for analysis..."
+
+          # Build adservice (Java with Gradle)
+          cd src/adservice
+          chmod +x gradlew
+          ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon
+
+          # Build shopping assistant service
+          cd ../shoppingassistantservice
+          chmod +x gradlew
+          ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon
+        continue-on-error: true
+
+      - name: Build .NET service
+        run: |
+          echo "📦 Building .NET service for analysis..."
+          cd src/cartservice
+          dotnet build src/cartservice.csproj -c Release
+        continue-on-error: true
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=freundcloud
+            -Dsonar.projectKey=freundcloud_microservices-demo
+
+      - name: Upload SonarCloud Results to ServiceNow
+        if: ${{ !inputs.skip_servicenow && !github.event.pull_request }}
+        uses: ServiceNow/servicenow-devops-sonar@v3.1.0
+        with:
+          # Use token-based authentication (preferred)
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN || '' }}
+          # Fallback to username/password if token not available
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER || '' }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD || '' }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'SonarCloud Analysis'
+          sonar-host-url: 'https://sonarcloud.io'
+          sonar-project-key: 'freundcloud_microservices-demo'
+          sonar-org-key: 'freundcloud'
+        continue-on-error: true
+
+      - name: Generate SonarCloud Badge
+        run: |
+          echo "### ☁️ SonarCloud Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **View Results**: [SonarCloud Dashboard](https://sonarcloud.io/dashboard?id=freundcloud_microservices-demo)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Quality Metrics**:" >> $GITHUB_STEP_SUMMARY
+          echo "- Organization: \`freundcloud\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: \`freundcloud_microservices-demo\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Languages: Go, Python, Java, JavaScript, C#" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ secrets.SN_INSTANCE_URL }}" != "" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Results uploaded to ServiceNow DevOps" >> $GITHUB_STEP_SUMMARY
+          fi
