@@ -149,7 +149,7 @@ jobs:
           inputs.service == 'paymentservice'
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'  # Use LTS for better compatibility with native modules
 
       - name: Run Node.js Tests (Placeholder)
         id: nodejs-tests
