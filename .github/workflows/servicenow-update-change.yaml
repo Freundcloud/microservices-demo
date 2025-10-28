@@ -1,7 +1,7 @@
 ---
 name: "ServiceNow Update Change Request"
 
-"on":
+on:
   workflow_call:
     inputs:
       environment:
@@ -28,16 +28,6 @@ name: "ServiceNow Update Change Request"
         description: 'Frontend application URL'
         required: false
         type: string
-      auto_close:
-        description: 'Automatically close change request on success'
-        required: false
-        type: boolean
-        default: false
-      use_token_auth:
-        description: 'Use token-based authentication (v2.0+) instead of basic auth'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -48,30 +38,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate Inputs
-        id: validate
-        run: |
-          # Validate change request number format
-          CHANGE_NUM="${{ inputs.change_request_number }}"
-          if ! [[ "$CHANGE_NUM" =~ ^CHG[0-9]{7}$ ]]; then
-            echo "⚠️  Warning: Change request number format looks unusual: $CHANGE_NUM"
-            echo "Expected format: CHG0123456"
-          fi
-
-          # Validate deployment status
-          STATUS="${{ inputs.deployment_status }}"
-          if [[ "$STATUS" != "success" && "$STATUS" != "failure" ]]; then
-            echo "❌ Invalid deployment status: $STATUS"
-            echo "Expected: success or failure"
-            exit 1
-          fi
-
-          echo "✅ Validation passed"
-          echo "change_number=$CHANGE_NUM" >> $GITHUB_OUTPUT
-          echo "deployment_status=$STATUS" >> $GITHUB_OUTPUT
-
       - name: Prepare Work Notes
-        id: prepare-notes
+        id: prepare
         run: |
           STATUS="${{ inputs.deployment_status }}"
           ENV="${{ inputs.environment }}"
@@ -127,110 +95,59 @@ Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{
 Please review workflow logs for error details."
           fi
 
-          # Save work notes to file (handles multi-line content)
-          echo "$NOTES" > /tmp/work_notes.txt
-          echo "work_notes<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/work_notes.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Save to environment
+          echo "WORK_NOTES<<EOF" >> $GITHUB_ENV
+          echo "$NOTES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-      - name: Prepare Change Details JSON
-        id: prepare-json
+      - name: Update Change Request via REST API
+        id: update
         run: |
-          STATUS="${{ inputs.deployment_status }}"
-          AUTO_CLOSE="${{ inputs.auto_close }}"
+          CHANGE_NUM="${{ inputs.change_request_number }}"
 
-          # Read work notes from file
-          WORK_NOTES=$(cat /tmp/work_notes.txt)
+          echo "🔄 Updating change request: $CHANGE_NUM"
 
-          # Build change details JSON
-          if [ "$STATUS" = "success" ] && [ "$AUTO_CLOSE" = "true" ]; then
-            # Success + auto-close: Set state to closed
-            CHANGE_DETAILS=$(jq -n \
-              --arg work_notes "$WORK_NOTES" \
-              --arg close_code "successful" \
-              --arg close_notes "Deployment verified and application is healthy. Change automatically closed by CI/CD pipeline." \
-              --arg state "3" \
-              '{
-                work_notes: $work_notes,
-                close_code: $close_code,
-                close_notes: $close_notes,
-                state: $state
-              }')
-          elif [ "$STATUS" = "success" ]; then
-            # Success without auto-close: Update to implement state with work notes
-            CHANGE_DETAILS=$(jq -n \
-              --arg work_notes "$WORK_NOTES" \
-              --arg state "-1" \
-              '{
-                work_notes: $work_notes,
-                state: $state
-              }')
-          else
-            # Failure: Update work notes, keep in implement state
-            CHANGE_DETAILS=$(jq -n \
-              --arg work_notes "$WORK_NOTES" \
-              --arg state "-1" \
-              '{
-                work_notes: $work_notes,
-                state: $state
-              }')
-          fi
+          # Build JSON payload
+          PAYLOAD=$(jq -n \
+            --arg work_notes "$WORK_NOTES" \
+            --arg state "-1" \
+            '{
+              work_notes: $work_notes,
+              state: $state
+            }')
 
-          echo "change_details=$CHANGE_DETAILS" >> $GITHUB_OUTPUT
+          echo "Payload:"
+          echo "$PAYLOAD" | jq '.'
 
-          echo "### 📝 Prepared Change Details" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
-          echo "$CHANGE_DETAILS" | jq '.' >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          # Make REST API call
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X PATCH \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${CHANGE_NUM}")
 
-      - name: Update Change Request (Token Auth)
-        if: inputs.use_token_auth == true
-        id: update-token
-        continue-on-error: true
-        uses: ServiceNow/servicenow-devops-update-change@v2.0.0
-        with:
-          devops-integration-token: ${{ secrets.SERVICENOW_DEVOPS_TOKEN }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          context-github: ${{ toJSON(github) }}
-          change-request-number: ${{ inputs.change_request_number }}
-          change-request-details: ${{ steps.prepare-json.outputs.change_details }}
+          # Parse response
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
 
-      - name: Update Change Request (Basic Auth)
-        if: inputs.use_token_auth == false
-        id: update-basic
-        continue-on-error: true
-        uses: ServiceNow/servicenow-devops-update-change@v2.0.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          context-github: ${{ toJSON(github) }}
-          change-request-number: ${{ inputs.change_request_number }}
-          change-request-details: ${{ steps.prepare-json.outputs.change_details }}
+          echo "HTTP Status: $HTTP_CODE"
 
-      - name: Verify Update Status
-        id: verify
-        run: |
-          if [ "${{ inputs.use_token_auth }}" = "true" ]; then
-            UPDATE_STATUS="${{ steps.update-token.outcome }}"
-            UPDATE_OUTPUT="${{ steps.update-token.outputs.status }}"
-          else
-            UPDATE_STATUS="${{ steps.update-basic.outcome }}"
-            UPDATE_OUTPUT="${{ steps.update-basic.outputs.status }}"
-          fi
-
-          echo "update_status=$UPDATE_STATUS" >> $GITHUB_OUTPUT
-
-          if [ "$UPDATE_STATUS" = "success" ]; then
-            echo "✅ Successfully updated change request: ${{ inputs.change_request_number }}"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Successfully updated change request"
             echo "update_result=success" >> $GITHUB_OUTPUT
+
+            # Extract sys_id from response
+            SYS_ID=$(echo "$BODY" | jq -r '.result[0].sys_id // .result.sys_id // empty')
+            if [ -n "$SYS_ID" ]; then
+              echo "sys_id=$SYS_ID" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "❌ Failed to update change request: ${{ inputs.change_request_number }}"
-            echo "Status: $UPDATE_OUTPUT"
+            echo "❌ Failed to update change request (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
             echo "update_result=failure" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
       - name: Create Summary
@@ -238,7 +155,7 @@ Please review workflow logs for error details."
         run: |
           CHANGE_NUM="${{ inputs.change_request_number }}"
           STATUS="${{ inputs.deployment_status }}"
-          UPDATE_RESULT="${{ steps.verify.outputs.update_result }}"
+          UPDATE_RESULT="${{ steps.update.outputs.update_result }}"
           ENV="${{ inputs.environment }}"
 
           echo "## 📝 ServiceNow Change Request Update" >> $GITHUB_STEP_SUMMARY
@@ -248,63 +165,22 @@ Please review workflow logs for error details."
           echo "| Change Request | **${CHANGE_NUM}** |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | ${ENV} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deployment Status | ${STATUS} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Update Result | ${UPDATE_RESULT} |" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ inputs.auto_close }}" = "true" ] && [ "$STATUS" = "success" ]; then
-            echo "| Auto-Close | ✅ Enabled |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Auto-Close | ❌ Disabled |" >> $GITHUB_STEP_SUMMARY
-          fi
-
+          echo "| Update Result | ${UPDATE_RESULT:-failure} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [View Change Request in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request_list.do?sysparm_query=number=${CHANGE_NUM})" >> $GITHUB_STEP_SUMMARY
+
+          # Add link to ServiceNow
+          if [ -n "${{ steps.update.outputs.sys_id }}" ]; then
+            echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${{ steps.update.outputs.sys_id }})" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔗 [Search in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request_list.do?sysparm_query=number=${CHANGE_NUM})" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "$UPDATE_RESULT" = "failure" ]; then
             echo "### ⚠️ Update Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The change request was not updated automatically. You may need to:" >> $GITHUB_STEP_SUMMARY
+            echo "The change request was not updated automatically. Please:" >> $GITHUB_STEP_SUMMARY
             echo "1. Manually update the change request in ServiceNow" >> $GITHUB_STEP_SUMMARY
-            echo "2. Check authentication credentials and permissions" >> $GITHUB_STEP_SUMMARY
-            echo "3. Review workflow logs for error details" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Fallback REST API Update (if GitHub Action fails)
-        if: steps.verify.outputs.update_result == 'failure'
-        continue-on-error: true
-        run: |
-          echo "⚠️ Attempting fallback update via REST API..."
-
-          CHANGE_NUM="${{ inputs.change_request_number }}"
-          WORK_NOTES=$(cat /tmp/work_notes.txt)
-
-          # Build payload
-          PAYLOAD=$(jq -n \
-            --arg work_notes "$WORK_NOTES" \
-            '{
-              work_notes: $work_notes
-            }')
-
-          # Make REST API call to update work notes only (safer than state changes)
-          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -X PATCH \
-            -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${CHANGE_NUM}")
-
-          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
-          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Fallback update successful via REST API"
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Fallback Update**: ✅ Work notes added via REST API" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Fallback update also failed (HTTP $HTTP_CODE)"
-            echo "$BODY" | jq '.' || echo "$BODY"
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Fallback Update**: ❌ Also failed (HTTP $HTTP_CODE)" >> $GITHUB_STEP_SUMMARY
+            echo "2. Verify authentication credentials" >> $GITHUB_STEP_SUMMARY
+            echo "3. Check user has 'itil' role" >> $GITHUB_STEP_SUMMARY
           fi

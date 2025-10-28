@@ -703,24 +703,20 @@ jobs:
   # ============================================================================
   # STAGE 8: Update ServiceNow Change Request
   # ============================================================================
-  # TEMPORARILY DISABLED DUE TO YAML VALIDATION ISSUE
-  # TODO: Fix servicenow-update-change.yaml syntax error
 
-  # update-servicenow-change:
-  #   name: "📝 Update ServiceNow Change"
-  #   needs: [pipeline-init, servicenow-change, deploy-to-environment]
-  #   if: always() && needs.servicenow-change.outputs.change_request_number != ''
-  #   uses: ./.github/workflows/servicenow-update-change.yaml
-  #   secrets: inherit
-  #   with:
-  #     environment: ${{ needs.pipeline-init.outputs.environment }}
-  #     change_request_number: ${{ needs.servicenow-change.outputs.change_request_number }}
-  #     deployment_status: ${{ needs.deploy-to-environment.result }}
-  #     running_pods: ${{ needs.deploy-to-environment.outputs.running_pods }}
-  #     total_pods: ${{ needs.deploy-to-environment.outputs.total_pods }}
-  #     frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url }}
-  #     auto_close: false
-  #     use_token_auth: false
+  update-servicenow-change:
+    name: "📝 Update ServiceNow Change"
+    needs: [pipeline-init, servicenow-change, deploy-to-environment]
+    if: always() && needs.servicenow-change.outputs.change_request_number != ''
+    uses: ./.github/workflows/servicenow-update-change.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+      change_request_number: ${{ needs.servicenow-change.outputs.change_request_number }}
+      deployment_status: ${{ needs.deploy-to-environment.result }}
+      running_pods: ${{ needs.deploy-to-environment.outputs.running_pods }}
+      total_pods: ${{ needs.deploy-to-environment.outputs.total_pods }}
+      frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url }}
 
   # ============================================================================
   # STAGE 9: Pipeline Summary
@@ -739,7 +735,7 @@ jobs:
       - servicenow-change
       - deploy-to-environment
       - smoke-tests
-      # - update-servicenow-change  # Temporarily disabled
+      - update-servicenow-change
     if: always()
     runs-on: ubuntu-latest
 
@@ -769,7 +765,7 @@ jobs:
           echo "| ServiceNow Change | ${{ needs.servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          # echo "| Update Change | ${{ needs.update-servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY  # Temporarily disabled
+          echo "| Update Change | ${{ needs.update-servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "## 📝 ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
