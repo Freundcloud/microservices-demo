@@ -37,6 +37,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Get Current Change Request State
+        id: get-current-state
+        run: |
+          # Query ServiceNow to get the current state of the change request
+          RESPONSE=$(curl -s \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Accept: application/json" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}&sysparm_fields=state")
+
+          CURRENT_STATE=$(echo "$RESPONSE" | jq -r '.result[0].state')
+
+          echo "Current state of ${{ inputs.change_request_number }}: $CURRENT_STATE"
+          echo "current_state=$CURRENT_STATE" >> $GITHUB_OUTPUT
+
+      - name: Move to Implement State (if needed)
+        id: move-to-implement
+        if: steps.get-current-state.outputs.current_state == '-5'
+        run: |
+          # If change is in New state (-5), move it to Implement (-1) first
+          # ServiceNow doesn't allow direct transition from New to Closed
+
+          echo "Change is in New state (-5), moving to Implement (-1) first..."
+
+          PAYLOAD=$(jq -n \
+            --arg state "-1" \
+            '{
+              "state": $state,
+              "work_notes": "Deployment started. Moving to Implement state."
+            }')
+
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X PATCH \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Moved to Implement state"
+          else
+            echo "⚠️ Failed to move to Implement state (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+          fi
+
       - name: Determine Change Request State
         id: determine-state
         run: |
