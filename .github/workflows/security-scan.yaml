@@ -153,9 +153,9 @@ jobs:
 
       - name: Fix SARIF URI Schemes (Grype)
         if: always()
-        run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh results.sarif
+        uses: ./.github/actions/fix-sarif-uris
+        with:
+          sarif-file: results.sarif
         continue-on-error: true
 
       - name: Upload Grype Results to Security Tab
@@ -246,9 +246,9 @@ jobs:
 
       - name: Fix SARIF URI Schemes (Semgrep)
         if: always()
-        run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh semgrep-results.sarif
+        uses: ./.github/actions/fix-sarif-uris
+        with:
+          sarif-file: semgrep-results.sarif
         continue-on-error: true
 
       - name: Upload Semgrep Results
@@ -278,9 +278,9 @@ jobs:
 
       - name: Fix SARIF URI Schemes (Trivy)
         if: always()
-        run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh trivy-fs-results.sarif
+        uses: ./.github/actions/fix-sarif-uris
+        with:
+          sarif-file: trivy-fs-results.sarif
         continue-on-error: true
 
       - name: Upload Trivy Results
@@ -336,9 +336,9 @@ jobs:
 
       - name: Fix Checkov SARIF URI Schemes
         if: always()
-        run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh checkov-results.sarif
+        uses: ./.github/actions/fix-sarif-uris
+        with:
+          sarif-file: checkov-results.sarif
 
       - name: Upload Checkov Results
         uses: github/codeql-action/upload-sarif@v3
@@ -358,9 +358,9 @@ jobs:
 
       - name: Fix tfsec SARIF URI Schemes
         if: always()
-        run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh tfsec-results.sarif
+        uses: ./.github/actions/fix-sarif-uris
+        with:
+          sarif-file: tfsec-results.sarif
         continue-on-error: true
 
       - name: Upload tfsec Results to Security Tab
@@ -445,9 +445,9 @@ jobs:
 
       - name: Fix SARIF URI Schemes (OWASP)
         if: always()
-        run: |
-          chmod +x scripts/fix-sarif-uris.sh
-          ./scripts/fix-sarif-uris.sh dependency-check-report/dependency-check-report.sarif
+        uses: ./.github/actions/fix-sarif-uris
+        with:
+          sarif-file: dependency-check-report/dependency-check-report.sarif
         continue-on-error: true
 
       - name: Upload Results

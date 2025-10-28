@@ -1,0 +1,22 @@
+---
+name: 'Fix SARIF URI Schemes'
+description: >-
+  Convert git:// URIs to file:// URIs in SARIF files for GitHub Code Scanning
+  compatibility
+author: 'Microservices Demo Team'
+
+inputs:
+  sarif-file:
+    description: 'Path to SARIF file to fix (supports multiple files space-separated)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Make script executable
+      run: chmod +x scripts/fix-sarif-uris.sh
+      shell: bash
+
+    - name: Fix SARIF URI schemes
+      run: ./scripts/fix-sarif-uris.sh ${{ inputs.sarif-file }}
+      shell: bash
