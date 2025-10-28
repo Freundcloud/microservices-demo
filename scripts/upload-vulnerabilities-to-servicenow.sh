@@ -176,50 +176,10 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
     *) SN_SEVERITY="5" ;;
   esac
 
-  # Check if vulnerability entry exists
-  VUL_ENTRY_SEARCH=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-    "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_entry?sysparm_query=id=$CVE_ID&sysparm_limit=1")
-
-  VUL_ENTRY_COUNT=$(echo "$VUL_ENTRY_SEARCH" | jq -r '.result | length')
-
-  if [ "$VUL_ENTRY_COUNT" -gt 0 ]; then
-    VUL_ENTRY_SYS_ID=$(echo "$VUL_ENTRY_SEARCH" | jq -r '.result[0].sys_id')
-  else
-    # Create vulnerability entry
-    VUL_ENTRY_PAYLOAD=$(jq -n \
-      --arg cve "$CVE_ID" \
-      --arg title "$TITLE" \
-      --arg desc "$DESCRIPTION" \
-      --arg severity "$SN_SEVERITY" \
-      '{
-        "id": $cve,
-        "name": $title,
-        "summary": $desc,
-        "normalized_severity": $severity,
-        "source": "Trivy"
-      }')
-
-    VUL_ENTRY_CREATE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-      -H "Content-Type: application/json" \
-      -H "Accept: application/json" \
-      -X POST \
-      -d "$VUL_ENTRY_PAYLOAD" \
-      "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_entry")
-
-    VUL_ENTRY_SYS_ID=$(echo "$VUL_ENTRY_CREATE" | jq -r '.result.sys_id')
-
-    # Debug: Log error if sys_id is null
-    if [ -z "$VUL_ENTRY_SYS_ID" ] || [ "$VUL_ENTRY_SYS_ID" = "null" ]; then
-      echo -e "  ${RED}✗${NC} Failed to create vulnerability entry for $CVE_ID"
-      echo "  API Response: $(echo "$VUL_ENTRY_CREATE" | jq -c '.')"
-      ((ERROR_COUNT++))
-      continue
-    fi
-  fi
-
-  # Check if vulnerability item already exists for this CI and vulnerability
+  # Check if vulnerability item already exists for this CI and CVE
+  # Search by CI and CVE ID in short_description since we can't link to vulnerability table
   VUL_ITEM_SEARCH=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-    "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_vulnerable_item?sysparm_query=cmdb_ci=$CI_SYS_ID^vulnerability=$VUL_ENTRY_SYS_ID&sysparm_limit=1")
+    "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_vulnerable_item?sysparm_query=cmdb_ci=$CI_SYS_ID^short_descriptionLIKE$CVE_ID&sysparm_limit=1")
 
   VUL_ITEM_COUNT=$(echo "$VUL_ITEM_SEARCH" | jq -r '.result | length')
 
@@ -229,22 +189,25 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
     continue
   fi
 
-  # Create vulnerable item
+  # Create vulnerable item directly without vulnerability entry
+  # Note: We can't create in sn_vul_entry due to ACL restrictions
+  # Creating standalone vulnerable item with all details embedded
   VUL_ITEM_PAYLOAD=$(jq -n \
     --arg ci "$CI_SYS_ID" \
-    --arg vul "$VUL_ENTRY_SYS_ID" \
+    --arg cve "$CVE_ID" \
+    --arg title "$TITLE" \
     --arg severity "$SN_SEVERITY" \
     --arg pkg "$PKG_NAME" \
     --arg installed "$INSTALLED_VERSION" \
     --arg fixed "$FIXED_VERSION" \
+    --arg desc "$DESCRIPTION" \
     '{
       "cmdb_ci": $ci,
-      "vulnerability": $vul,
       "severity": $severity,
       "source": "Trivy",
-      "state": "open",
-      "short_description": ("Vulnerability in " + $pkg + " " + $installed),
-      "description": ("Package: " + $pkg + "\nInstalled: " + $installed + "\nFixed: " + $fixed)
+      "state": "1",
+      "short_description": ($cve + " - Vulnerability in " + $pkg + " " + $installed),
+      "description": ("CVE: " + $cve + "\nTitle: " + $title + "\n\nPackage: " + $pkg + "\nInstalled Version: " + $installed + "\nFixed Version: " + $fixed + "\n\nDescription:\n" + $desc)
     }')
 
   VUL_ITEM_CREATE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
