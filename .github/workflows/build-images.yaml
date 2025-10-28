@@ -517,7 +517,7 @@ jobs:
 
           # Upload vulnerabilities
           echo "📤 Uploading vulnerabilities to ServiceNow..."
-          ./scripts/upload-vulnerabilities-to-servicenow.sh \
+          DEBUG=true ./scripts/upload-vulnerabilities-to-servicenow.sh \
             "trivy-results-${{ matrix.service }}.json" \
             "${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}" \
             "${{ inputs.environment }}"
@@ -525,6 +525,7 @@ jobs:
           SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          DEBUG: 'true'
         continue-on-error: true
 
       - name: Push to ECR

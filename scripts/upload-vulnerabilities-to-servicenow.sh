@@ -216,16 +216,33 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
   else
     ((ERROR_COUNT++))
     echo -e "  ${RED}✗${NC} $CVE_ID - Failed to create vulnerable item"
+
     # Print full API response for debugging
+    echo ""
+    echo -e "${RED}Full API Response:${NC}"
+    echo "$VUL_ITEM_CREATE" | jq '.'
+    echo ""
+
+    # Extract error details
     ERROR_MSG=$(echo "$VUL_ITEM_CREATE" | jq -r '.error.message // .error // "Unknown error"')
     ERROR_DETAIL=$(echo "$VUL_ITEM_CREATE" | jq -r '.error.detail // empty')
-    echo "    Error: $ERROR_MSG"
+
+    echo -e "${RED}Error Details:${NC}"
+    echo "  Message: $ERROR_MSG"
     if [ -n "$ERROR_DETAIL" ]; then
-      echo "    Detail: $ERROR_DETAIL"
+      echo "  Detail: $ERROR_DETAIL"
     fi
-    # Print full response in debug mode (first 500 chars)
+
+    # Print the payload that was sent
+    echo ""
+    echo -e "${YELLOW}Payload sent:${NC}"
+    echo "$VUL_ITEM_PAYLOAD" | jq '.'
+    echo ""
+
+    # Fail fast on first error in debug mode
     if [ "${DEBUG:-false}" = "true" ]; then
-      echo "    Full response: $(echo "$VUL_ITEM_CREATE" | jq -c '.' | cut -c1-500)"
+      echo -e "${RED}Failing fast due to DEBUG mode${NC}"
+      exit 1
     fi
   fi
 done
