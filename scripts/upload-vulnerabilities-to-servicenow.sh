@@ -207,6 +207,14 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
       "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_entry")
 
     VUL_ENTRY_SYS_ID=$(echo "$VUL_ENTRY_CREATE" | jq -r '.result.sys_id')
+
+    # Debug: Log error if sys_id is null
+    if [ -z "$VUL_ENTRY_SYS_ID" ] || [ "$VUL_ENTRY_SYS_ID" = "null" ]; then
+      echo -e "  ${RED}✗${NC} Failed to create vulnerability entry for $CVE_ID"
+      echo "  API Response: $(echo "$VUL_ENTRY_CREATE" | jq -c '.')"
+      ((ERROR_COUNT++))
+      continue
+    fi
   fi
 
   # Check if vulnerability item already exists for this CI and vulnerability
@@ -253,7 +261,8 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
     echo -e "  ${GREEN}✓${NC} $CVE_ID ($SEVERITY) - $PKG_NAME"
   else
     ((ERROR_COUNT++))
-    echo -e "  ${RED}✗${NC} $CVE_ID - Upload failed"
+    echo -e "  ${RED}✗${NC} $CVE_ID - Failed to create vulnerable item"
+    echo "  API Response: $(echo "$VUL_ITEM_CREATE" | jq -c '.')"
   fi
 done
 
