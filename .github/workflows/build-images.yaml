@@ -469,24 +469,26 @@ jobs:
           retention-days: 90
         continue-on-error: true
 
-      - name: Upload SBOM to ServiceNow
-        if: inputs.push_images
-        uses: ServiceNow/sbom-upload@v1
-        with:
-          snSbomUser: ${{ secrets.SN_SBOM_USER }}
-          snSbomPassword: ${{ secrets.SN_SBOM_PASSWORD }}
-          snInstanceUrl: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          ghToken: ${{ secrets.GITHUB_TOKEN }}
-          ghAccountOwner: Freundcloud
-          repository: microservices-demo
-          provider: 'repository'
-          path: 'sbom-${{ matrix.service }}.json'
-          businessApplicationName: 'Online Boutique - ${{ matrix.service }}'
-          lifecycleStage: ${{ inputs.environment == 'prod' && 'production' || 'pre_production' }}
-          buildId: ${{ github.run_number }}
-          fetchVulnerabilityInfo: true
-          fetchPackageInfo: true
-        continue-on-error: true
+      # DISABLED: ServiceNow SBOM upload - action repository not found
+      # TODO: Research correct ServiceNow SBOM upload action and re-enable
+      # - name: Upload SBOM to ServiceNow
+      #   if: inputs.push_images
+      #   uses: ServiceNow/sbom-upload@v1
+      #   with:
+      #     snSbomUser: ${{ secrets.SN_SBOM_USER }}
+      #     snSbomPassword: ${{ secrets.SN_SBOM_PASSWORD }}
+      #     snInstanceUrl: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+      #     ghToken: ${{ secrets.GITHUB_TOKEN }}
+      #     ghAccountOwner: Freundcloud
+      #     repository: microservices-demo
+      #     provider: 'repository'
+      #     path: 'sbom-${{ matrix.service }}.json'
+      #     businessApplicationName: 'Online Boutique - ${{ matrix.service }}'
+      #     lifecycleStage: ${{ inputs.environment == 'prod' && 'production' || 'pre_production' }}
+      #     buildId: ${{ github.run_number }}
+      #     fetchVulnerabilityInfo: true
+      #     fetchPackageInfo: true
+      #   continue-on-error: true
 
       - name: Register Package with ServiceNow
         if: inputs.push_images
