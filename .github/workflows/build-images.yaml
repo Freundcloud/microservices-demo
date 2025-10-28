@@ -439,6 +439,43 @@ jobs:
           exit-code: '0'
           severity: 'CRITICAL,HIGH,MEDIUM'
 
+      - name: Run Trivy Vulnerability Scanner (JSON for ServiceNow)
+        if: inputs.push_images
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+          format: 'json'
+          output: 'trivy-results-${{ matrix.service }}.json'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+        continue-on-error: true
+
+      - name: Upload Vulnerabilities to ServiceNow
+        if: inputs.push_images
+        run: |
+          # Check if Trivy results exist
+          if [ ! -f "trivy-results-${{ matrix.service }}.json" ]; then
+            echo "⚠️ Trivy results not found, skipping ServiceNow upload"
+            exit 0
+          fi
+
+          # Check if upload script exists
+          if [ ! -f "scripts/upload-vulnerabilities-to-servicenow.sh" ]; then
+            echo "⚠️ Upload script not found, skipping ServiceNow upload"
+            exit 0
+          fi
+
+          # Upload vulnerabilities
+          echo "📤 Uploading vulnerabilities to ServiceNow..."
+          ./scripts/upload-vulnerabilities-to-servicenow.sh \
+            "trivy-results-${{ matrix.service }}.json" \
+            "${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}" \
+            "${{ inputs.environment }}"
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        continue-on-error: true
+
       - name: Push to ECR
         if: inputs.push_images
         uses: docker/build-push-action@v5
@@ -493,6 +530,8 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.push_images }}" == "true" ]; then
             echo "✅ Pushed to ECR" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Trivy vulnerability scan completed" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Vulnerabilities uploaded to ServiceNow Vulnerability Response" >> $GITHUB_STEP_SUMMARY
             echo "✅ Registered with ServiceNow as package: \`${{ matrix.service }}-${{ inputs.environment }}-${{ github.run_number }}.package\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "⏭️ Image not pushed (build only)" >> $GITHUB_STEP_SUMMARY
@@ -547,6 +586,7 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
               echo "- ✅ Test results registered for each service" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Vulnerabilities uploaded to Vulnerability Response" >> $GITHUB_STEP_SUMMARY
               echo "- ✅ Each Docker image registered as individual package" >> $GITHUB_STEP_SUMMARY
               echo "- ✅ Package naming: \`{service}-${{ inputs.environment }}-${{ github.run_number }}.package\`" >> $GITHUB_STEP_SUMMARY
             fi
