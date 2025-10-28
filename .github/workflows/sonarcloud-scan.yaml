@@ -75,17 +75,14 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - name: Build Java services
+      - name: Build Java service
         run: |
-          echo "📦 Building Java services for analysis..."
+          echo "📦 Building Java service for analysis..."
 
           # Build adservice (Java with Gradle)
+          # Note: adservice is the only Java service in this project
           echo "Building adservice..."
           (cd src/adservice && chmod +x gradlew && ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon)
-
-          # Build shopping assistant service
-          echo "Building shoppingassistantservice..."
-          (cd src/shoppingassistantservice && chmod +x gradlew && ./gradlew build -x test -x verifyGoogleJavaFormat --no-daemon)
         continue-on-error: true
 
       - name: Build .NET service

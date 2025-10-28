@@ -102,7 +102,7 @@ SonarCloud analyzes the following aspects of your code:
 |----------|----------|---------|
 | **Go** | frontend, checkoutservice, productcatalogservice, shippingservice | Built-in |
 | **Python** | emailservice, recommendationservice, loadgenerator, shoppingassistantservice | Built-in |
-| **Java** | adservice, shoppingassistantservice (Gradle builds) | Built-in |
+| **Java** | adservice (Gradle build) | Built-in |
 | **JavaScript/Node.js** | currencyservice, paymentservice | Built-in |
 | **C#** | cartservice (.NET) | Built-in |
 
