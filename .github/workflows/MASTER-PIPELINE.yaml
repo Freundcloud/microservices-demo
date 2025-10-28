@@ -657,21 +657,24 @@ jobs:
   # ============================================================================
   # STAGE 8: Update ServiceNow Change Request
   # ============================================================================
-  # DISABLED: workflow_call causing validation errors
 
-  # update-servicenow-change:
-  #   name: "📝 Update ServiceNow Change"
-  #   needs: [pipeline-init, servicenow-change, deploy-to-environment]
-  #   if: always() && needs.servicenow-change.outputs.change_request_number != ''
-  #   uses: ./.github/workflows/servicenow-update-change.yaml
-  #   secrets: inherit
-  #   with:
-  #     environment: ${{ needs.pipeline-init.outputs.environment }}
-  #     change_request_number: ${{ needs.servicenow-change.outputs.change_request_number }}
-  #     deployment_status: ${{ needs.deploy-to-environment.result }}
-  #     running_pods: ${{ needs.deploy-to-environment.outputs.running_pods }}
-  #     total_pods: ${{ needs.deploy-to-environment.outputs.total_pods }}
-  #     frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url }}
+  update-servicenow-change:
+    name: "📝 Update ServiceNow Change"
+    needs: [pipeline-init, servicenow-change, deploy-to-environment, smoke-tests]
+    if: |
+      always() &&
+      needs.servicenow-change.result == 'success' &&
+      needs.servicenow-change.outputs.change_request_number != '' &&
+      (needs.deploy-to-environment.result == 'success' || needs.deploy-to-environment.result == 'failure')
+    uses: ./.github/workflows/servicenow-update-change.yaml
+    secrets: inherit
+    with:
+      environment: ${{ needs.pipeline-init.outputs.environment }}
+      change_request_number: ${{ needs.servicenow-change.outputs.change_request_number }}
+      deployment_status: ${{ needs.deploy-to-environment.result }}
+      running_pods: ${{ needs.deploy-to-environment.outputs.running_pods || '0' }}
+      total_pods: ${{ needs.deploy-to-environment.outputs.total_pods || '0' }}
+      frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url || '' }}
 
   # ============================================================================
   # STAGE 9: Pipeline Summary
@@ -685,12 +688,11 @@ jobs:
       - detect-terraform-changes
       - detect-service-changes
       - build-and-push
-      - upload-test-results
       - register-packages
       - servicenow-change
       - deploy-to-environment
       - smoke-tests
-      # - update-servicenow-change  # Disabled
+      - update-servicenow-change
     if: always()
     runs-on: ubuntu-latest
 

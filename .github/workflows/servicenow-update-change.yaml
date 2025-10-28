@@ -1,0 +1,140 @@
+name: ServiceNow - Update Change Request
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment (dev/qa/prod)'
+        required: true
+        type: string
+      change_request_number:
+        description: 'ServiceNow change request number (e.g., CHG0030001)'
+        required: true
+        type: string
+      deployment_status:
+        description: 'Deployment result (success/failure)'
+        required: true
+        type: string
+      running_pods:
+        description: 'Number of running pods'
+        required: false
+        type: string
+        default: '0'
+      total_pods:
+        description: 'Total number of pods expected'
+        required: false
+        type: string
+        default: '0'
+      frontend_url:
+        description: 'Frontend application URL'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  update-change-request:
+    name: Update Change Request
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine Change Request State
+        id: determine-state
+        run: |
+          # Map deployment status to ServiceNow change request states
+          # State values: -5=New, 0=Assess, 1=Authorize, 2=Scheduled, 3=Implement, 4=Review, 7=Closed
+
+          if [ "${{ inputs.deployment_status }}" == "success" ]; then
+            # Deployment successful - mark as Implemented (3) or Closed Complete (3)
+            echo "state=3" >> $GITHUB_OUTPUT
+            echo "close_code=successful" >> $GITHUB_OUTPUT
+            echo "close_notes=Deployment completed successfully. All services running." >> $GITHUB_OUTPUT
+            echo "status_label=✅ Successful" >> $GITHUB_OUTPUT
+          else
+            # Deployment failed - mark as Closed Incomplete (4) or keep in Implement with notes
+            echo "state=4" >> $GITHUB_OUTPUT
+            echo "close_code=unsuccessful" >> $GITHUB_OUTPUT
+            echo "close_notes=Deployment failed. Review logs for details." >> $GITHUB_OUTPUT
+            echo "status_label=❌ Failed" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Change Request: ${{ inputs.change_request_number }}"
+          echo "Deployment Status: ${{ inputs.deployment_status }}"
+
+      - name: Build Work Notes
+        id: work-notes
+        run: |
+          WORK_NOTES="Deployment to ${{ inputs.environment }} environment completed at $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+
+          **Deployment Result:** ${{ steps.determine-state.outputs.status_label }}
+
+          **Services Status:**
+          - Running Pods: ${{ inputs.running_pods }}
+          - Total Pods: ${{ inputs.total_pods }}
+          - Pod Health: $([ "${{ inputs.running_pods }}" == "${{ inputs.total_pods }}" ] && echo "✅ All healthy" || echo "⚠️ Some pods not ready")
+
+          **Application Access:**
+          - Frontend URL: ${{ inputs.frontend_url || 'Not available yet' }}
+
+          **GitHub Workflow:**
+          - Run ID: ${{ github.run_id }}
+          - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - Actor: ${{ github.actor }}
+          - Commit: ${{ github.sha }}
+          - Branch: ${{ github.ref_name }}
+
+          **Next Steps:**
+          $(if [ "${{ inputs.deployment_status }}" == "success" ]; then
+            echo "- Verify application functionality"
+            echo "- Monitor application metrics"
+            echo "- Close change request if validation passes"
+          else
+            echo "- Review deployment logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- Investigate failure cause"
+            echo "- Plan remediation or rollback"
+          fi)"
+
+          # Save as multiline output (escape for JSON)
+          echo "work_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$WORK_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update Change Request in ServiceNow
+        uses: ServiceNow/servicenow-devops-update-change@v3.1.0
+        with:
+          # Authentication (Basic Auth)
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+
+          # Change Request Identifier
+          change-request-number: ${{ inputs.change_request_number }}
+
+          # GitHub Context
+          context-github: ${{ toJSON(github) }}
+
+          # Change Request Updates
+          # IMPORTANT: State must be LAST in the JSON object for proper processing
+          change-request-details: |
+            {
+              "work_notes": "${{ steps.work-notes.outputs.work_notes }}",
+              "close_code": "${{ steps.determine-state.outputs.close_code }}",
+              "close_notes": "${{ steps.determine-state.outputs.close_notes }}",
+              "state": "${{ steps.determine-state.outputs.state }}"
+            }
+
+      - name: Update Summary
+        if: always()
+        run: |
+          echo "## 📝 ServiceNow Change Request Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Change Request | **${{ inputs.change_request_number }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployment Status | ${{ steps.determine-state.outputs.status_label }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| New State | ${{ steps.determine-state.outputs.state }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Close Code | ${{ steps.determine-state.outputs.close_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View in ServiceNow:**" >> $GITHUB_STEP_SUMMARY
+          echo "${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sysparm_query=number=${{ inputs.change_request_number }}" >> $GITHUB_STEP_SUMMARY
