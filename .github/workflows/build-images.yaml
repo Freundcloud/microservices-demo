@@ -350,6 +350,15 @@ jobs:
         # Quality Gate: Make tests blocking for production, non-blocking for dev/qa
         continue-on-error: ${{ inputs.environment != 'prod' }}
 
+      - name: Upload Test Results as Artifact
+        if: always() && steps.find-test-results.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.service }}
+          path: ${{ steps.find-test-results.outputs.path }}
+          retention-days: 30
+        continue-on-error: true
+
       - name: Publish Test Results to GitHub
         if: always() && steps.find-test-results.outputs.found == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
