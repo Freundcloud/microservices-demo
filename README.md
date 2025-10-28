@@ -1,72 +1,74 @@
-# Online Boutique - AWS Deployment
+# ServiceNow + GitHub DevOps Integration Demo
 
 <p align="center">
 <img src="/src/frontend/static/icons/Hipster_HeroLogoMaroon.svg" width="300" alt="Online Boutique" />
 </p>
 
-![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen)
-![Terraform](https://img.shields.io/badge/IaC-Terraform-purple)
+![ServiceNow](https://img.shields.io/badge/ServiceNow-DevOps%20Change-green)
+![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-blue)
+![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD-Automated-brightgreen)
 ![AWS](https://img.shields.io/badge/Cloud-AWS-orange)
-![Istio](https://img.shields.io/badge/Service%20Mesh-Istio-blue)
 
-**Online Boutique** is a cloud-native microservices demo application deployed on AWS. The application is a web-based e-commerce platform where users can browse items, add them to the cart, and purchase them.
+## 🎯 What This Demo Showcases
 
-This AWS-focused version demonstrates modern cloud-native practices perfect for **GitHub + AWS + ServiceNow** collaboration workflows.
+**This is a ServiceNow + GitHub DevOps Change Management integration demo** that demonstrates automated, compliant deployments across multiple environments.
+
+**Primary Focus:**
+
+- ✅ **Automated Change Requests**: GitHub Actions automatically creates ServiceNow Change Requests
+- ✅ **13 Custom Fields**: Complete GitHub context (repo, branch, commit, actor, environment)
+- ✅ **Multi-Environment Approvals**: Dev auto-approved, QA/Prod require manual approval
+- ✅ **Complete Audit Trail**: Full compliance evidence and traceability
+- ✅ **Work Item Integration**: GitHub Issues tracked in ServiceNow
+- ✅ **Test Results Upload**: Automated evidence for change approvals
+- ✅ **Security Scanning**: 10+ scanners with results uploaded to ServiceNow
+
+**Test Application:**
+The **Online Boutique** microservices application (12 services on AWS EKS) serves as the test infrastructure to demonstrate the integration value. Kubernetes/AWS are tools to show the integration—not the focus of the demo.
 
 ## 🚀 Quick Start
 
-### For New Developers
+**Total Setup Time: 2-3 hours** (AWS + GitHub + ServiceNow)
+
+### Step-by-Step Setup
+
+Follow these guides in order:
+
+1. **[AWS Deployment Guide](docs/1-AWS-DEPLOYMENT-GUIDE.md)** (30-45 min)
+   - Deploy EKS cluster and infrastructure
+   - Configure AWS credentials
+   - Run Terraform deployment
+
+2. **[GitHub Setup Guide](docs/2-GITHUB-SETUP-GUIDE.md)** (20-30 min)
+   - Configure GitHub Actions workflows
+   - Set up AWS and ServiceNow secrets
+   - Build and push container images
+
+3. **[ServiceNow Integration Guide](docs/3-SERVICENOW-INTEGRATION-GUIDE.md)** (45-60 min)
+   - Install ServiceNow DevOps plugin
+   - Create 13 custom fields on change_request table
+   - Configure approval workflows
+   - Test the integration
+
+**See:** [Documentation Hub](docs/README.md) for complete navigation
+
+### Quick Deploy (For Experienced Users)
 
 ```bash
-# 1. Clone repository
-git clone <repository-url>
-cd microservices-demo
+# 1. Deploy infrastructure
+source .envrc  # Load AWS credentials
+just tf-apply  # Deploy EKS cluster (~15 min)
 
-# 2. Run automated onboarding
-just onboard
-
-# 3. Configure AWS credentials
-cp .envrc.example .envrc
-# Edit .envrc with your AWS credentials
-source .envrc
-
-# 4. Deploy single cluster (contains dev, qa, prod node groups)
-just tf-apply
-
-# 5. Install Helm charts and Istio components
-./post-install.sh
-
-# 6. Configure kubectl and deploy to environments
+# 2. Configure kubectl
 just k8s-config
+
+# 3. Deploy to environments
 kubectl apply -k kustomize/overlays/dev
 kubectl apply -k kustomize/overlays/qa
 kubectl apply -k kustomize/overlays/prod
 
-# 6. Access application
-just k8s-url
-```
-
-**See:** [Complete Onboarding Guide](docs/ONBOARDING.md) for detailed setup instructions.
-
-### For Experienced Users
-
-```bash
-# Deploy infrastructure (single cluster with dev, qa, prod node groups)
-cd terraform-aws
-source ../.envrc  # Load AWS credentials
-terraform apply
-cd ..
-
-# Install Helm charts and Istio service mesh
-./post-install.sh
-
-# Configure kubectl
-aws eks update-kubeconfig --region eu-west-2 --name microservices
-
-# Deploy to each environment namespace
-kubectl apply -k ../kustomize/overlays/dev
-kubectl apply -k ../kustomize/overlays/qa
-kubectl apply -k ../kustomize/overlays/prod
+# 4. Automated promotion pipeline
+just promote v1.0.0 all  # Promotes version across all environments
 ```
 
 ## 📚 Documentation
@@ -122,19 +124,26 @@ kubectl apply -k ../kustomize/overlays/prod
 | [loadgenerator](src/loadgenerator) | Python | Load testing |
 | [shoppingassistantservice](src/shoppingassistantservice) | Java | AI shopping assistant |
 
-### AWS Infrastructure
+### AWS Infrastructure (Test Environment)
 
-- **Amazon EKS**: Single managed Kubernetes cluster with 3 dedicated node groups
-- **VPC**: Multi-AZ networking in eu-west-2 (London) across 3 availability zones
-- **ElastiCache**: Redis for session storage (shared across all environments)
+**Ultra-Minimal Configuration** (~$134/month):
+
+- **Amazon EKS**: Single managed Kubernetes cluster (1 node, t3.large)
+- **VPC**: Multi-AZ networking in eu-west-2 (London)
+- **ElastiCache**: Redis for session storage (cache.t3.micro)
 - **ECR**: Container registry with vulnerability scanning
-- **Istio**: Service mesh with mTLS, observability (shared control plane)
+- **ALB**: Application Load Balancer for ingress
 - **IAM**: IRSA for secure AWS access
-- **NLB**: Network Load Balancer for ingress
+
+**3 Environments on 1 Node**:
+
+- **microservices-dev**: 1 replica per service (10 pods)
+- **microservices-qa**: 1 replica per service (10 pods)
+- **microservices-prod**: 1 replica per service (10 pods)
 
 **Region**: eu-west-2 (London, UK)
 
-**See:** [Complete Architecture Guide](docs/architecture/REPOSITORY-STRUCTURE.md) | [Single-Cluster Migration](SINGLE-CLUSTER-MIGRATION.md)
+**See:** [Cost Optimization Guide](COST-OPTIMIZATION.md) for configuration options
 
 ## ✨ Features
 
@@ -172,57 +181,132 @@ kubectl apply -k ../kustomize/overlays/prod
 - ✅ Comprehensive documentation
 - ✅ Automated onboarding
 
-## 🌍 Single-Cluster Multi-Environment Architecture
+## 🔄 ServiceNow DevOps Integration
 
-**One EKS cluster** hosting **three environments** with four dedicated node groups:
+**The core value proposition of this demo!**
 
-### System Node Group (Cluster Infrastructure)
+### Automated Change Management
 
-- **Node Group**: 2-3 × t3.small (2 vCPU, 2GB RAM)
-- **Purpose**: Hosts cluster add-ons (CoreDNS, EBS CSI driver, metrics-server, etc.)
-- **Node Labels**: `role=system`, `workload=cluster-addons`
-- **Taints**: None (allows system pods to schedule)
-- **Cost**: ~£12/month
+Every deployment automatically creates a ServiceNow Change Request with complete GitHub context:
 
-### Development Environment
+**13 Custom Fields on change_request table:**
 
-- **Namespace**: `microservices-dev`
-- **Node Group**: 2-4 × t3.medium (2 vCPU, 4GB RAM)
-- **Replicas**: 1 per service
-- **Features**: Basic Istio, no load generator
-- **Node Labels**: `environment=dev`, `workload=microservices-dev`
+- `u_source` - "GitHub Actions"
+- `u_correlation_id` - Workflow run ID for traceability
+- `u_repository` - Git repository name
+- `u_branch` - Git branch name
+- `u_commit_sha` - Git commit hash
+- `u_actor` - GitHub user who triggered deployment
+- `u_environment` - Target environment (dev/qa/prod)
+- `u_github_run_id` - Workflow run ID
+- `u_github_run_url` - Link to workflow run
+- `u_github_repo_url` - Link to repository
+- `u_github_commit_url` - Link to commit
+- `u_version` - Application version
+- `u_deployment_type` - Type of deployment
 
-### QA Environment
+### Multi-Environment Approval Workflows
 
-- **Namespace**: `microservices-qa`
-- **Node Group**: 3-6 × t3.large (2 vCPU, 8GB RAM)
-- **Replicas**: 2 per service
-- **Features**: Full Istio observability stack, load generator enabled
-- **Node Labels**: `environment=qa`, `workload=microservices-qa`
+**Development (Auto-Approved)**:
 
-### Production Environment
+- Changes automatically approved
+- Deployed immediately
+- Fast iteration for developers
 
-- **Namespace**: `microservices-prod`
-- **Node Group**: 5-10 × t3.xlarge (4 vCPU, 16GB RAM)
-- **Replicas**: 3 per service (High Availability)
-- **Features**: Full Istio stack, no load generator
-- **Node Labels**: `environment=prod`, `workload=microservices-prod`
+**QA (Manual Approval)**:
 
-**Node Isolation**: Each environment has dedicated nodes via taints/tolerations - dev pods can't run on prod nodes!
+- QA Lead approval required
+- ServiceNow Change Request created
+- Tests must pass before deployment
 
-**Total Cost**: ~£470/month (vs ~£549/month for 3 separate clusters) - **14% savings**
+**Production (CAB Approval)**:
 
-**Deploy the cluster:**
+- Change Advisory Board (CAB) approval required
+- Complete change documentation
+- Test evidence attached
+- Security scan results included
+
+### Work Item Integration
+
+- GitHub Issues automatically tracked in ServiceNow Work Items
+- Linked to Change Requests
+- Complete traceability from issue to deployment
+
+### Test Results Upload
+
+- Unit tests, integration tests, security scans
+- Automated evidence generation
+- Attached to Change Requests
+- Enables risk-based approval decisions
+
+### Compliance Benefits
+
+- ✅ **SOC 2**: Complete audit trail
+- ✅ **ISO 27001**: Change management evidence
+- ✅ **NIST CSF**: Access control and monitoring
+- ✅ **HIPAA/PCI DSS**: Deployment tracking
+
+**See:** [ServiceNow Integration Guide](docs/3-SERVICENOW-INTEGRATION-GUIDE.md) for setup
+
+## 🌍 Multi-Environment Architecture
+
+**Ultra-Minimal Demo Configuration** - One cluster, one node, three environments:
+
+### Single Node Configuration
+
+- **Node**: 1 × t3.large (2 vCPU, 8GB RAM)
+- **Total Capacity**: ~38 pods (85-90% utilized)
+- **Purpose**: Demo/development only (not production-ready)
+- **Cost**: ~$134/month (80% cheaper than multi-node setup)
+
+### Three Namespaces (Namespace Isolation)
+
+**Development Environment** (`microservices-dev`):
+
+- **Replicas**: 1 per service (10 pods total)
+- **Purpose**: Fast iteration, auto-approved changes
+- **Resources**: Minimal CPU/memory requests
+- **ServiceNow**: Auto-approved deployments
+
+**QA Environment** (`microservices-qa`):
+
+- **Replicas**: 1 per service (10 pods total)
+- **Purpose**: Testing and validation
+- **Resources**: Moderate CPU/memory requests
+- **ServiceNow**: QA Lead approval required
+
+**Production Environment** (`microservices-prod`):
+
+- **Replicas**: 1 per service (10 pods total)
+- **Purpose**: Production-like deployment
+- **Resources**: Higher CPU/memory requests
+- **ServiceNow**: CAB approval required
+
+### Resource Quotas & LimitRanges
+
+Each namespace has:
+
+- **ResourceQuota**: Prevents overconsumption
+- **LimitRange**: Enforces min/max resource limits
+- **Network Policies**: Namespace isolation
+
+### Deployment Strategy
 
 ```bash
-just tf-apply           # Creates single cluster with all 3 node groups
+just tf-apply           # Creates single cluster
 just k8s-config         # Configure kubectl
-kubectl apply -k kustomize/overlays/dev    # Deploy to dev
-kubectl apply -k kustomize/overlays/qa     # Deploy to qa
-kubectl apply -k kustomize/overlays/prod   # Deploy to prod
+kubectl apply -k kustomize/overlays/dev    # Deploy to dev namespace
+kubectl apply -k kustomize/overlays/qa     # Deploy to qa namespace
+kubectl apply -k kustomize/overlays/prod   # Deploy to prod namespace
 ```
 
-**See:** [Single-Cluster Migration Guide](SINGLE-CLUSTER-MIGRATION.md) | [Kustomize Overlays](kustomize/overlays/README.md)
+**Alternative Configurations:**
+
+- **Balanced**: 1 × t3.xlarge with full observability (~$195/month)
+- **Safer Minimal**: 2 nodes with redundancy (~$256/month)
+- **Production**: Multi-node groups with HA (see [Cost Optimization](COST-OPTIMIZATION.md))
+
+**See:** [Cost Optimization Guide](COST-OPTIMIZATION.md) for all configuration options
 
 ## 🛠️ Common Tasks
 
@@ -285,44 +369,95 @@ just security-scan-secrets    # Detect secrets
 Comprehensive security scanning on every commit:
 
 - **CodeQL**: Static analysis for Python, JavaScript, Go, Java, C#
-- **Trivy**: Container vulnerability scanning
+- **Trivy**: Container vulnerability scanning + SBOM generation
+- **Grype**: Dependency vulnerability scanning
 - **Gitleaks**: Secret detection
 - **Semgrep**: Pattern-based code analysis
 - **Checkov/tfsec**: Terraform security scanning
 - **OWASP Dependency Check**: Known vulnerable dependencies
 
-All results appear in GitHub Security tab.
+**Security Results Integration:**
 
-**See:** [Security Scanning Guide](docs/setup/SECURITY-SCANNING.md)
+- All results appear in GitHub Security tab
+- SARIF format reports uploaded to GitHub Code Scanning
+- Vulnerability data uploaded to ServiceNow for approval evidence
+- Complete compliance audit trail
+
+**See:** [GitHub Setup Guide - Security Scanning](docs/2-GITHUB-SETUP-GUIDE.md#security-scanning)
 
 ## 📊 Cost Estimation
 
-Monthly AWS costs by environment (eu-west-2):
+**Ultra-Minimal Demo Configuration** (~$134/month):
 
-| Component | Dev | QA | Prod |
-|-----------|-----|-----|------|
-| EKS Control Plane | £60 | £60 | £60 |
-| EC2 Nodes | £37 | £74 | £205 |
-| NAT Gateway | £27 | £27 | £37 |
-| Load Balancer | £15 | £15 | £15 |
-| ElastiCache Redis | £8 | £12 | £41 |
-| ECR + Logs | £5 | £5 | £5 |
-| **Total/month** | **~£152** | **~£193** | **~£363** |
+| Component | Monthly Cost |
+|-----------|--------------|
+| EKS Control Plane | $73 |
+| EC2 Nodes (1 × t3.large) | $32 |
+| NAT Gateway | $15 |
+| Load Balancer (ALB) | $8 |
+| ElastiCache Redis (cache.t3.micro) | $4 |
+| ECR + Logs | $2 |
+| **Total** | **~$134/month** |
 
-**Optimization tips available in:** [Cost Optimization](docs/README-AWS.md#cost-optimization)
+**Cost Optimization Options:**
+
+- **Current (Ultra-Minimal)**: 1 node, minimal resources → ~$134/mo
+- **Balanced**: 1 × t3.xlarge, full observability → ~$195/mo
+- **Safer Minimal**: 2 nodes, redundancy → ~$256/mo
+- **Production-Ready**: Multi-node groups, HA → ~$400-600/mo
+
+**See:** [Complete Cost Optimization Guide](COST-OPTIMIZATION.md)
 
 ## 🚢 CI/CD Pipeline
 
-Automated workflows with GitHub Actions:
+**Complete GitHub Actions automation with ServiceNow integration:**
 
-- **[terraform-validate.yaml](.github/workflows/terraform-validate.yaml)** - Multi-environment validation and testing
-- **[terraform-plan.yaml](.github/workflows/terraform-plan.yaml)** - Infrastructure preview on PRs
-- **[terraform-apply.yaml](.github/workflows/terraform-apply.yaml)** - Automated deployment on merge
-- **[build-and-push-images.yaml](.github/workflows/build-and-push-images.yaml)** - Container builds with security scans
-- **[security-scan.yaml](.github/workflows/security-scan.yaml)** - Comprehensive security scanning
-- **[deploy-application.yaml](.github/workflows/deploy-application.yaml)** - Application deployment to EKS
+### Main Workflows
 
-**Setup:** [GitHub Actions Configuration](docs/setup/GITHUB-ACTIONS-SETUP.md)
+- **[MASTER-PIPELINE.yaml](.github/workflows/MASTER-PIPELINE.yaml)** - Orchestrates entire deployment pipeline
+  - Calls security scan, build, deploy, and ServiceNow workflows
+  - Manages multi-environment promotion
+  - Handles approval gates
+
+- **[build-images.yaml](.github/workflows/build-images.yaml)** - Smart container builds
+  - Only rebuilds changed services
+  - Multi-arch support (amd64/arm64)
+  - Vulnerability scanning with Trivy
+  - SBOM generation for compliance
+
+- **[security-scan.yaml](.github/workflows/security-scan.yaml)** - Comprehensive security
+  - CodeQL, Trivy, Grype, Gitleaks, Semgrep, Checkov, tfsec
+  - SARIF upload to GitHub Security tab
+  - Vulnerability upload to ServiceNow
+
+- **[deploy-environment.yaml](.github/workflows/deploy-environment.yaml)** - Kubernetes deployment
+  - Environment-specific deployment (dev/qa/prod)
+  - Health check verification
+  - Rollback on failure
+
+- **[servicenow-integration.yaml](.github/workflows/servicenow-integration.yaml)** - Change automation
+  - Creates ServiceNow Change Requests
+  - Populates 13 custom fields
+  - Registers work items and test results
+  - Updates change state after deployment
+
+### Automated Promotion Pipeline
+
+```bash
+just promote v1.2.3 all  # Automated version promotion across environments
+```
+
+The promotion script:
+
+1. Creates release branch
+2. Updates all Kustomize overlays
+3. Creates PR and waits for CI checks
+4. Prompts for merge approval
+5. Deploys to DEV (auto-approved)
+6. Prompts for QA deployment (requires ServiceNow approval)
+7. Prompts for PROD deployment (requires CAB approval)
+
+**Setup:** [GitHub Setup Guide](docs/2-GITHUB-SETUP-GUIDE.md)
 
 ## 📸 Screenshots
 
@@ -334,11 +469,12 @@ Automated workflows with GitHub Actions:
 
 Contributions welcome! Please:
 
-1. Read the [Development Guide](docs/development/development-guide.md)
+1. Read the [Documentation Hub](docs/README.md)
 2. Follow existing code patterns
 3. Run security scans: `just security-scan-all`
 4. Update documentation as needed
-5. Submit pull request
+5. Test your changes in dev environment first
+6. Submit pull request with clear description
 
 ## 📝 License
 
@@ -350,21 +486,23 @@ Original Google Cloud version: [GoogleCloudPlatform/microservices-demo](https://
 
 ### Getting Help
 
-1. Check the [Troubleshooting Guide](docs/README-AWS.md#troubleshooting)
-2. Review [Documentation Index](docs/README.md)
-3. Search existing GitHub issues
-4. Open new issue with:
+1. **Start with the guides**: [Documentation Hub](docs/README.md)
+   - [AWS Deployment Guide](docs/1-AWS-DEPLOYMENT-GUIDE.md#troubleshooting)
+   - [GitHub Setup Guide](docs/2-GITHUB-SETUP-GUIDE.md#troubleshooting)
+   - [ServiceNow Integration Guide](docs/3-SERVICENOW-INTEGRATION-GUIDE.md#troubleshooting)
+2. Search existing GitHub issues
+3. Open new issue with:
    - Problem description
    - Steps to reproduce
    - Logs and error messages
-   - Environment details
+   - Environment details (AWS region, ServiceNow instance, etc.)
 
 ### Additional Resources
 
+- [ServiceNow DevOps Documentation](https://docs.servicenow.com/bundle/tokyo-devops/page/product/enterprise-dev-ops/concept/dev-ops-home.html)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [Amazon EKS Documentation](https://docs.aws.amazon.com/eks/)
-- [Istio Documentation](https://istio.io/latest/docs/)
 - [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [EKS Best Practices](https://aws.github.io/aws-eks-best-practices/)
 
 ---
 

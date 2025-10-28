@@ -1,18 +1,32 @@
-# Microservices Demo - Project Overview
+# ServiceNow + GitHub DevOps Integration Demo
 
-> Cloud-native microservices application demonstrating modern DevOps practices with GitHub Actions, AWS EKS, Istio, and ServiceNow integration
+> **Primary Focus:** ServiceNow DevOps Change Management integration with GitHub Actions
+>
+> **Test Application:** Cloud-native microservices (Online Boutique) on AWS EKS
 
-## What is This Demo?
+## 🎯 What is This Demo?
 
-This repository demonstrates a complete, production-ready microservices architecture running on AWS EKS (Amazon Elastic Kubernetes Service) with full DevOps automation including:
+**This demonstrates ServiceNow + GitHub DevOps Change Management integration** with automated, compliant deployments across multiple environments.
+
+### Primary Focus (The Demo Value!)
+
+- ✅ **Automated Change Requests**: GitHub Actions automatically creates ServiceNow Change Requests
+- ✅ **13 Custom Fields**: Complete GitHub context (repo, branch, commit, actor, environment)
+- ✅ **Multi-Environment Approvals**: Dev auto-approved, QA/Prod require manual approval
+- ✅ **Complete Audit Trail**: Full compliance evidence and traceability
+- ✅ **Work Item Integration**: GitHub Issues tracked in ServiceNow
+- ✅ **Test Results Upload**: Automated evidence for change approvals
+- ✅ **Security Scanning**: 10+ scanners with results uploaded to ServiceNow
+
+### Test Application (Supporting Infrastructure)
+
+The **Online Boutique** e-commerce application serves as test infrastructure to demonstrate the integration:
 
 - **12 Polyglot Microservices** (Go, Python, Java, Node.js, C#)
-- **Service Mesh** (Istio for traffic management and observability)
-- **Infrastructure as Code** (Terraform for AWS resources)
-- **CI/CD Automation** (GitHub Actions)
-- **Change Management** (ServiceNow DevOps integration)
+- **AWS EKS** (Kubernetes cluster for deployment)
+- **Infrastructure as Code** (Terraform)
+- **CI/CD Automation** (GitHub Actions orchestration)
 - **Security Scanning** (Multi-tool security pipeline)
-- **CMDB Integration** (Automated infrastructure discovery)
 
 ## Architecture
 
@@ -36,28 +50,35 @@ A modern e-commerce application consisting of 12 microservices:
 | **loadgenerator** | Python/Locust | Realistic traffic simulation |
 
 **Communication**: All inter-service calls use **gRPC** (Protocol Buffers)
-**Security**: **Strict mTLS** enforced by Istio service mesh
 
-### Infrastructure
+### Infrastructure (Test Environment Only!)
 
 **Cloud Provider**: AWS
 **Region**: eu-west-2 (London, UK)
 
-**Kubernetes**:
-- **Cluster**: Amazon EKS (Managed Kubernetes)
-- **Networking**: AWS VPC with 3 availability zones
-- **Service Mesh**: Istio 1.x
-- **Ingress**: Istio Gateway with AWS NLB
+**Ultra-Minimal Configuration** (~$134/month):
 
-**Storage & Caching**:
-- **Redis**: Amazon ElastiCache (for cart service)
+- **Kubernetes**: Amazon EKS (1 node, t3.large)
+- **Networking**: AWS VPC with 3 availability zones
+- **Ingress**: AWS ALB (Application Load Balancer)
+- **Redis**: Amazon ElastiCache (cache.t3.micro)
 - **Container Registry**: Amazon ECR
 
-**Cost Optimization**:
-- **Current**: ~$134/month (ultra-minimal demo configuration)
-- **Configuration**: 1x t3.large node (2 vCPU, 8 GB RAM)
-- **Capacity**: ~38 pods total across all environments
-- **See**: [COST-OPTIMIZATION.md](COST-OPTIMIZATION.md) for alternatives
+**3 Environments on 1 Node**:
+
+- **microservices-dev**: 1 replica per service (10 pods)
+- **microservices-qa**: 1 replica per service (10 pods)
+- **microservices-prod**: 1 replica per service (10 pods)
+- **Total**: ~38 pods (85-90% capacity)
+
+**Configuration Options**:
+
+- **Current (Ultra-Minimal)**: 1 node → ~$134/mo
+- **Balanced**: 1 × t3.xlarge with observability → ~$195/mo
+- **Safer Minimal**: 2 nodes with redundancy → ~$256/mo
+- **Production**: Multi-node groups with HA → ~$400-600/mo
+
+**See**: [COST-OPTIMIZATION.md](COST-OPTIMIZATION.md) for all options
 
 ## Multi-Environment Strategy
 
@@ -87,48 +108,94 @@ kubectl apply -k kustomize/overlays/prod   # Deploy to prod
 - ✅ Automated deployment with approval gates
 - ✅ ServiceNow change management integration
 
-### 2. ServiceNow Integration
+### 2. ServiceNow Integration (THE MAIN VALUE!)
 
-**Change Management**:
-- Automated change requests for every deployment
-- Environment-specific approval workflows (dev=auto, qa/prod=manual)
-- Security scan evidence attached to changes
-- Complete audit trail
+**Automated Change Management**:
 
-**CMDB Automation**:
-- Automatic EKS cluster discovery
-- Microservice deployment tracking
-- Real-time inventory updates
+Every deployment automatically creates a ServiceNow Change Request with:
 
-**See**: [docs/servicenow-integration/](docs/servicenow-integration/) for setup
+**13 Custom Fields on change_request table**:
+
+- `u_source` - "GitHub Actions"
+- `u_correlation_id` - Workflow run ID for traceability
+- `u_repository` - Git repository name
+- `u_branch` - Git branch name
+- `u_commit_sha` - Git commit hash
+- `u_actor` - GitHub user who triggered deployment
+- `u_environment` - Target environment (dev/qa/prod)
+- `u_github_run_id` - Workflow run ID
+- `u_github_run_url` - Link to workflow run
+- `u_github_repo_url` - Link to repository
+- `u_github_commit_url` - Link to commit
+- `u_version` - Application version
+- `u_deployment_type` - Type of deployment
+
+**Multi-Environment Approval Workflows**:
+
+- **Dev**: Auto-approved deployments (fast iteration)
+- **QA**: QA Lead approval required (testing validation)
+- **Prod**: CAB approval required (complete change documentation)
+
+**Work Item Integration**:
+
+- GitHub Issues automatically tracked in ServiceNow Work Items
+- Linked to Change Requests
+- Complete traceability from issue to deployment
+
+**Test Results Upload**:
+
+- Unit tests, integration tests, security scans
+- Automated evidence generation
+- Attached to Change Requests
+- Enables risk-based approval decisions
+
+**Compliance Benefits**:
+
+- ✅ **SOC 2**: Complete audit trail
+- ✅ **ISO 27001**: Change management evidence
+- ✅ **NIST CSF**: Access control and monitoring
+- ✅ **HIPAA/PCI DSS**: Deployment tracking
+
+**Setup Guide**: [docs/3-SERVICENOW-INTEGRATION-GUIDE.md](docs/3-SERVICENOW-INTEGRATION-GUIDE.md)
 
 ### 3. Security Scanning
 
-Integrated security tools:
-- **CodeQL**: Static analysis (5 languages)
+**10+ Integrated Security Tools**:
+
+- **CodeQL**: Static analysis (Python, JavaScript, Go, Java, C#)
 - **Trivy**: Container vulnerability scanning + SBOM generation
-- **Gitleaks**: Secret detection
-- **Semgrep**: SAST with custom rules
-- **tfsec & Checkov**: Infrastructure security
-- **Dependency-Check**: OWASP dependency analysis
+- **Grype**: Dependency vulnerability scanning
+- **Gitleaks**: Secret detection in code and history
+- **Semgrep**: SAST with custom security rules
+- **tfsec**: Terraform security scanning
+- **Checkov**: IaC security best practices
+- **OWASP Dependency Check**: Known vulnerable dependencies
+- **Bandit**: Python security linter
+- **Gosec**: Go security scanner
 
-Results available in:
-- GitHub Security tab
-- ServiceNow change requests (as evidence)
+**Security Results Integration**:
 
-### 4. Observability
+- ✅ GitHub Security tab (SARIF format)
+- ✅ ServiceNow Change Requests (as approval evidence)
+- ✅ Complete compliance audit trail
+- ✅ Automated vulnerability tracking
 
-**Istio Service Mesh** provides:
-- **Kiali**: Service topology visualization (port 20001)
-- **Grafana**: Metrics dashboards (port 3000)
-- **Jaeger**: Distributed tracing (port 16686)
-- **Prometheus**: Metrics collection (port 9090)
+### 4. Observability (Optional - Disabled for Cost)
 
-**Access dashboards**:
-```bash
-just istio-kiali     # Service mesh topology
-just istio-grafana   # Metrics and dashboards
-```
+**CloudWatch Integration**:
+
+- Application logs automatically shipped to CloudWatch
+- Structured logging with correlation IDs
+- Query logs across all services
+
+**Optional: Istio Observability** (disabled in ultra-minimal config):
+
+- **Kiali**: Service topology visualization
+- **Grafana**: Metrics dashboards
+- **Jaeger**: Distributed tracing
+- **Prometheus**: Metrics collection
+
+Enable with `enable_istio_addons = true` in terraform.tfvars (adds ~$60/mo)
 
 ### 5. Infrastructure as Code
 
@@ -147,96 +214,104 @@ just istio-grafana   # Metrics and dashboards
 
 ## Quick Start
 
-### Prerequisites
+**Total Setup Time: 2-3 hours** (AWS + GitHub + ServiceNow)
 
-- AWS account with admin access
-- GitHub account
-- `kubectl`, `terraform`, `docker`, `just`, `aws-cli` installed
-- ServiceNow instance (optional, for change management)
+### Follow These 3 Guides in Order
 
-### 1. Clone and Configure
+1. **[AWS Deployment Guide](docs/1-AWS-DEPLOYMENT-GUIDE.md)** (30-45 min)
+   - Deploy EKS cluster and infrastructure
+   - Configure AWS credentials
+   - Run Terraform deployment
+
+2. **[GitHub Setup Guide](docs/2-GITHUB-SETUP-GUIDE.md)** (20-30 min)
+   - Configure GitHub Actions workflows
+   - Set up AWS and ServiceNow secrets
+   - Build and push container images
+
+3. **[ServiceNow Integration Guide](docs/3-SERVICENOW-INTEGRATION-GUIDE.md)** (45-60 min)
+   - Install ServiceNow DevOps plugin
+   - Create 13 custom fields on change_request table
+   - Configure approval workflows
+   - Test the integration
+
+### Quick Commands Overview
 
 ```bash
-git clone https://github.com/your-org/microservices-demo.git
-cd microservices-demo
-
-# Copy and edit AWS credentials
-cp .envrc.example .envrc
-edit .envrc  # Add your AWS credentials
+# 1. Deploy Infrastructure
 source .envrc
-```
-
-### 2. Deploy Infrastructure
-
-```bash
-just tf-init
-just tf-plan
 just tf-apply  # Takes ~15 minutes
-```
 
-### 3. Deploy Application
-
-```bash
-# Configure kubectl
+# 2. Deploy Application
 just k8s-config
-
-# Deploy to dev environment
 kubectl apply -k kustomize/overlays/dev
+kubectl apply -k kustomize/overlays/qa
+kubectl apply -k kustomize/overlays/prod
 
-# Wait for pods to be ready
-kubectl get pods -n microservices-dev --watch
+# 3. Automated Version Promotion
+just promote v1.0.0 all  # Promotes across all environments with ServiceNow approvals
+
+# 4. Check Cluster Status
+just cluster-status
+kubectl get pods -n microservices-dev
 ```
 
-### 4. Access the Application
-
-```bash
-# Get the Istio ingress URL
-just k8s-url
-
-# Or manually
-kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-```
-
-### 5. Access Observability Dashboards
-
-```bash
-just istio-kiali     # Service mesh topology
-just istio-grafana   # Metrics dashboards
-```
-
-**Full setup guide**: [docs/ONBOARDING.md](docs/ONBOARDING.md)
+**Complete Setup Guide**: [Documentation Hub](docs/README.md)
 
 ## Use Cases
 
 This demo is designed for:
 
-### 1. Learning Modern Microservices
+### 1. ServiceNow + GitHub Integration Demo (PRIMARY!)
 
-- **Polyglot architecture**: See how 5 different programming languages work together
-- **gRPC communication**: Learn Protocol Buffers and service contracts
-- **Service mesh**: Understand Istio traffic management and mTLS
-- **Cloud-native patterns**: Observe 12-factor app principles in action
+**Perfect for demonstrating**:
+
+- ✅ **Automated Change Requests** with complete GitHub context
+- ✅ **Multi-Environment Approvals** (dev/qa/prod)
+- ✅ **Complete Audit Trail** for compliance
+- ✅ **Work Item Integration** (GitHub Issues → ServiceNow)
+- ✅ **Security Evidence** attached to change requests
+- ✅ **Risk-Based Approvals** with test results
+
+**Target Audience**:
+
+- ServiceNow administrators
+- DevOps teams
+- IT Governance/Compliance teams
+- Change Advisory Board (CAB) members
 
 ### 2. DevOps Practice
 
-- **GitOps workflows**: All changes via Git + GitHub Actions
-- **Infrastructure as Code**: Terraform for complete AWS stack
-- **Multi-environment**: Practice dev → qa → prod promotion
-- **Security-first**: Integrated scanning at every stage
+**GitOps workflows**:
 
-### 3. ServiceNow Integration Demo
+- All changes via Git + GitHub Actions
+- Infrastructure as Code with Terraform
+- Multi-environment promotion (dev → qa → prod)
+- Security-first development
 
-- **Change automation**: See how GitHub integrates with ServiceNow
-- **Approval workflows**: Environment-specific approval gates
-- **CMDB automation**: Automatic infrastructure discovery
-- **Compliance**: Complete audit trail for SOX/HIPAA requirements
+### 3. Compliance & Governance
 
-### 4. Kubernetes Learning
+**Complete Audit Trail**:
 
-- **Multi-namespace deployments**: Environment isolation
-- **Kustomize**: Configuration management best practices
-- **Istio**: Service mesh features (mTLS, traffic routing, observability)
-- **AWS EKS**: Managed Kubernetes in production
+- Who deployed what, when, where, and why
+- Automated evidence collection
+- Security scan results for every deployment
+- Approval workflows enforced programmatically
+
+**Compliance Frameworks**:
+
+- SOC 2 Type II (access controls + audit logs)
+- ISO 27001 (change management)
+- NIST Cybersecurity Framework
+- HIPAA/PCI DSS (deployment tracking)
+
+### 4. Learning Platform (Supporting Use Case)
+
+**For teams learning**:
+
+- Polyglot microservices architecture
+- gRPC communication
+- Kubernetes multi-environment deployments
+- AWS EKS and managed services
 
 ## Project Structure
 
@@ -305,17 +380,26 @@ microservices-demo/
 - **DevOps Change API**: Modern change velocity
 - **CMDB**: Automated infrastructure discovery
 
-## Limitations
+## Limitations (Demo Configuration Only!)
 
 This demo uses an **ultra-minimal cluster configuration** to reduce costs:
 
-⚠️ **Single Node Cluster**:
-- **Capacity**: 1x t3.large (2 vCPU, 8 GB RAM)
-- **Max pods**: ~38 total
-- **Environments**: Can run dev OR qa OR prod (not all simultaneously)
-- **Cost**: ~$134/month
+⚠️ **Not Production-Ready**:
 
-**For production or multi-environment testing**, see [COST-OPTIMIZATION.md](COST-OPTIMIZATION.md) for scaling options.
+- **Capacity**: 1x t3.large (2 vCPU, 8 GB RAM)
+- **Max pods**: ~38 total (dev + qa + prod all on 1 node)
+- **Replicas**: 1 per service (no redundancy)
+- **Purpose**: **Demo and development only**
+- **Cost**: ~$134/month (80% cheaper than production setup)
+
+**For production deployments**, see [COST-OPTIMIZATION.md](COST-OPTIMIZATION.md) for:
+
+- Multi-node configurations
+- High availability setups
+- Auto-scaling configurations
+- Disaster recovery options
+
+**Key Message**: *The infrastructure is minimal by design to demonstrate the ServiceNow + GitHub integration, not to showcase production Kubernetes architecture.*
 
 ## Common Tasks
 
@@ -323,47 +407,62 @@ This demo uses an **ultra-minimal cluster configuration** to reduce costs:
 # Infrastructure
 just tf-init                     # Initialize Terraform
 just tf-plan                     # Preview changes
-just tf-apply                    # Deploy infrastructure
+just tf-apply                    # Deploy infrastructure (~15 min)
 
-# Kubernetes
+# Kubernetes Deployment
 just k8s-config                  # Configure kubectl
-kubectl apply -k overlays/dev    # Deploy to dev
-kubectl get pods -n microservices-dev
+kubectl apply -k kustomize/overlays/dev    # Deploy to dev
+kubectl apply -k kustomize/overlays/qa     # Deploy to qa
+kubectl apply -k kustomize/overlays/prod   # Deploy to prod
 
-# Observability
-just istio-kiali                 # Service topology
-just istio-grafana               # Metrics dashboards
+# Automated Promotion (ServiceNow Integration!)
+just promote v1.2.3 all          # Automated version promotion
+                                 # - Creates release branch
+                                 # - Updates Kustomize overlays
+                                 # - Creates PR and waits for CI
+                                 # - Deploys to DEV (auto-approved)
+                                 # - Prompts for QA (ServiceNow approval)
+                                 # - Prompts for PROD (CAB approval)
+
+# Cluster Management
 just cluster-status              # Complete cluster overview
+just k8s-logs frontend           # View service logs
+kubectl get pods -n microservices-dev
 
 # Development
 just docker-build frontend       # Build single service
 just docker-build-all            # Build all services
-just k8s-logs frontend           # View service logs
 
-# ServiceNow
-gh workflow run deploy-with-servicenow-basic.yaml -f environment=dev
-gh workflow run aws-infrastructure-discovery.yaml
+# Demo Workflows
+just demo-run dev v1.0.0         # Run demo deployment with ServiceNow
 ```
 
 **Full command reference**: Run `just` to see all 50+ commands
 
 ## Documentation
 
-### Essential Guides
+### 🚀 Essential Setup Guides (Start Here!)
 
-- **[ONBOARDING.md](docs/ONBOARDING.md)** - New developer complete setup
-- **[ServiceNow Integration](docs/servicenow-integration/)** - Change management setup
-- **[COST-OPTIMIZATION.md](COST-OPTIMIZATION.md)** - Scaling and cost options
+1. **[AWS Deployment Guide](docs/1-AWS-DEPLOYMENT-GUIDE.md)** (30-45 min)
+   - Deploy EKS cluster and infrastructure
 
-### Architecture
+2. **[GitHub Setup Guide](docs/2-GITHUB-SETUP-GUIDE.md)** (20-30 min)
+   - Configure GitHub Actions and workflows
 
-- **[REPOSITORY-STRUCTURE.md](docs/architecture/REPOSITORY-STRUCTURE.md)** - Detailed codebase guide
-- **[ISTIO-DEPLOYMENT.md](docs/architecture/ISTIO-DEPLOYMENT.md)** - Service mesh configuration
+3. **[ServiceNow Integration Guide](docs/3-SERVICENOW-INTEGRATION-GUIDE.md)** (45-60 min)
+   - Install DevOps plugin, create custom fields, configure approvals
 
-### Development
+### 🎯 Demo Materials
 
-- **[development-guide.md](docs/development/development-guide.md)** - Making changes
-- **[adding-new-microservice.md](docs/development/adding-new-microservice.md)** - Adding services
+- **[Demo Script](docs/SERVICENOW-GITHUB-DEMO-GUIDE.md)** - Complete demo walkthrough
+- **[Demo Slides](docs/SERVICENOW-GITHUB-DEMO-SLIDES.md)** - 18-slide presentation
+
+### 📖 Complete Documentation
+
+- **[Documentation Hub](docs/README.md)** - Navigation guide for all docs
+- **[Cost Optimization](COST-OPTIMIZATION.md)** - Scaling and pricing options
+
+**Additional documentation** (architecture, development, troubleshooting) available in [docs/_archive](docs/_archive/)
 
 ## Contributing
 
