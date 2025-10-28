@@ -71,32 +71,37 @@ kubectl apply -k ../kustomize/overlays/prod
 
 ## 📚 Documentation
 
-**Complete documentation is available in the [docs/](docs/) directory.**
+### 🚀 Getting Started
 
-### Essential Guides
+**Follow these 3 guides to get the demo running** (Total: 2-3 hours):
 
-- **[🎓 Developer Onboarding](docs/ONBOARDING.md)** - Start here! Complete setup guide for new developers
-- **[📖 Documentation Index](docs/README.md)** - Complete documentation overview
-- **[✨ What's New](docs/WHATS-NEW.md)** - Latest features: ServiceNow integration, dependency scanning, enhanced security
-- **[☁️  AWS Deployment Guide](docs/README-AWS.md)** - Comprehensive AWS deployment instructions
-- **[🔧 Justfile Reference](justfile)** - All available automation commands
+1. **[AWS Deployment Guide](docs/1-AWS-DEPLOYMENT-GUIDE.md)** (30-45 min)
+   - Deploy EKS cluster and infrastructure to AWS
+   - Prerequisites, AWS setup, Terraform deployment
 
-### Setup & Configuration
+2. **[GitHub Setup Guide](docs/2-GITHUB-SETUP-GUIDE.md)** (20-30 min)
+   - Configure GitHub Actions and workflows
+   - Set up secrets, build and deploy images
 
-- [AWS Setup Guide](docs/setup/AWS-SETUP.md) - AWS credentials and permissions
-- [GitHub Actions Setup](docs/setup/GITHUB-ACTIONS-SETUP.md) - CI/CD configuration
-- [Security Scanning](docs/setup/SECURITY-SCANNING.md) - Security tools and processes
+3. **[ServiceNow Integration Guide](docs/3-SERVICENOW-INTEGRATION-GUIDE.md)** (45-60 min)
+   - Install ServiceNow DevOps plugin
+   - Create custom fields, configure change automation
+   - Set up approval workflows
 
-### Architecture & Design
+### 🎯 Demo Materials
 
-- [Repository Structure](docs/architecture/REPOSITORY-STRUCTURE.md) - Complete codebase guide
-- [Istio Service Mesh](docs/architecture/ISTIO-DEPLOYMENT.md) - Service mesh implementation
-- [Product Requirements](docs/architecture/product-requirements.md) - System specifications
+**This is a ServiceNow + GitHub DevOps integration demo** (Kubernetes/AWS are just test infrastructure):
 
-### Development
+- **[Demo Script](docs/SERVICENOW-GITHUB-DEMO-GUIDE.md)** - Complete demo walkthrough with 5 scenarios
+- **[Demo Slides](docs/SERVICENOW-GITHUB-DEMO-SLIDES.md)** - 18-slide presentation deck
 
-- [Development Guide](docs/development/development-guide.md) - Development workflows
-- [Adding Microservices](docs/development/adding-new-microservice.md) - Service creation guide
+### 📖 Complete Documentation
+
+- **[Documentation Hub](docs/README.md)** - Navigation guide for all documentation
+- **[🔧 Justfile Reference](justfile)** - All 50+ automation commands
+- **[💰 Cost Optimization](COST-OPTIMIZATION.md)** - Scaling and pricing options
+
+**Additional documentation** (architecture, development, troubleshooting) is available in [docs/_archive](docs/_archive/)
 
 ## 🏗️ Architecture
 
@@ -366,10 +371,11 @@ Original Google Cloud version: [GoogleCloudPlatform/microservices-demo](https://
 **⭐ Star this repository if you find it useful!**
 
 **Perfect for demonstrating:**
-- Microservices architecture on AWS EKS
-- Istio service mesh with mTLS
+- **ServiceNow + GitHub DevOps Change Management** (Primary focus!)
+- Automated change requests with custom GitHub context fields
+- Multi-environment approval workflows (dev/qa/prod)
+- Complete audit trail and compliance evidence
 - GitOps workflows with GitHub Actions
-- Multi-language gRPC applications
-- Comprehensive security scanning
+- Comprehensive security scanning pipeline
+- Multi-language microservices on AWS EKS (test application)
 - Infrastructure as Code with Terraform
-- Cloud-native observability

@@ -1,227 +1,164 @@
-# Documentation Index
+# Documentation Hub
 
-> Complete documentation for the Microservices Demo project
+> Complete documentation for ServiceNow + GitHub DevOps Integration Demo
 
-**New to this project?** Start with **[DEMO-OVERVIEW.md](../DEMO-OVERVIEW.md)** to understand what this demo does.
+## 🚀 Getting Started
 
-## 🆕 Recent Updates (2025-01-28)
+This project demonstrates **ServiceNow DevOps Change Management** integrated with **GitHub Actions** for automated, compliant deployments.
 
-**ServiceNow Integration Fixes**:
-- ✅ **[State Transition Fix](SERVICENOW-STATE-TRANSITION-FIX.md)** - Fixed "change cannot be moved to state : 3" error
-  - ServiceNow state machine validation
-  - Automatic transition through Implement state
-  - Complete root cause analysis and solution
-- ✅ **ServiceNow Update Change** - Change requests now properly closed after deployment
-  - JSON escaping fixes (multiline strings)
-  - State value corrections (close vs cancel)
-  - Works for success, failure, and skipped deployments
+### Essential Guides
 
-**GitHub Actions Workflow Improvements**:
-- 📊 **[Workflow Refactoring Analysis](WORKFLOW-REFACTORING-ANALYSIS.md)** - Comprehensive analysis of all 12 workflows
-  - Identified 100+ duplicated code blocks across 4,679 lines
-  - Found opportunities for 25-30% code reduction
-  - Documented missing best practices (caching, composite actions, matrix strategy)
-  - Expected 40-60% faster builds with dependency caching
-- 📝 **[Workflow Refactoring Implementation Guide](WORKFLOW-REFACTORING-IMPLEMENTATION-GUIDE.md)** - Step-by-step refactoring plan
-  - Phase 1 (Week 1): Quick wins - composite actions + caching
-  - Phase 2 (Week 2): Environment setup standardization
-  - Phase 3 (Week 3-4): Matrix strategy + modular workflows
-  - Complete code examples and testing procedures
+Follow these 3 guides in order to get the demo running:
 
-**Previous Updates (2025-10-27)**:
-- ✅ **Semantic Versioning Fixed** - Images now correctly tagged with `v1.2.3` format
-- ✅ **Test Quality Gates Enforced** - Tests now properly fail workflows when they fail
-- ✅ **C# Test Logger Added** - JunitXml.TestLogger package for .NET test results
-- ✅ **GitHub Actions Permissions** - Fixed reusable workflow permissions
+1. **[AWS Deployment Guide](1-AWS-DEPLOYMENT-GUIDE.md)** (30-45 minutes)
+   - Deploy EKS cluster and infrastructure to AWS
+   - Prerequisites: AWS account, Terraform, kubectl
+   - Creates the test application environment
 
-## Quick Start Guides
+2. **[GitHub Setup Guide](2-GITHUB-SETUP-GUIDE.md)** (20-30 minutes)
+   - Configure GitHub Actions and workflows
+   - Set up AWS and ServiceNow secrets
+   - Build and deploy container images
 
-### For Developers
-- **[Onboarding Guide](ONBOARDING.md)** - Complete setup for new developers (30 minutes)
-  - AWS credentials configuration
-  - Terraform infrastructure deployment
-  - Kubernetes cluster setup
-  - First deployment
+3. **[ServiceNow Integration Guide](3-SERVICENOW-INTEGRATION-GUIDE.md)** (45-60 minutes)
+   - Install ServiceNow DevOps plugin
+   - Create 13 custom fields on change_request table
+   - Configure automated change management
+   - Set up approval workflows (dev/qa/prod)
 
-### For DevOps Engineers
-- **[AWS Setup](setup/AWS-SETUP.md)** - AWS account and credentials
-- **[GitHub Actions Setup](setup/GITHUB-ACTIONS-SETUP.md)** - CI/CD configuration
-- **[Security Scanning](setup/SECURITY-SCANNING.md)** - Configure security tools
+**Total Setup Time**: 2-3 hours
 
-## Documentation by Category
+---
 
-### 🏗️ Architecture
+## 🎯 Demo Materials
 
-**Understanding the System**:
-- **[Repository Structure](architecture/REPOSITORY-STRUCTURE.md)** - Complete codebase guide
-  - Directory organization
-  - Source code layout
-  - Protocol Buffers
-  - Kubernetes manifests
-  - Terraform structure
+Once setup is complete, use these materials to present the demo:
 
-- **[Istio Service Mesh](architecture/ISTIO-DEPLOYMENT.md)** - Service mesh configuration
-  - Istio installation
-  - mTLS security
-  - Traffic management
-  - Observability (Kiali, Grafana, Jaeger)
-  - Troubleshooting
+- **[Demo Script](SERVICENOW-GITHUB-DEMO-GUIDE.md)** - Complete demo walkthrough
+  - 5 demo scenarios (10-30 minutes each)
+  - Pre-demo checklist
+  - Q&A preparation
+  - Focus on ServiceNow + GitHub integration
 
-### 💻 Development
+- **[Demo Slides](SERVICENOW-GITHUB-DEMO-SLIDES.md)** - 18-slide presentation
+  - Problem statement and solution
+  - Custom fields and automation benefits
+  - Security and compliance value
+  - ROI and business benefits
 
-**Working with the Code**:
-- **[Development Guide](development/development-guide.md)** - Daily development tasks
-  - Local development setup
-  - Building and testing services
-  - Debugging techniques
-  - Making changes to services
+---
 
-- **[Adding New Microservices](development/adding-new-microservice.md)** - Extending the application
-  - Service creation template
-  - Kubernetes integration
-  - gRPC/Protocol Buffers
-  - CI/CD integration
+## 📚 Quick Reference
 
-### 🚀 Deployment
+### What This Demo Shows
 
-**Getting to Production**:
-- **[Complete AWS Deployment](README-AWS.md)** - Full deployment guide
-  - Infrastructure setup
-  - Multi-environment deployment (dev/qa/prod)
-  - Cost estimation
-  - Troubleshooting
+✅ **Automated Change Management**
+- GitHub Actions automatically create ServiceNow Change Requests
+- Dev deployments auto-approved
+- QA/Prod require manual approval
 
-- **[Terraform Backend](TERRAFORM-BACKEND-GUIDE.md)** - Remote state configuration
-  - S3 backend setup
-  - State locking with DynamoDB
-  - Team collaboration
+✅ **Complete Audit Trail**
+- 13 custom fields capture GitHub context (repo, branch, commit, actor, environment)
+- Work items track GitHub Issues
+- Test results uploaded to ServiceNow
+- Full compliance evidence
 
-### 🔒 Security
+✅ **Multi-Environment Pipeline**
+- Dev → QA → Prod promotion workflow
+- Environment-specific approval requirements
+- Automated rollback on failures
 
-**Security Tooling**:
-- **[Security Scanning Setup](setup/SECURITY-SCANNING.md)** - Complete security pipeline
-  - CodeQL (SAST for 5 languages)
-  - Trivy (Container + SBOM)
-  - Gitleaks (Secret detection)
-  - Semgrep, Checkov, tfsec (IaC security)
-  - GitHub Security integration
+### What This Demo Is NOT About
 
-- **[Security Evidence](SECURITY-EVIDENCE-GUIDE.md)** - Evidence generation for compliance
-  - SARIF format exports
-  - Compliance reporting
+❌ Kubernetes architecture
+❌ AWS infrastructure details
+❌ Microservices patterns
+❌ Container orchestration
 
-### 📊 Operations
+**Key Message**: *"The cluster is just a test application. The value is in the ServiceNow + GitHub integration."*
 
-**Running in Production**:
-- **[Cost Optimization](../COST-OPTIMIZATION.md)** - Scaling and pricing
-  - Ultra-minimal config (~$134/month)
-  - Balanced config (~$195/month)
-  - Production config (~$442/month)
-  - Node sizing recommendations
+---
 
-- **Monitoring** (via Istio dashboards):
-  - Kiali: `just istio-kiali` (service topology)
-  - Grafana: `just istio-grafana` (metrics)
-  - Jaeger: `just istio-jaeger` (tracing)
-  - Prometheus: `just istio-prometheus` (raw metrics)
+## 🏗️ Architecture Overview
 
-### 🔧 Release Management
+### Infrastructure (Just for Testing)
+- **AWS EKS**: Kubernetes cluster (1 node, ultra-minimal)
+- **12 Microservices**: Online Boutique demo app
+- **3 Environments**: dev, qa, prod namespaces
+- **Cost**: ~$134/month (see [COST-OPTIMIZATION.md](../COST-OPTIMIZATION.md))
 
-**Version Control & Releases**:
-- **[Release Process](RELEASE-PROCESS.md)** - How to cut releases
-- **[Release Automation](RELEASE-AUTOMATION.md)** - Automated release workflows
+### Integration (The Important Part!)
+- **ServiceNow DevOps Plugin**: Change automation
+- **GitHub Actions**: 12 workflows with security scanning
+- **Custom Fields**: 13 fields on change_request table
+- **Work Items**: GitHub Issues → ServiceNow tracking
+- **Test Results**: Automated evidence upload
 
-### 🔗 ServiceNow Integration
+---
 
-**Complete DevOps Change Management Suite**:
-- **[Package Registration](SERVICENOW-PACKAGE-REGISTRATION.md)** - Automatic Docker image registration
-  - Register all 12 microservices as packages
-  - Track container deployments
-  - Link to change requests
-- **[Test Results Integration](SERVICENOW-TEST-INTEGRATION.md)** - Unit test results upload
-  - Automated test result tracking
-  - Support for all test frameworks (Go, Python, Java, C#, Node.js)
-  - Evidence for change approvals
-- **[Change Automation](SERVICENOW-CHANGE-AUTOMATION.md)** - Automated change requests
-  - Auto-approve for DEV
-  - Manual approval for QA/PROD
-  - Integration with Terraform and Kubernetes deployments
-  - Complete audit trail
+## 🔧 Common Commands
 
-## Technology Stack
-
-### Infrastructure
-- **Cloud**: AWS (VPC, EKS, ElastiCache, ECR)
-- **IaC**: Terraform 1.5+
-- **Kubernetes**: Amazon EKS 1.28+
-- **Service Mesh**: Istio 1.x
-
-### Application
-- **Languages**: Go, Python, Java, Node.js, C#
-- **Communication**: gRPC (Protocol Buffers)
-- **Caching**: Redis (ElastiCache)
-- **Observability**: Prometheus, Grafana, Jaeger, Kiali
-
-### CI/CD
-- **Platform**: GitHub Actions (12 workflows, 4,679 lines)
-- **Security**: CodeQL, Trivy, Gitleaks, Semgrep, Checkov, tfsec
-- **Optimization**: See [Workflow Refactoring Analysis](WORKFLOW-REFACTORING-ANALYSIS.md) for improvement opportunities
-
-## Project Structure
-
-```
-microservices-demo/
-├── DEMO-OVERVIEW.md          # Start here - project overview
-├── CLAUDE.md                  # Claude Code assistant instructions
-├── justfile                   # 50+ automation commands
-├── kustomize/                 # Multi-environment K8s configs
-│   ├── base/                  # Shared manifests
-│   ├── components/            # Reusable components
-│   └── overlays/              # Environment overrides
-│       ├── dev/
-│       ├── qa/
-│       └── prod/
-├── src/                       # 12 microservice applications
-├── terraform-aws/             # Infrastructure as Code
-│   ├── environments/          # Per-environment configs
-│   └── tests/                 # Terraform tests
-├── .github/workflows/         # CI/CD pipelines
-└── docs/                      # This documentation
-    ├── ONBOARDING.md         # New developer setup
-    ├── setup/                 # Setup guides
-    ├── architecture/          # System design
-    ├── development/           # Developer guides
-    └── servicenow-integration/ # ServiceNow docs
-```
-
-## Common Commands
-
-### Infrastructure
+### Infrastructure Management
 ```bash
-just tf-init                   # Initialize Terraform
-just tf-plan                   # Preview changes
-just tf-apply                  # Deploy infrastructure
+just onboard                  # First-time setup (automated)
+just tf-apply                 # Deploy AWS infrastructure
+just k8s-config               # Configure kubectl
 ```
 
-### Kubernetes
+### Application Deployment
 ```bash
-just k8s-config                # Configure kubectl
-kubectl apply -k overlays/dev  # Deploy to dev
+# Traditional deployment
+just k8s-deploy               # Deploy to cluster
+
+# Kustomize multi-environment
+kubectl apply -k kustomize/overlays/dev    # Deploy to dev
+kubectl apply -k kustomize/overlays/qa     # Deploy to qa
+kubectl apply -k kustomize/overlays/prod   # Deploy to prod
+```
+
+### Demo Workflows
+```bash
+just promote 1.2.3 all        # Automated version promotion
+just demo-run dev 1.2.3       # Run demo deployment
+```
+
+### Monitoring
+```bash
+just cluster-status           # Overall cluster health
+just k8s-logs frontend        # View service logs
 kubectl get pods -n microservices-dev
 ```
 
-### Observability
-```bash
-just istio-kiali               # Service mesh topology
-just istio-grafana             # Metrics dashboards
-just cluster-status            # Complete overview
-```
+**Full command reference**: Run `just` to see all 50+ commands
 
-**Full command reference**: Run `just` to see all commands
+---
 
-## Troubleshooting
+## 📖 Additional Documentation
+
+### Still Available (in _archive)
+- Detailed architecture guides
+- Development workflows
+- Troubleshooting deep-dives
+- Historical implementation docs
+
+These have been moved to `docs/_archive/` for reference but are not needed for the demo.
+
+---
+
+## 🆘 Troubleshooting
 
 ### Quick Fixes
+
+**AWS Deployment Issues**:
+- See [AWS Deployment Guide - Troubleshooting](1-AWS-DEPLOYMENT-GUIDE.md#troubleshooting)
+
+**GitHub Actions Failures**:
+- See [GitHub Setup Guide - Troubleshooting](2-GITHUB-SETUP-GUIDE.md#troubleshooting)
+
+**ServiceNow Integration Issues**:
+- See [ServiceNow Integration Guide - Troubleshooting](3-SERVICENOW-INTEGRATION-GUIDE.md#troubleshooting)
+
+### Common Issues
 
 **Pods not starting**:
 ```bash
@@ -230,55 +167,49 @@ kubectl describe pod <pod-name> -n microservices-dev
 kubectl logs <pod-name> -n microservices-dev
 ```
 
-**Istio issues**:
-```bash
-just istio-analyze             # Check configuration
-istioctl proxy-status          # Check proxy status
-```
-
 **Terraform errors**:
 ```bash
-just tf-validate               # Validate syntax
-just tf-test                   # Run tests
+just tf-validate              # Validate configuration
+just tf-test                  # Run tests
 ```
 
-### Detailed Troubleshooting
+**ServiceNow Change Request errors**:
+- Check custom fields exist: [Guide Section](3-SERVICENOW-INTEGRATION-GUIDE.md#create-custom-fields)
+- Verify orchestration tool ID: [Guide Section](3-SERVICENOW-INTEGRATION-GUIDE.md#configure-orchestration-tool)
 
-- **[AWS Deployment Guide - Troubleshooting](README-AWS.md#troubleshooting)**
-- **[Istio Troubleshooting](architecture/ISTIO-DEPLOYMENT.md#troubleshooting)**
+---
 
-## Getting Help
+## 📞 Getting Help
 
-1. **Check documentation** in this folder first
-2. **Search** existing GitHub issues
-3. **Ask in discussions** (GitHub Discussions)
+1. **Check the 3 essential guides** above first
+2. **Review demo materials** for presentation guidance
+3. **Search existing GitHub issues**
 4. **Open an issue** with:
    - Problem description
    - Steps to reproduce
-   - Logs and error messages
-   - Environment details
+   - Error messages and logs
+   - Environment details (AWS region, ServiceNow instance, etc.)
 
-## Documentation Archive
+---
 
-Historical and detailed implementation documentation has been moved to `docs/_archive/`:
-- Troubleshooting guides
-- Implementation details
-- Compliance analyses
-- Antipattern guides
+## 🎓 Learning Path
 
-These are kept for reference but not needed for daily use.
+**New to this project?** Follow this path:
 
-## Contributing
+1. Read this README (you are here!)
+2. Complete [AWS Deployment Guide](1-AWS-DEPLOYMENT-GUIDE.md)
+3. Complete [GitHub Setup Guide](2-GITHUB-SETUP-GUIDE.md)
+4. Complete [ServiceNow Integration Guide](3-SERVICENOW-INTEGRATION-GUIDE.md)
+5. Review [Demo Script](SERVICENOW-GITHUB-DEMO-GUIDE.md)
+6. Practice with [Demo Slides](SERVICENOW-GITHUB-DEMO-SLIDES.md)
+7. Run your first demo!
 
-See **[Development Guide](development/development-guide.md)** for contribution guidelines.
+---
 
-## License
+## 📄 License
 
 Apache License 2.0 - Based on [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo)
 
 ---
 
-**Quick Links**:
-- **[Project Overview](../DEMO-OVERVIEW.md)** - Understand the demo
-- **[Onboarding](ONBOARDING.md)** - Get started in 30 minutes
-- **[Cost Optimization](../COST-OPTIMIZATION.md)** - Scaling options
+**Ready to start?** Begin with [AWS Deployment Guide](1-AWS-DEPLOYMENT-GUIDE.md) 🚀
