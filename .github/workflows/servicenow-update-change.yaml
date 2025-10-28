@@ -19,17 +19,14 @@ on:
         description: 'Number of running pods'
         required: false
         type: string
-        default: ''
       total_pods:
         description: 'Total number of pods'
         required: false
         type: string
-        default: ''
       frontend_url:
         description: 'Frontend application URL'
         required: false
         type: string
-        default: ''
       auto_close:
         description: 'Automatically close change request on success'
         required: false
