@@ -313,16 +313,17 @@ jobs:
           echo "| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
 
   # Update ServiceNow Change Request with deployment outcome
-  update-servicenow-change:
-    name: Update ServiceNow Change (${{ inputs.environment }})
-    needs: [servicenow-change, deploy]
-    if: always() && needs.servicenow-change.outputs.change_number != ''
-    uses: ./.github/workflows/servicenow-update-change.yaml
-    secrets: inherit
-    with:
-      environment: ${{ inputs.environment }}
-      change_request_number: ${{ needs.servicenow-change.outputs.change_number }}
-      deployment_status: ${{ needs.deploy.result }}
-      running_pods: ${{ needs.deploy.outputs.running_pods }}
-      total_pods: ${{ needs.deploy.outputs.total_pods }}
-      frontend_url: ${{ needs.deploy.outputs.frontend_url }}
+  # DISABLED: workflow_call to servicenow-update-change.yaml causing validation errors
+  # update-servicenow-change:
+  #   name: Update ServiceNow Change (${{ inputs.environment }})
+  #   needs: [servicenow-change, deploy]
+  #   if: always() && needs.servicenow-change.outputs.change_number != ''
+  #   uses: ./.github/workflows/servicenow-update-change.yaml
+  #   secrets: inherit
+  #   with:
+  #     environment: ${{ inputs.environment }}
+  #     change_request_number: ${{ needs.servicenow-change.outputs.change_number }}
+  #     deployment_status: ${{ needs.deploy.result }}
+  #     running_pods: ${{ needs.deploy.outputs.running_pods }}
+  #     total_pods: ${{ needs.deploy.outputs.total_pods }}
+  #     frontend_url: ${{ needs.deploy.outputs.frontend_url }}
