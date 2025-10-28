@@ -716,7 +716,6 @@ jobs:
       - register-packages
       - servicenow-change
       - deploy-to-environment
-      - upload-config-to-servicenow
       - smoke-tests
     if: always()
     runs-on: ubuntu-latest
@@ -746,7 +745,6 @@ jobs:
           echo "| Register Packages | ${{ needs.register-packages.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ServiceNow Change | ${{ needs.servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Upload Config | ${{ needs.upload-config-to-servicenow.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
