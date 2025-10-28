@@ -193,12 +193,10 @@ jobs:
 
       - name: Setup Java (for adservice)
         if: matrix.service == 'adservice'
-        uses: actions/setup-java@v4
+        uses: ./.github/actions/setup-java-env
         with:
-          distribution: 'temurin'
           java-version: '19'
-          cache: 'gradle'
-          cache-dependency-path: 'src/adservice/*.gradle*'
+          service: 'adservice'
 
       - name: Setup Python (for Python services)
         if: |
@@ -213,11 +211,10 @@ jobs:
         if: |
           matrix.service == 'currencyservice' ||
           matrix.service == 'paymentservice'
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-env
         with:
           node-version: '20'  # Use LTS for better compatibility with native modules
-          cache: 'npm'
-          cache-dependency-path: 'src/${{ matrix.service }}/package-lock.json'
+          service: ${{ matrix.service }}
 
       # Run tests based on service type
       - name: Run Go Tests

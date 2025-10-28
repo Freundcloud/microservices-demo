@@ -1,0 +1,29 @@
+---
+name: 'Setup Java Environment'
+description: 'Install Java with Gradle caching for microservices'
+author: 'Microservices Demo Team'
+
+inputs:
+  java-version:
+    description: 'Java version to install'
+    required: false
+    default: '19'
+  distribution:
+    description: 'Java distribution (temurin, adopt, etc.)'
+    required: false
+    default: 'temurin'
+  service:
+    description: 'Service name for cache path (e.g., adservice)'
+    required: false
+    default: 'adservice'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: ${{ inputs.distribution }}
+        java-version: ${{ inputs.java-version }}
+        cache: 'gradle'
+        cache-dependency-path: 'src/${{ inputs.service }}/*.gradle*'

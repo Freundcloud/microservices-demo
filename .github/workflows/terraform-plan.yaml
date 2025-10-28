@@ -54,9 +54,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: ./.github/actions/setup-terraform
         with:
-          terraform_version: ${{ inputs.tf_version }}
+          terraform-version: ${{ inputs.tf_version }}
 
       - name: Terraform Format Check
         id: fmt
