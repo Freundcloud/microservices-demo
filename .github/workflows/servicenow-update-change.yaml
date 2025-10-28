@@ -115,11 +115,12 @@ jobs:
 
           # Change Request Updates
           # IMPORTANT: State must be LAST in the JSON object for proper processing
+          # Note: Using toJSON() to properly escape newlines and special characters in work_notes
           change-request-details: |
             {
-              "work_notes": "${{ steps.work-notes.outputs.work_notes }}",
-              "close_code": "${{ steps.determine-state.outputs.close_code }}",
-              "close_notes": "${{ steps.determine-state.outputs.close_notes }}",
+              "work_notes": ${{ toJSON(steps.work-notes.outputs.work_notes) }},
+              "close_code": ${{ toJSON(steps.determine-state.outputs.close_code) }},
+              "close_notes": ${{ toJSON(steps.determine-state.outputs.close_notes) }},
               "state": "${{ steps.determine-state.outputs.state }}"
             }
 
