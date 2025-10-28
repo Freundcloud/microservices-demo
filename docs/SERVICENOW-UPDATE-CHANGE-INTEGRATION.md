@@ -316,6 +316,21 @@ Replace `CHG0030001` with your change request number.
 
 **Solution:** Check ServiceNow system logs for validation errors
 
+### State Transition Error
+
+**Error:** `change cannot be moved to state : 3 for change request number : CHG0030258`
+
+**Root Cause:** ServiceNow state machine doesn't allow direct transition from New (-5) to Closed (3)
+
+**Solution:** ✅ **FIXED** - Workflow now automatically transitions through Implement state first
+
+**How it works:**
+1. Query current state of change request
+2. If state = -5 (New), move to -1 (Implement) first
+3. Then proceed with normal close to state 3
+
+**Documentation:** See [ServiceNow State Transition Fix](SERVICENOW-STATE-TRANSITION-FIX.md) for complete details
+
 ### Work Notes Not Visible
 
 **Issue:** Deployment completed but no work notes

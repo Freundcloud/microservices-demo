@@ -6,6 +6,16 @@
 
 ## 🆕 Recent Updates (2025-01-28)
 
+**ServiceNow Integration Fixes**:
+- ✅ **[State Transition Fix](SERVICENOW-STATE-TRANSITION-FIX.md)** - Fixed "change cannot be moved to state : 3" error
+  - ServiceNow state machine validation
+  - Automatic transition through Implement state
+  - Complete root cause analysis and solution
+- ✅ **ServiceNow Update Change** - Change requests now properly closed after deployment
+  - JSON escaping fixes (multiline strings)
+  - State value corrections (close vs cancel)
+  - Works for success, failure, and skipped deployments
+
 **GitHub Actions Workflow Improvements**:
 - 📊 **[Workflow Refactoring Analysis](WORKFLOW-REFACTORING-ANALYSIS.md)** - Comprehensive analysis of all 12 workflows
   - Identified 100+ duplicated code blocks across 4,679 lines
