@@ -16,9 +16,25 @@ const currencyData = require('./data/currency_conversion.json');
  */
 function _carry(amount) {
   const fractionSize = Math.pow(10, 9);
-  amount.nanos += (amount.units % 1) * fractionSize;
+
+  // Extract fractional part and convert to nanos
+  // For negative numbers, we need to handle the fractional part specially
+  let fractionalPart = amount.units % 1;
+  if (fractionalPart < 0) {
+    // Convert negative fractional to positive: -1.5 → floor(-1.5) = -2, fractional = 0.5
+    fractionalPart += 1;
+  }
+
+  amount.nanos += fractionalPart * fractionSize;
   amount.units = Math.floor(amount.units) + Math.floor(amount.nanos / fractionSize);
   amount.nanos = amount.nanos % fractionSize;
+
+  // Handle any remaining negative nanos
+  if (amount.nanos < 0) {
+    amount.units -= 1;
+    amount.nanos += fractionSize;
+  }
+
   return amount;
 }
 
