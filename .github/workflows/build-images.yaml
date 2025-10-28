@@ -451,45 +451,6 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64,linux/arm64
 
-      - name: Generate SBOM
-        if: inputs.push_images
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
-          format: cyclonedx-json
-          output-file: sbom-${{ matrix.service }}.json
-        continue-on-error: true
-
-      - name: Upload SBOM Artifact
-        if: inputs.push_images
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-${{ matrix.service }}
-          path: sbom-${{ matrix.service }}.json
-          retention-days: 90
-        continue-on-error: true
-
-      # DISABLED: ServiceNow SBOM upload - action repository not found
-      # TODO: Research correct ServiceNow SBOM upload action and re-enable
-      # - name: Upload SBOM to ServiceNow
-      #   if: inputs.push_images
-      #   uses: ServiceNow/sbom-upload@v1
-      #   with:
-      #     snSbomUser: ${{ secrets.SN_SBOM_USER }}
-      #     snSbomPassword: ${{ secrets.SN_SBOM_PASSWORD }}
-      #     snInstanceUrl: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-      #     ghToken: ${{ secrets.GITHUB_TOKEN }}
-      #     ghAccountOwner: Freundcloud
-      #     repository: microservices-demo
-      #     provider: 'repository'
-      #     path: 'sbom-${{ matrix.service }}.json'
-      #     businessApplicationName: 'Online Boutique - ${{ matrix.service }}'
-      #     lifecycleStage: ${{ inputs.environment == 'prod' && 'production' || 'pre_production' }}
-      #     buildId: ${{ github.run_number }}
-      #     fetchVulnerabilityInfo: true
-      #     fetchPackageInfo: true
-      #   continue-on-error: true
-
       - name: Register Package with ServiceNow
         if: inputs.push_images
         uses: ServiceNow/servicenow-devops-register-package@v3.1.0
@@ -532,10 +493,7 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.push_images }}" == "true" ]; then
             echo "✅ Pushed to ECR" >> $GITHUB_STEP_SUMMARY
-            echo "✅ SBOM generated and uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
             echo "✅ Registered with ServiceNow as package: \`${{ matrix.service }}-${{ inputs.environment }}-${{ github.run_number }}.package\`" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Business Application: \`Online Boutique - ${{ matrix.service }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Lifecycle Stage: \`${{ inputs.environment == 'prod' && 'production' || 'pre_production' }}\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "⏭️ Image not pushed (build only)" >> $GITHUB_STEP_SUMMARY
           fi
@@ -584,17 +542,12 @@ jobs:
             echo "- ✅ Test results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
             echo "- ✅ Test results published to GitHub Checks" >> $GITHUB_STEP_SUMMARY
             echo "- ✅ Trivy vulnerability scanning completed" >> $GITHUB_STEP_SUMMARY
-            echo "- ✅ SBOM generated for all images" >> $GITHUB_STEP_SUMMARY
             echo "- ✅ Results uploaded to GitHub Security tab" >> $GITHUB_STEP_SUMMARY
             if [ "${{ inputs.push_images }}" == "true" ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "### ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
               echo "- ✅ Test results registered for each service" >> $GITHUB_STEP_SUMMARY
               echo "- ✅ Each Docker image registered as individual package" >> $GITHUB_STEP_SUMMARY
-              echo "- ✅ **SBOM uploaded to Vulnerability Response workspace**" >> $GITHUB_STEP_SUMMARY
-              echo "- ✅ Business applications linked: \`Online Boutique - {service}\`" >> $GITHUB_STEP_SUMMARY
-              echo "- ✅ Lifecycle stages tracked (dev → pre_production, prod → production)" >> $GITHUB_STEP_SUMMARY
-              echo "- ✅ Vulnerability correlation enabled" >> $GITHUB_STEP_SUMMARY
               echo "- ✅ Package naming: \`{service}-${{ inputs.environment }}-${{ github.run_number }}.package\`" >> $GITHUB_STEP_SUMMARY
             fi
           else

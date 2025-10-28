@@ -525,9 +525,8 @@ jobs:
 
   # Config validation removed - beta feature was unreliable
   # Configuration tracking now handled via:
-  # 1. SBOM uploads (dependency tracking in build-images.yaml)
-  # 2. Package registration (artifact tracking in build-images.yaml)
-  # 3. Git commit history (change tracking via GitHub)
+  # 1. Package registration (artifact tracking in build-images.yaml)
+  # 2. Git commit history (change tracking via GitHub)
 
   # ============================================================================
   # STAGE 5: Post-Deployment Validation

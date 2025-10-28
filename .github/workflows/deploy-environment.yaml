@@ -158,9 +158,8 @@ jobs:
 
       # Config validation removed - beta feature was unreliable
       # Configuration files are tracked via:
-      # 1. SBOM uploads (dependency tracking)
-      # 2. Package registration (artifact tracking)
-      # 3. Git commit history (change tracking)
+      # 1. Package registration (artifact tracking)
+      # 2. Git commit history (change tracking)
 
       - name: Deploy with Kustomize
         id: deploy
