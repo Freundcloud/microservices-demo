@@ -153,42 +153,11 @@ jobs:
           echo "</details>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      # Upload Kubernetes deployment manifests to ServiceNow as evidence
-      - name: Upload Deployment Config to ServiceNow
-        id: config-validate
-        uses: ServiceNow/servicenow-devops-config-validate@v1.0.0-beta
-        with:
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          devops-integration-username: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          application-name: 'microservices-demo'
-          target: 'deployable'
-          deployable-name: '${{ inputs.environment }}'
-          name-path: 'deployment-${{ github.run_number }}'
-          auto-commit: true
-          auto-validate: true
-          auto-publish: true
-          config-file-path: 'kustomize/overlays/${{ inputs.environment }}/*.yaml'
-          data-format: 'yaml'
-          snapshot-validation-timeout: 30
-          terminate-on-policy-validation-failures: false
-        continue-on-error: true
-
-      - name: Config Upload Summary
-        if: always()
-        run: |
-          if [ "${{ steps.config-validate.outcome }}" == "success" ]; then
-            echo "### ✅ Configuration Uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "- **Snapshot**: \`${{ steps.config-validate.outputs.snapshot-name }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "- **Validation Status**: \`${{ steps.config-validate.outputs.validation-status }}\`" >> $GITHUB_STEP_SUMMARY
-            if [ -n "${{ steps.config-validate.outputs.changeset-number }}" ]; then
-              echo "- **Changeset**: \`${{ steps.config-validate.outputs.changeset-number }}\`" >> $GITHUB_STEP_SUMMARY
-            fi
-            echo "" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Config upload to ServiceNow failed (non-blocking)" >> $GITHUB_STEP_SUMMARY
-          fi
+      # Config validation removed - beta feature was unreliable
+      # Configuration files are tracked via:
+      # 1. SBOM uploads (dependency tracking)
+      # 2. Package registration (artifact tracking)
+      # 3. Git commit history (change tracking)
 
       - name: Deploy with Kustomize
         id: deploy

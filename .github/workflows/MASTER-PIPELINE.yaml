@@ -523,42 +523,11 @@ jobs:
       wait_for_ready: true
       timeout_minutes: ${{ needs.pipeline-init.outputs.is_production == 'true' && 15 || 10 }}
 
-  upload-config-to-servicenow:
-    name: "⚙️ Upload Config to ServiceNow"
-    needs: [pipeline-init, deploy-to-environment]
-    if: needs.deploy-to-environment.result == 'success'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Upload Deployment Config
-        uses: ServiceNow/servicenow-devops-config-validate@v1.0.0-beta
-        with:
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          devops-integration-username: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          application-name: 'microservices-demo'
-          target: 'deployable'
-          deployable-name: 'microservices-${{ needs.pipeline-init.outputs.environment }}'
-          name-path: 'deployment-${{ github.run_number }}-${{ needs.pipeline-init.outputs.environment }}'
-          auto-commit: true
-          auto-validate: true
-          auto-publish: true
-          config-file-path: 'kustomize/overlays/${{ needs.pipeline-init.outputs.environment }}/kustomization.yaml'
-          data-format: 'yaml'
-          snapshot-validation-timeout: 30
-          terminate-on-policy-validation-failures: false
-
-      - name: Config Upload Summary
-        if: always()
-        run: |
-          echo "## ⚙️ Configuration Uploaded" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Kubernetes configs uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
-          echo "Snapshot: \`deployment-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "Environment: **${{ needs.pipeline-init.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+  # Config validation removed - beta feature was unreliable
+  # Configuration tracking now handled via:
+  # 1. SBOM uploads (dependency tracking in build-images.yaml)
+  # 2. Package registration (artifact tracking in build-images.yaml)
+  # 3. Git commit history (change tracking via GitHub)
 
   # ============================================================================
   # STAGE 5: Post-Deployment Validation
@@ -566,8 +535,8 @@ jobs:
 
   smoke-tests:
     name: "✅ Smoke Tests"
-    needs: [pipeline-init, upload-config-to-servicenow]
-    if: needs.upload-config-to-servicenow.result == 'success'
+    needs: [pipeline-init, deploy-to-environment]
+    if: needs.deploy-to-environment.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
