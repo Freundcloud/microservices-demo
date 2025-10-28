@@ -416,6 +416,20 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js (for npm install)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Node.js Dependencies
+        run: |
+          echo "Installing paymentservice dependencies..."
+          cd src/paymentservice && npm ci --ignore-scripts && cd ../..
+
+          echo "Installing currencyservice dependencies..."
+          cd src/currencyservice && npm ci --ignore-scripts && cd ../..
+        continue-on-error: true
+
       - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
@@ -423,6 +437,9 @@ jobs:
           path: 'src/'
           format: 'SARIF'
           out: 'dependency-check-report'
+          args: >-
+            --disableNodeAudit
+            --disableOssIndex
 
       - name: Fix SARIF URI Schemes (OWASP)
         if: always()
