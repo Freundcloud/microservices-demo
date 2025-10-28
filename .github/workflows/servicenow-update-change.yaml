@@ -40,16 +40,19 @@ jobs:
       - name: Get Current Change Request State
         id: get-current-state
         run: |
-          # Query ServiceNow to get the current state of the change request
+          # Query ServiceNow to get the current state and sys_id of the change request
           RESPONSE=$(curl -s \
             -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
             -H "Accept: application/json" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}&sysparm_fields=state")
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}&sysparm_fields=state,sys_id")
 
           CURRENT_STATE=$(echo "$RESPONSE" | jq -r '.result[0].state')
+          SYS_ID=$(echo "$RESPONSE" | jq -r '.result[0].sys_id')
 
           echo "Current state of ${{ inputs.change_request_number }}: $CURRENT_STATE"
+          echo "System ID: $SYS_ID"
           echo "current_state=$CURRENT_STATE" >> $GITHUB_OUTPUT
+          echo "sys_id=$SYS_ID" >> $GITHUB_OUTPUT
 
       - name: Move to Implement State (if needed)
         id: move-to-implement
@@ -60,8 +63,7 @@ jobs:
 
           echo "Change is in New state (-5), moving to Implement (-1) first..."
 
-          # Use ServiceNow DevOps Update Change action to move to Implement
-          # This uses the same authentication and ensures consistent behavior
+          # Use PUT method with sys_id (PATCH not supported with query parameters)
           PAYLOAD=$(jq -n \
             '{
               "state": "-1",
@@ -72,9 +74,9 @@ jobs:
             -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
-            -X PATCH \
+            -X PUT \
             -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}")
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${{ steps.get-current-state.outputs.sys_id }}")
 
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
           BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
@@ -159,7 +161,7 @@ jobs:
       - name: Update Change Request in ServiceNow (Close)
         run: |
           # Close the change request using direct REST API
-          # This gives us more control over the state transition
+          # Use PUT method with sys_id (PATCH not supported with query parameters)
 
           echo "Closing change request ${{ inputs.change_request_number }}..."
 
@@ -179,16 +181,16 @@ jobs:
             -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
-            -X PATCH \
+            -X PUT \
             -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}")
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${{ steps.get-current-state.outputs.sys_id }}")
 
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
           BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
 
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Change request closed successfully"
-            UPDATED_STATE=$(echo "$BODY" | jq -r '.result[0].state // .result.state // "unknown"')
+            UPDATED_STATE=$(echo "$BODY" | jq -r '.result.state // "unknown"')
             echo "New state: $UPDATED_STATE"
           else
             echo "❌ Failed to close change request (HTTP $HTTP_CODE)"
