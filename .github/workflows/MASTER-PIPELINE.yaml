@@ -382,6 +382,9 @@ jobs:
     outputs:
       previous_version: ${{ steps.get-version.outputs.version }}
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Setup AWS Credentials
         uses: ./.github/actions/setup-aws-credentials
         with:
