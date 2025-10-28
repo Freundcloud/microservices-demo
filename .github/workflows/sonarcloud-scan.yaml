@@ -103,7 +103,7 @@ jobs:
         with:
           args: >
             -Dsonar.organization=freundcloud
-            -Dsonar.projectKey=freundcloud_microservices-demo
+            -Dsonar.projectKey=Freundcloud_microservices-demo
 
       - name: Upload SonarCloud Results to ServiceNow
         if: ${{ !inputs.skip_servicenow && !github.event.pull_request }}
@@ -117,7 +117,7 @@ jobs:
           context-github: ${{ toJSON(github) }}
           job-name: 'SonarCloud Analysis'
           sonar-host-url: 'https://sonarcloud.io'
-          sonar-project-key: 'freundcloud_microservices-demo'
+          sonar-project-key: 'Freundcloud_microservices-demo'
           sonar-org-key: 'freundcloud'
         continue-on-error: true
 
@@ -125,11 +125,11 @@ jobs:
         run: |
           echo "### ☁️ SonarCloud Analysis Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 **View Results**: [SonarCloud Dashboard](https://sonarcloud.io/dashboard?id=freundcloud_microservices-demo)" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **View Results**: [SonarCloud Dashboard](https://sonarcloud.io/dashboard?id=Freundcloud_microservices-demo)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📊 **Quality Metrics**:" >> $GITHUB_STEP_SUMMARY
           echo "- Organization: \`freundcloud\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Project: \`freundcloud_microservices-demo\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: \`Freundcloud_microservices-demo\`" >> $GITHUB_STEP_SUMMARY
           echo "- Languages: Go, Python, Java, JavaScript, C#" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ secrets.SN_INSTANCE_URL }}" != "" ]; then

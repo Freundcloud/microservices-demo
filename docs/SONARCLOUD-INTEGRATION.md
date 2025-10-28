@@ -162,7 +162,7 @@ The **ServiceNow DevOps Sonar** action (`servicenow-devops-sonar@v3.1.0`) upload
 
 | Field | Description |
 |-------|-------------|
-| **Project Key** | `freundcloud_microservices-demo` |
+| **Project Key** | `Freundcloud_microservices-demo` |
 | **Organization** | `freundcloud` |
 | **Commit SHA** | Git commit hash |
 | **Branch** | Branch name (main, develop, etc.) |
@@ -213,7 +213,7 @@ POST https://{instance}.service-now.com/api/sn_devops/v1/devops/tool/sonar
 ```json
 {
   "toolId": "f62c4e49c3fcf614e1bbf0cb050131ef",
-  "projectKey": "freundcloud_microservices-demo",
+  "projectKey": "Freundcloud_microservices-demo",
   "organization": "freundcloud",
   "sonarUrl": "https://sonarcloud.io",
   "commit": "e620ecf6...",
@@ -251,7 +251,7 @@ POST https://{instance}.service-now.com/api/sn_devops/v1/devops/tool/sonar
 
 #### C. Configure Organization
 - Organization Key: `freundcloud` (already set in `sonar-project.properties`)
-- Project Key: `freundcloud_microservices-demo` (already set)
+- Project Key: `Freundcloud_microservices-demo` (already set)
 
 ### 2. GitHub Secrets Setup
 
@@ -374,7 +374,7 @@ The configuration file is located at the repository root:
 ```properties
 # Organization and Project
 sonar.organization=freundcloud
-sonar.projectKey=freundcloud_microservices-demo
+sonar.projectKey=Freundcloud_microservices-demo
 sonar.projectName=Microservices Demo (AWS EKS)
 sonar.projectVersion=1.2.4
 
@@ -422,7 +422,7 @@ To modify the analysis configuration:
      with:
        args: >
          -Dsonar.organization=freundcloud
-         -Dsonar.projectKey=freundcloud_microservices-demo
+         -Dsonar.projectKey=Freundcloud_microservices-demo
          -Dsonar.verbose=true  # Enable debug logging
    ```
 
@@ -447,7 +447,7 @@ gh workflow run MASTER-PIPELINE.yaml \
 
 ### 2. Verify SonarCloud Results
 
-1. Go to [sonarcloud.io/dashboard?id=freundcloud_microservices-demo](https://sonarcloud.io/dashboard?id=freundcloud_microservices-demo)
+1. Go to [sonarcloud.io/dashboard?id=Freundcloud_microservices-demo](https://sonarcloud.io/dashboard?id=Freundcloud_microservices-demo)
 2. Check the latest scan results
 3. Verify quality gate status
 
@@ -554,13 +554,13 @@ Coverage below 70%
 
 **Error:**
 ```
-Project freundcloud_microservices-demo not found
+Project Freundcloud_microservices-demo not found
 ```
 
 **Solution:**
 1. Verify project exists in SonarCloud
 2. Check organization key: `freundcloud`
-3. Ensure project key matches: `freundcloud_microservices-demo`
+3. Ensure project key matches: `Freundcloud_microservices-demo`
 
 ---
 
@@ -674,7 +674,7 @@ Use ServiceNow data for:
 
 For issues or questions:
 1. Check [Troubleshooting](#troubleshooting) section
-2. Review SonarCloud logs at [sonarcloud.io](https://sonarcloud.io/dashboard?id=freundcloud_microservices-demo)
+2. Review SonarCloud logs at [sonarcloud.io](https://sonarcloud.io/dashboard?id=Freundcloud_microservices-demo)
 3. Check ServiceNow logs in the instance
 4. Open GitHub issue in the repository
 
