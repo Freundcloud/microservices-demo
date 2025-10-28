@@ -178,7 +178,7 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
 
   # Check if vulnerability entry exists
   VUL_ENTRY_SEARCH=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-    "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_entry?sysparm_query=vulnerability_id=$CVE_ID&sysparm_limit=1")
+    "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_entry?sysparm_query=id=$CVE_ID&sysparm_limit=1")
 
   VUL_ENTRY_COUNT=$(echo "$VUL_ENTRY_SEARCH" | jq -r '.result | length')
 
@@ -192,10 +192,10 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
       --arg desc "$DESCRIPTION" \
       --arg severity "$SN_SEVERITY" \
       '{
-        "vulnerability_id": $cve,
-        "short_description": $title,
-        "description": $desc,
-        "severity": $severity,
+        "id": $cve,
+        "name": $title,
+        "summary": $desc,
+        "normalized_severity": $severity,
         "source": "Trivy"
       }')
 
