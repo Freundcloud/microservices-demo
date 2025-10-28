@@ -93,11 +93,13 @@ This is likely a ServiceNow API quirk or configuration issue specific to the ins
 
 Instead of fixing the creation workflow (which might break other things), we **fix the update workflow** to handle any state the change might be in.
 
+**Key Decision**: Replaced ServiceNow DevOps action with direct REST API calls for complete control over state transitions.
+
 ### Changes Made
 
 **File**: `.github/workflows/servicenow-update-change.yaml`
 
-Added two new steps before closing:
+Replaced ServiceNow DevOps action with three custom steps:
 
 #### 1. Get Current Change Request State
 ```yaml
@@ -130,10 +132,9 @@ Added two new steps before closing:
     echo "Change is in New state (-5), moving to Implement (-1) first..."
 
     PAYLOAD=$(jq -n \
-      --arg state "-1" \
       '{
-        "state": $state,
-        "work_notes": "Deployment started. Moving to Implement state."
+        "state": "-1",
+        "work_notes": "Deployment started. Moving to Implement state before closing."
       }')
 
     RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
@@ -148,17 +149,69 @@ Added two new steps before closing:
     BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
 
     if [ "$HTTP_CODE" = "200" ]; then
-      echo "✅ Moved to Implement state"
+      echo "✅ Moved to Implement state (-1)"
+      echo "successfully_transitioned=true" >> $GITHUB_OUTPUT
     else
       echo "⚠️ Failed to move to Implement state (HTTP $HTTP_CODE)"
       echo "$BODY" | jq '.' || echo "$BODY"
+      echo "successfully_transitioned=false" >> $GITHUB_OUTPUT
+    fi
+
+    # Small delay to ensure state is updated in ServiceNow
+    sleep 2
+```
+
+**Purpose**: Conditionally move change from New (-5) to Implement (-1) if needed using direct REST API
+
+#### 3. Update Change Request (Close)
+```yaml
+- name: Update Change Request in ServiceNow (Close)
+  run: |
+    # Close the change request using direct REST API
+    # This gives us more control over the state transition
+
+    echo "Closing change request ${{ inputs.change_request_number }}..."
+
+    PAYLOAD=$(jq -n \
+      --arg work_notes "${{ steps.work-notes.outputs.work_notes }}" \
+      --arg close_code "${{ steps.determine-state.outputs.close_code }}" \
+      --arg close_notes "${{ steps.determine-state.outputs.close_notes }}" \
+      --arg state "${{ steps.determine-state.outputs.state }}" \
+      '{
+        "work_notes": $work_notes,
+        "close_code": $close_code,
+        "close_notes": $close_notes,
+        "state": $state
+      }')
+
+    RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+      -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -X PATCH \
+      -d "$PAYLOAD" \
+      "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ inputs.change_request_number }}")
+
+    HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+    BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+    if [ "$HTTP_CODE" = "200" ]; then
+      echo "✅ Change request closed successfully"
+      UPDATED_STATE=$(echo "$BODY" | jq -r '.result[0].state // .result.state // "unknown"')
+      echo "New state: $UPDATED_STATE"
+    else
+      echo "❌ Failed to close change request (HTTP $HTTP_CODE)"
+      echo "$BODY" | jq '.' || echo "$BODY"
+      exit 1
     fi
 ```
 
-**Purpose**: Conditionally move change from New (-5) to Implement (-1) if needed
+**Purpose**: Close the change request using direct REST API with complete control over timing and field order
 
-#### 3. Then Close (existing step)
-The existing "Update Change Request in ServiceNow" step now works because the change is in Implement state, which **can** transition to Closed.
+**Why Replace ServiceNow DevOps Action?**
+- The `servicenow-devops-update-change@v3.1.0` action tried to update state immediately
+- It didn't respect our pre-transition to Implement state
+- Direct REST API gives us full control over order and timing of updates
 
 ---
 
