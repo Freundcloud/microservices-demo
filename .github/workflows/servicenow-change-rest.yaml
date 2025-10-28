@@ -344,8 +344,9 @@ jobs:
             # State values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed
             # Approval values: not_requested, requested, approved, rejected
 
-            if [ "$STATE" = "-1" ] || [ "$STATE" = "0" ]; then
-              echo "✅ Change Request approved and ready for implementation"
+            # Accept Scheduled (-2), Implement (-1), or Review (0) states with approved status
+            if [ "$APPROVAL" = "approved" ] && ([ "$STATE" = "-2" ] || [ "$STATE" = "-1" ] || [ "$STATE" = "0" ]); then
+              echo "✅ Change Request approved (state: $STATE) and ready for deployment"
               exit 0
             elif [ "$APPROVAL" = "rejected" ]; then
               echo "❌ Change Request was rejected"
