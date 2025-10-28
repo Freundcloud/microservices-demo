@@ -471,7 +471,7 @@ jobs:
 
       - name: Upload SBOM to ServiceNow
         if: inputs.push_images
-        uses: ServiceNow/servicenow-devops-sbom@v2.0.1
+        uses: ServiceNow/sbom-upload@v1
         with:
           snSbomUser: ${{ secrets.SN_SBOM_USER }}
           snSbomPassword: ${{ secrets.SN_SBOM_PASSWORD }}
@@ -481,7 +481,6 @@ jobs:
           repository: microservices-demo
           provider: 'repository'
           path: 'sbom-${{ matrix.service }}.json'
-          ref: ${{ github.ref_name }}
           businessApplicationName: 'Online Boutique - ${{ matrix.service }}'
           lifecycleStage: ${{ inputs.environment == 'prod' && 'production' || 'pre_production' }}
           buildId: ${{ github.run_number }}
