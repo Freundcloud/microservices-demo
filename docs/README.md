@@ -4,18 +4,25 @@
 
 **New to this project?** Start with **[DEMO-OVERVIEW.md](../DEMO-OVERVIEW.md)** to understand what this demo does.
 
-## 🆕 Recent Updates (2025-10-27)
+## 🆕 Recent Updates (2025-01-28)
 
-**Critical Pipeline Fixes**:
+**GitHub Actions Workflow Improvements**:
+- 📊 **[Workflow Refactoring Analysis](WORKFLOW-REFACTORING-ANALYSIS.md)** - Comprehensive analysis of all 12 workflows
+  - Identified 100+ duplicated code blocks across 4,679 lines
+  - Found opportunities for 25-30% code reduction
+  - Documented missing best practices (caching, composite actions, matrix strategy)
+  - Expected 40-60% faster builds with dependency caching
+- 📝 **[Workflow Refactoring Implementation Guide](WORKFLOW-REFACTORING-IMPLEMENTATION-GUIDE.md)** - Step-by-step refactoring plan
+  - Phase 1 (Week 1): Quick wins - composite actions + caching
+  - Phase 2 (Week 2): Environment setup standardization
+  - Phase 3 (Week 3-4): Matrix strategy + modular workflows
+  - Complete code examples and testing procedures
+
+**Previous Updates (2025-10-27)**:
 - ✅ **Semantic Versioning Fixed** - Images now correctly tagged with `v1.2.3` format
-  - Fixed version parameter passing from promote script to workflows
-  - Fixed build job referencing non-existent outputs
-  - See [VERSION-TRACKING-STRATEGY.md](VERSION-TRACKING-STRATEGY.md#recent-implementation-updates-2025-10-27)
-- ✅ **Test Quality Gates Enforced** - Removed `continue-on-error` flags from all test steps
-  - Go, C#, Java, Python tests now properly fail workflows when tests fail
-  - No more hidden test failures
+- ✅ **Test Quality Gates Enforced** - Tests now properly fail workflows when they fail
 - ✅ **C# Test Logger Added** - JunitXml.TestLogger package for .NET test results
-- ✅ **GitHub Actions Permissions** - Fixed reusable workflow permissions for test result publishing
+- ✅ **GitHub Actions Permissions** - Fixed reusable workflow permissions
 
 ## Quick Start Guides
 
@@ -146,8 +153,9 @@
 - **Observability**: Prometheus, Grafana, Jaeger, Kiali
 
 ### CI/CD
-- **Platform**: GitHub Actions
+- **Platform**: GitHub Actions (12 workflows, 4,679 lines)
 - **Security**: CodeQL, Trivy, Gitleaks, Semgrep, Checkov, tfsec
+- **Optimization**: See [Workflow Refactoring Analysis](WORKFLOW-REFACTORING-ANALYSIS.md) for improvement opportunities
 
 ## Project Structure
 
