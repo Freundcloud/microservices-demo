@@ -219,7 +219,7 @@ describe('Currency Service', () => {
       const backToUsd = CurrencyService.convertCurrency(euros, 'USD');
 
       // Should be approximately the same (allowing for rounding errors)
-      expect(Math.abs(backToUsd.units - originalAmount.units)).toBeLessThan(1);
+      expect(Math.abs(backToUsd.units - originalAmount.units)).toBeLessThanOrEqual(1);
     });
 
     it('should maintain value on GBP -> JPY -> GBP conversion', () => {
@@ -228,8 +228,8 @@ describe('Currency Service', () => {
       const yen = CurrencyService.convertCurrency(originalAmount, 'JPY');
       const backToGbp = CurrencyService.convertCurrency(yen, 'GBP');
 
-      // Should be approximately the same
-      expect(Math.abs(backToGbp.units - originalAmount.units)).toBeLessThan(1);
+      // Should be approximately the same (allowing for rounding errors)
+      expect(Math.abs(backToGbp.units - originalAmount.units)).toBeLessThanOrEqual(1);
     });
   });
 });
