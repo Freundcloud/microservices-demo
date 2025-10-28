@@ -170,6 +170,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Prepare ServiceNow Authentication
+        id: sn-auth
+        uses: ./.github/actions/servicenow-auth
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
       # =====================================================================
       # RUN UNIT TESTS BEFORE BUILDING
       # =====================================================================
@@ -343,10 +352,10 @@ jobs:
         if: steps.find-test-results.outputs.found == 'true'
         uses: ServiceNow/servicenow-devops-test-report@v6.0.0
         with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ steps.sn-auth.outputs.username }}
+          devops-integration-user-password: ${{ steps.sn-auth.outputs.password }}
+          instance-url: ${{ steps.sn-auth.outputs.instance-url }}
+          tool-id: ${{ steps.sn-auth.outputs.tool-id }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Build ${{ matrix.service }}'
           xml-report-filename: ${{ steps.find-test-results.outputs.path }}
@@ -548,10 +557,10 @@ jobs:
         if: inputs.push_images
         uses: ServiceNow/servicenow-devops-register-package@v3.1.0
         with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ steps.sn-auth.outputs.username }}
+          devops-integration-user-password: ${{ steps.sn-auth.outputs.password }}
+          instance-url: ${{ steps.sn-auth.outputs.instance-url }}
+          tool-id: ${{ steps.sn-auth.outputs.tool-id }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Build ${{ matrix.service }}'
           artifacts: '[{"name": "${{ env.ECR_REGISTRY }}/${{ matrix.service }}", "version": "${{ inputs.environment }}-${{ github.sha }}", "semanticVersion": "${{ inputs.environment }}-${{ github.run_number }}", "repositoryName": "${{ github.repository }}"}]'
