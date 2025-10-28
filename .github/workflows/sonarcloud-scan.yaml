@@ -7,14 +7,11 @@ name: "☁️ SonarCloud Code Quality"
       SONAR_TOKEN:
         description: 'SonarCloud authentication token'
         required: true
-      SN_DEVOPS_INTEGRATION_TOKEN:
-        description: 'ServiceNow DevOps integration token'
-        required: false
       SN_DEVOPS_USER:
-        description: 'ServiceNow DevOps username (fallback)'
+        description: 'ServiceNow DevOps username (basic auth)'
         required: false
       SN_DEVOPS_PASSWORD:
-        description: 'ServiceNow DevOps password (fallback)'
+        description: 'ServiceNow DevOps password (basic auth)'
         required: false
       SN_INSTANCE_URL:
         description: 'ServiceNow instance URL'
@@ -114,11 +111,9 @@ jobs:
         if: ${{ !inputs.skip_servicenow && !github.event.pull_request }}
         uses: ServiceNow/servicenow-devops-sonar@v3.1.0
         with:
-          # Use token-based authentication (preferred)
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN || '' }}
-          # Fallback to username/password if token not available
-          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER || '' }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD || '' }}
+          # Basic Authentication (Option 2)
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}

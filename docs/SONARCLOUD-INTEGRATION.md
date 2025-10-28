@@ -260,11 +260,12 @@ Add the following secrets to your GitHub repository:
 | Secret Name | Value | Required | Purpose |
 |-------------|-------|----------|---------|
 | `SONAR_TOKEN` | SonarCloud authentication token | ✅ Yes | SonarCloud API access |
-| `SN_DEVOPS_INTEGRATION_TOKEN` | ServiceNow DevOps integration token | ✅ Yes | ServiceNow API access (preferred) |
-| `SN_DEVOPS_USER` | ServiceNow username | ⚠️ Fallback | ServiceNow API access (basic auth) |
-| `SN_DEVOPS_PASSWORD` | ServiceNow password | ⚠️ Fallback | ServiceNow API access (basic auth) |
+| `SN_DEVOPS_USER` | ServiceNow username | ✅ Yes | ServiceNow API access (basic auth) |
+| `SN_DEVOPS_PASSWORD` | ServiceNow password | ✅ Yes | ServiceNow API access (basic auth) |
 | `SN_INSTANCE_URL` | `https://calitiiltddemo3.service-now.com` | ✅ Yes | ServiceNow instance URL |
 | `SN_ORCHESTRATION_TOOL_ID` | `f62c4e49c3fcf614e1bbf0cb050131ef` | ✅ Yes | GitHub tool ID in ServiceNow |
+
+**Note:** This integration uses **Basic Authentication (Option 2)** for ServiceNow. The `SONAR_TOKEN` is already configured in your repository.
 
 #### How to Get SONAR_TOKEN:
 1. Go to [sonarcloud.io/account/security](https://sonarcloud.io/account/security)
@@ -274,23 +275,22 @@ Add the following secrets to your GitHub repository:
 5. Expiration: 90 days (or custom)
 6. Copy the token immediately (it won't be shown again)
 
-#### How to Get SN_DEVOPS_INTEGRATION_TOKEN:
-1. Log into ServiceNow instance
-2. Navigate to **DevOps → GitHub Tools**
-3. Find your GitHub tool record (`f62c4e49c3fcf614e1bbf0cb050131ef`)
-4. Generate API token from the tool configuration
-5. Copy the token
+#### How to Get ServiceNow Credentials:
+The basic authentication credentials (`SN_DEVOPS_USER` and `SN_DEVOPS_PASSWORD`) are already configured in your repository. These credentials provide access to the ServiceNow DevOps API.
 
 #### Add Secrets to GitHub:
 ```bash
 # Via GitHub UI
 Repository → Settings → Secrets and variables → Actions → New repository secret
 
-# Via GitHub CLI
-gh secret set SONAR_TOKEN --body "<your-token>"
-gh secret set SN_DEVOPS_INTEGRATION_TOKEN --body "<your-token>"
-gh secret set SN_INSTANCE_URL --body "https://calitiiltddemo3.service-now.com"
-gh secret set SN_ORCHESTRATION_TOOL_ID --body "f62c4e49c3fcf614e1bbf0cb050131ef"
+# Via GitHub CLI (if you need to update SONAR_TOKEN)
+gh secret set SONAR_TOKEN --body "<your-sonarcloud-token>"
+
+# ServiceNow credentials are already configured:
+# SN_DEVOPS_USER
+# SN_DEVOPS_PASSWORD
+# SN_INSTANCE_URL
+# SN_ORCHESTRATION_TOOL_ID
 ```
 
 ### 3. ServiceNow DevOps Setup
@@ -496,19 +496,25 @@ HTTP 401 Unauthorized
 
 **Solutions:**
 
-**A. Token Authentication (Preferred)**
-1. Verify `SN_DEVOPS_INTEGRATION_TOKEN` is set
-2. Check token is valid in ServiceNow
+**A. Basic Authentication**
+1. Verify `SN_DEVOPS_USER` and `SN_DEVOPS_PASSWORD` are set correctly
+   ```bash
+   gh secret list | grep SN_DEVOPS
+   ```
+2. Check user has DevOps permissions in ServiceNow
 3. Verify tool ID is correct: `f62c4e49c3fcf614e1bbf0cb050131ef`
 
-**B. Basic Authentication (Fallback)**
-1. Verify `SN_DEVOPS_USER` and `SN_DEVOPS_PASSWORD` are set
-2. Check user has DevOps permissions in ServiceNow
-
-**C. Check ServiceNow Logs**
+**B. Check ServiceNow Logs**
 1. Navigate to **System Logs → Application Logs**
 2. Filter by `devops` or `sonar`
 3. Look for API errors
+
+**C. Test ServiceNow API Access**
+Test the credentials manually:
+```bash
+curl -u "$SN_USER:$SN_PASS" \
+  "$SN_URL/api/now/table/sys_user?sysparm_limit=1"
+```
 
 ---
 
