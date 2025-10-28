@@ -155,11 +155,7 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
 
   CVE_ID=$(echo "$VUL" | jq -r '.VulnerabilityID')
   PKG_NAME=$(echo "$VUL" | jq -r '.PkgName')
-  INSTALLED_VERSION=$(echo "$VUL" | jq -r '.InstalledVersion')
-  FIXED_VERSION=$(echo "$VUL" | jq -r '.FixedVersion // "N/A"')
   SEVERITY=$(echo "$VUL" | jq -r '.Severity')
-  TITLE=$(echo "$VUL" | jq -r '.Title // "No title"')
-  DESCRIPTION=$(echo "$VUL" | jq -r '.Description // "No description"')
 
   # Skip if CVE_ID is empty
   if [ -z "$CVE_ID" ] || [ "$CVE_ID" = "null" ]; then
@@ -192,22 +188,17 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
   # Create vulnerable item directly without vulnerability entry
   # Note: We can't create in sn_vul_entry due to ACL restrictions
   # Creating standalone vulnerable item with all details embedded
-  VUL_ITEM_PAYLOAD=$(jq -n \
+  # Pass the entire vulnerability object to jq to properly handle special characters
+  VUL_ITEM_PAYLOAD=$(echo "$VUL" | jq \
     --arg ci "$CI_SYS_ID" \
-    --arg cve "$CVE_ID" \
-    --arg title "$TITLE" \
     --arg severity "$SN_SEVERITY" \
-    --arg pkg "$PKG_NAME" \
-    --arg installed "$INSTALLED_VERSION" \
-    --arg fixed "$FIXED_VERSION" \
-    --arg desc "$DESCRIPTION" \
     '{
       "cmdb_ci": $ci,
       "severity": $severity,
       "source": "Trivy",
       "state": "1",
-      "short_description": ($cve + " - Vulnerability in " + $pkg + " " + $installed),
-      "description": ("CVE: " + $cve + "\nTitle: " + $title + "\n\nPackage: " + $pkg + "\nInstalled Version: " + $installed + "\nFixed Version: " + $fixed + "\n\nDescription:\n" + $desc)
+      "short_description": (.VulnerabilityID + " - Vulnerability in " + .PkgName + " " + .InstalledVersion),
+      "description": ("CVE: " + .VulnerabilityID + "\nTitle: " + (.Title // "No title") + "\n\nPackage: " + .PkgName + "\nInstalled Version: " + .InstalledVersion + "\nFixed Version: " + (.FixedVersion // "N/A") + "\n\nDescription:\n" + (.Description // "No description"))
     }')
 
   VUL_ITEM_CREATE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
