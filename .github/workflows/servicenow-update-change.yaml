@@ -54,46 +54,6 @@ jobs:
           echo "current_state=$CURRENT_STATE" >> $GITHUB_OUTPUT
           echo "sys_id=$SYS_ID" >> $GITHUB_OUTPUT
 
-      - name: Move to Implement State (if needed)
-        id: move-to-implement
-        if: steps.get-current-state.outputs.current_state == '-5'
-        run: |
-          # If change is in New state (-5), move it to Implement (-1) first
-          # ServiceNow doesn't allow direct transition from New to Closed
-
-          echo "Change is in New state (-5), moving to Implement (-1) first..."
-
-          # Use PUT method with sys_id (PATCH not supported with query parameters)
-          PAYLOAD=$(jq -n \
-            '{
-              "state": "-1",
-              "work_notes": "Deployment started. Moving to Implement state before closing."
-            }')
-
-          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -X PUT \
-            -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${{ steps.get-current-state.outputs.sys_id }}")
-
-          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
-          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Moved to Implement state (-1)"
-            echo "successfully_transitioned=true" >> $GITHUB_OUTPUT
-          else
-            echo "⚠️ Failed to move to Implement state (HTTP $HTTP_CODE)"
-            echo "$BODY" | jq '.' || echo "$BODY"
-            echo "successfully_transitioned=false" >> $GITHUB_OUTPUT
-            # Don't fail - continue and let the main update step handle it
-          fi
-
-          # Small delay to ensure state is updated in ServiceNow
-          sleep 2
-
       - name: Determine Change Request State
         id: determine-state
         run: |
@@ -158,24 +118,27 @@ jobs:
           echo "$WORK_NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Update Change Request in ServiceNow (Close)
+      - name: Update Change Request in ServiceNow (Add Work Notes)
         run: |
-          # Close the change request using direct REST API
-          # Use PUT method with sys_id (PATCH not supported with query parameters)
+          # Update the change request with work notes and deployment details
+          # NOTE: We cannot change state via API due to ServiceNow business rule
+          # "Change Model: Check State Transition" blocks all state changes from New state
+          # State must be updated manually in ServiceNow or via ServiceNow workflows
 
-          echo "Closing change request ${{ inputs.change_request_number }}..."
+          echo "Updating change request ${{ inputs.change_request_number }} with deployment results..."
 
           PAYLOAD=$(jq -n \
             --arg work_notes "${{ steps.work-notes.outputs.work_notes }}" \
             --arg close_code "${{ steps.determine-state.outputs.close_code }}" \
             --arg close_notes "${{ steps.determine-state.outputs.close_notes }}" \
-            --arg state "${{ steps.determine-state.outputs.state }}" \
             '{
               "work_notes": $work_notes,
               "close_code": $close_code,
-              "close_notes": $close_notes,
-              "state": $state
+              "close_notes": $close_notes
             }')
+
+          echo "Payload (without state field):"
+          echo "$PAYLOAD" | jq '.'
 
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
             -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
@@ -189,11 +152,18 @@ jobs:
           BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
 
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Change request closed successfully"
-            UPDATED_STATE=$(echo "$BODY" | jq -r '.result.state // "unknown"')
-            echo "New state: $UPDATED_STATE"
+            echo "✅ Change request updated successfully"
+            echo ""
+            echo "⚠️  NOTE: State was NOT changed due to ServiceNow business rule restrictions"
+            echo "    The change request remains in state: ${{ steps.get-current-state.outputs.current_state }}"
+            echo "    close_code and close_notes have been set for when state is manually changed to Closed"
+            echo ""
+            echo "    To close this change request:"
+            echo "    1. Open: ${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${{ steps.get-current-state.outputs.sys_id }}"
+            echo "    2. Manually change State to 'Closed'"
+            echo "    3. The close_code and close_notes are already populated"
           else
-            echo "❌ Failed to close change request (HTTP $HTTP_CODE)"
+            echo "❌ Failed to update change request (HTTP $HTTP_CODE)"
             echo "$BODY" | jq '.' || echo "$BODY"
             exit 1
           fi
