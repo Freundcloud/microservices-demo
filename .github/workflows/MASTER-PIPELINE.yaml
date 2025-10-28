@@ -322,6 +322,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Prepare ServiceNow Authentication
+        id: sn-auth
+        uses: ./.github/actions/servicenow-auth
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
       - name: Build Package Metadata
         id: package-metadata
         run: |
@@ -353,10 +362,10 @@ jobs:
         if: steps.package-metadata.outputs.artifacts != '[]'
         uses: ServiceNow/servicenow-devops-register-package@v3.1.0
         with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          devops-integration-user-name: ${{ steps.sn-auth.outputs.username }}
+          devops-integration-user-password: ${{ steps.sn-auth.outputs.password }}
+          instance-url: ${{ steps.sn-auth.outputs.instance-url }}
+          tool-id: ${{ steps.sn-auth.outputs.tool-id }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Register Packages - ${{ needs.pipeline-init.outputs.environment }}'
           artifacts: ${{ steps.package-metadata.outputs.artifacts }}
