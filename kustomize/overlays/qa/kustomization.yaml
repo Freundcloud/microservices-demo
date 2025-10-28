@@ -34,37 +34,37 @@ commonAnnotations:
 images:
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/frontend
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/cartservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/cartservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/productcatalogservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/productcatalogservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/currencyservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/currencyservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/paymentservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/shippingservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/shippingservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/emailservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/checkoutservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/checkoutservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/recommendationservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/recommendationservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/adservice
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/adservice
-  newTag: v1.2.3
+  newTag: v1.2.4
 - name: us-central1-docker.pkg.dev/google-samples/microservices-demo/loadgenerator
   newName: 533267307120.dkr.ecr.eu-west-2.amazonaws.com/loadgenerator
-  newTag: v1.2.3
+  newTag: v1.2.4
 
 # Replica patches for qa (moderate replicas)
 patches:
