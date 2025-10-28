@@ -68,6 +68,11 @@ images:
 
 # Replica patches for prod (higher replicas for HA)
 patches:
+# Add prod-specific tags to ALB Ingress
+- path: ingress-patch.yaml
+  target:
+    kind: Ingress
+    name: frontend-ingress
 # Apply node affinity and tolerations to all deployments
 - path: node-affinity.yaml
   target:

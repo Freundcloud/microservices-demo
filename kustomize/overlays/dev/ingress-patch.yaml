@@ -1,0 +1,7 @@
+# Patch to add dev-specific tags to ALB Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  annotations:
+    alb.ingress.kubernetes.io/tags: Environment=dev,Project=microservices,ManagedBy=kustomize

@@ -75,6 +75,11 @@ patches:
 - path: deployment-strategy.yaml
   target:
     kind: Deployment
+# Add dev-specific tags to ALB Ingress
+- path: ingress-patch.yaml
+  target:
+    kind: Ingress
+    name: frontend-ingress
 - patch: |-
     apiVersion: apps/v1
     kind: Deployment
