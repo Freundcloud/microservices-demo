@@ -4,7 +4,21 @@
   "description": "A gRPC currency conversion microservice",
   "repository": "https://github.com/GoogleCloudPlatform/microservices-demo",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --coverage --coverageReporters=text --coverageReporters=cobertura",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --ci --coverage --coverageReporters=text --coverageReporters=cobertura"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "currency-logic.js",
+      "!node_modules/**",
+      "!test/**"
+    ],
+    "testMatch": [
+      "**/test/**/*.test.js"
+    ]
   },
   "license": "Apache-2.0",
   "dependencies": {
@@ -23,5 +37,9 @@
     "@opentelemetry/sdk-node": "0.205.0",
     "pino": "9.9.5",
     "xml2js": "0.6.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0"
   }
 }

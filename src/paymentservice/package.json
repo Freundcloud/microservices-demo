@@ -5,7 +5,21 @@
   "repository": "https://github.com/GoogleCloudPlatform/microservices-demo",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --coverage --coverageReporters=text --coverageReporters=cobertura",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --ci --coverage --coverageReporters=text --coverageReporters=cobertura"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "charge.js",
+      "!node_modules/**",
+      "!test/**"
+    ],
+    "testMatch": [
+      "**/test/**/*.test.js"
+    ]
   },
   "author": "Jonathan Lui",
   "license": "ISC",
@@ -23,5 +37,9 @@
     "pino": "9.9.5",
     "simple-card-validator": "^1.1.0",
     "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0"
   }
 }
