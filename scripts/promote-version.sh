@@ -30,7 +30,8 @@ echo ""
 # Ensure we're on main and up to date
 echo "📥 Ensuring main branch is up to date..."
 git checkout main 2>/dev/null || true
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 # 1. Create feature branch
 BRANCH="release/v${VERSION}"
