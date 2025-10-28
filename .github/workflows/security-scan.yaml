@@ -37,12 +37,10 @@ jobs:
 
       - name: Setup Java 21
         if: matrix.language == 'java'
-        uses: actions/setup-java@v4
+        uses: ./.github/actions/setup-java-env
         with:
-          distribution: 'temurin'
           java-version: '21'
-          cache: 'gradle'
-          cache-dependency-path: 'src/adservice/*.gradle*'
+          service: 'adservice'
 
       - name: Build Java services
         if: matrix.language == 'java'
@@ -418,18 +416,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (for npm install)
-        uses: actions/setup-node@v4
+      - name: Setup Node.js Environment
+        uses: ./.github/actions/setup-node-env
         with:
-          node-version: '20'  # Use LTS for better compatibility with native modules like pprof
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('src/paymentservice/package-lock.json', 'src/currencyservice/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
+          node-version: '20'
+        # Note: No service specified - caching disabled for multi-service install
 
       - name: Install Node.js Dependencies
         run: |

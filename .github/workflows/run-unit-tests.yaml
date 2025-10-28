@@ -89,12 +89,10 @@ jobs:
       # =====================================================================
       - name: Setup Java
         if: inputs.service == 'adservice'
-        uses: actions/setup-java@v4
+        uses: ./.github/actions/setup-java-env
         with:
-          distribution: 'temurin'
           java-version: '19'
-          cache: 'gradle'
-          cache-dependency-path: 'src/${{ inputs.service }}/*.gradle*'
+          service: ${{ inputs.service }}
 
       - name: Run Java Tests
         id: java-tests
@@ -145,15 +143,14 @@ jobs:
       # Node.js Services: currencyservice, paymentservice
       # Note: These services currently have no tests ("Error: no test specified")
       # =====================================================================
-      - name: Setup Node.js
+      - name: Setup Node.js Environment
         if: |
           inputs.service == 'currencyservice' ||
           inputs.service == 'paymentservice'
-        uses: actions/setup-node@v4
+        uses: ./.github/actions/setup-node-env
         with:
-          node-version: '20'  # Use LTS for better compatibility with native modules
-          cache: 'npm'
-          cache-dependency-path: 'src/${{ inputs.service }}/package-lock.json'
+          node-version: '20'
+          service: ${{ inputs.service }}
 
       - name: Run Node.js Tests (Placeholder)
         id: nodejs-tests
