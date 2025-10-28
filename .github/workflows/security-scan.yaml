@@ -432,6 +432,8 @@ jobs:
 
       - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
+        env:
+          OWASP_OSS_INDEX_API_TOKEN: ${{ secrets.SONA_TOKEN }}
         with:
           project: 'online-boutique'
           path: 'src/'
@@ -439,7 +441,6 @@ jobs:
           out: 'dependency-check-report'
           args: >-
             --disableNodeAudit
-            --disableOssIndex
 
       - name: Fix SARIF URI Schemes (OWASP)
         if: always()
