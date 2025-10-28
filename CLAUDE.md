@@ -608,6 +608,307 @@ source .envrc                              # Reload credentials
 - Cost-effective for smaller deployments or testing
 - See `kustomize/overlays/README.md` for detailed promotion workflow
 
+## GitHub Actions Best Practices & Antipatterns
+
+### Security Best Practices
+
+**✅ DO:**
+
+1. **Pin Actions to Full Commit SHA**
+   ```yaml
+   # Good - Pinned to specific commit SHA
+   - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab  # v3.5.2
+
+   # Bad - Uses mutable tag
+   - uses: actions/checkout@v3
+   ```
+   - Only way to use an action as an immutable release
+   - Prevents bad actors from adding backdoors via tag updates
+   - Include version comment for human readability
+
+2. **Limit Token Permissions (Principle of Least Privilege)**
+   ```yaml
+   # Good - Minimal permissions
+   permissions:
+     contents: read
+     pull-requests: write
+
+   # Bad - Overly permissive
+   permissions: write-all
+   ```
+   - Set default GITHUB_TOKEN to read-only
+   - Grant write permissions only where needed
+   - Use job-level permissions for fine-grained control
+
+3. **Use Environment Secrets with Protection Rules**
+   ```yaml
+   environment:
+     name: production
+     url: ${{ steps.deploy.outputs.url }}
+   ```
+   - Environment secrets enforce mandatory reviews before access
+   - Implement approval gates for sensitive environments (prod)
+   - Use environment-specific secrets instead of repository-level
+
+4. **Pass Secrets Explicitly to Steps**
+   ```yaml
+   # Good - Only expose needed secret
+   - name: Deploy
+     env:
+       API_KEY: ${{ secrets.DEPLOY_API_KEY }}
+     run: ./deploy.sh
+
+   # Bad - Exposes all secrets
+   - name: Deploy
+     env: ${{ toJson(secrets) }}
+     run: ./deploy.sh
+   ```
+
+5. **Use Verified Actions from Trusted Publishers**
+   - Prefer actions from GitHub (`actions/*`) or verified publishers
+   - Audit third-party actions before use
+   - Only 4.8% of marketplace actions are from verified creators
+   - 18% of actions have known vulnerable dependencies
+
+6. **Implement Branch Protection Rules**
+   ```yaml
+   # In repository settings
+   - Require pull request reviews
+   - Require status checks to pass
+   - Enforce for administrators
+   - Restrict who can push to main
+   ```
+
+**❌ DON'T:**
+
+1. **Avoid `workflow_run` Without Caution**
+   - Can lead to privilege escalation attacks
+   - Carefully validate inputs from fork PRs
+   - Use `pull_request_target` with explicit checkout of PR code
+
+2. **Don't Log Secrets or Sensitive Data**
+   ```yaml
+   # Bad
+   - run: echo "API_KEY=${{ secrets.API_KEY }}"
+
+   # Good
+   - run: ./deploy.sh
+     env:
+       API_KEY: ${{ secrets.API_KEY }}
+   ```
+
+3. **Don't Trust Fork PR Code in Sensitive Workflows**
+   - Use `pull_request` (not `pull_request_target`) for untrusted code
+   - Never expose secrets to fork PRs without approval
+   - Review code before merging to trigger sensitive workflows
+
+### Performance & Maintainability Best Practices
+
+**✅ DO:**
+
+1. **Use Dependency Caching**
+   ```yaml
+   - name: Cache dependencies
+     uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84  # v3.3.2
+     with:
+       path: |
+         ~/.npm
+         ~/.cache/pip
+         ~/.m2/repository
+       key: ${{ runner.os }}-deps-${{ hashFiles('**/package-lock.json', '**/requirements.txt', '**/pom.xml') }}
+       restore-keys: |
+         ${{ runner.os }}-deps-
+   ```
+   - Cache npm, pip, Maven, Gradle dependencies
+   - Use hash of dependency files in cache key
+   - Provide restore-keys for fallback
+   - Can reduce build time by 40-60%
+
+2. **Create Reusable Workflows for Common Patterns**
+   ```yaml
+   # .github/workflows/reusable-build.yaml
+   name: Reusable Build
+   on:
+     workflow_call:
+       inputs:
+         service-name:
+           required: true
+           type: string
+       secrets:
+         AWS_ACCESS_KEY_ID:
+           required: true
+
+   # Caller workflow
+   jobs:
+     build-frontend:
+       uses: ./.github/workflows/reusable-build.yaml
+       with:
+         service-name: frontend
+       secrets: inherit
+   ```
+   - Reduces duplication across workflows
+   - Centralizes maintenance
+   - Use for: builds, deployments, security scans
+
+3. **Use Composite Actions for Repeated Steps**
+   ```yaml
+   # .github/actions/setup-environment/action.yaml
+   name: Setup Environment
+   description: Setup common build environment
+   runs:
+     using: composite
+     steps:
+       - uses: actions/setup-node@1a4442cacd436585916779262731d5b162bc6ec7  # v3
+       - uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4
+       - name: Install dependencies
+         shell: bash
+         run: |
+           npm ci
+           pip install -r requirements.txt
+
+   # Use in workflows
+   - uses: ./.github/actions/setup-environment
+   ```
+
+4. **Implement Matrix Builds for Multi-Environment Testing**
+   ```yaml
+   strategy:
+     matrix:
+       environment: [dev, qa, prod]
+       node-version: [16, 18, 20]
+   steps:
+     - uses: actions/setup-node@v3
+       with:
+         node-version: ${{ matrix.node-version }}
+   ```
+
+5. **Use Job Outputs for Data Sharing**
+   ```yaml
+   jobs:
+     build:
+       outputs:
+         image-tag: ${{ steps.build.outputs.tag }}
+       steps:
+         - id: build
+           run: echo "tag=v1.2.3" >> $GITHUB_OUTPUT
+
+     deploy:
+       needs: build
+       steps:
+         - run: deploy.sh ${{ needs.build.outputs.image-tag }}
+   ```
+
+6. **Organize Workflows by Purpose**
+   - One workflow = one primary purpose (test, build, deploy, security)
+   - Use workflow_dispatch for manual triggers
+   - Use workflow_call for reusable components
+   - Separate fast checks (lint, unit tests) from slow ones (e2e, deploy)
+
+**❌ DON'T:**
+
+1. **Avoid Monolithic Workflows**
+   ```yaml
+   # Bad - Everything in one workflow
+   - Lint, test, build, security scan, deploy all in one file
+   - Hard to debug, slow to run, difficult to maintain
+
+   # Good - Separate workflows
+   - lint.yaml (runs on every PR, fast feedback)
+   - test.yaml (unit + integration tests)
+   - security.yaml (SAST, dependency scan)
+   - deploy.yaml (triggered by merge or manual)
+   ```
+
+2. **Don't Cache Large, Frequently Changing Files**
+   - Avoid caching node_modules directly (cache npm cache instead)
+   - Don't cache build artifacts that change every run
+   - Cache restoration can be slower than rebuilding for volatile data
+
+3. **Don't Repeat Setup Steps Across Jobs**
+   ```yaml
+   # Bad - Repeated in every job
+   jobs:
+     test:
+       steps:
+         - uses: actions/checkout@v3
+         - uses: actions/setup-node@v3
+         - run: npm ci
+         - run: npm test
+
+     lint:
+       steps:
+         - uses: actions/checkout@v3
+         - uses: actions/setup-node@v3
+         - run: npm ci
+         - run: npm run lint
+
+   # Good - Use composite action or reusable workflow
+   ```
+
+4. **Don't Hard-Code Values**
+   ```yaml
+   # Bad
+   - run: docker tag myapp:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/myapp:latest
+
+   # Good - Use inputs, secrets, or variables
+   - run: docker tag ${{ inputs.service }}:latest ${{ secrets.ECR_REGISTRY }}/${{ inputs.service }}:latest
+   ```
+
+### Workflow Design Patterns
+
+**When to Use Reusable Workflows:**
+
+- Need to reuse entire job with multiple steps
+- Different runner types needed (Linux vs Windows)
+- Complex multi-job workflows
+- Environment-specific deployments
+
+**When to Use Composite Actions:**
+
+- Reusing a set of steps within a job
+- Steps run on the same runner
+- Logic packaged as custom action
+- Setup/teardown patterns
+
+**When to Use Matrix Builds:**
+
+- Testing across multiple versions (Node 16, 18, 20)
+- Multi-environment deployments (dev, qa, prod)
+- Cross-platform builds (Linux, macOS, Windows)
+
+### Current Project Opportunities
+
+Based on analysis in [docs/_archive/WORKFLOW-REFACTORING-ANALYSIS.md](docs/_archive/WORKFLOW-REFACTORING-ANALYSIS.md):
+
+**Identified Issues:**
+
+- 100+ duplicated code blocks across 12 workflows
+- Missing dependency caching (40-60% faster builds possible)
+- No composite actions for setup steps
+- Hardcoded values in multiple places
+- Monolithic workflows mixing concerns
+
+**Recommended Actions:**
+
+1. Create composite actions for:
+   - AWS authentication setup
+   - Docker/ECR login
+   - Terraform setup
+   - Kubernetes config
+2. Implement dependency caching for:
+   - npm (frontend, currencyservice, paymentservice)
+   - pip (emailservice, recommendationservice, loadgenerator)
+   - Maven (adservice, shoppingassistantservice)
+   - Go modules (checkout, product catalog, shipping)
+   - NuGet (cartservice)
+3. Extract reusable workflows for:
+   - Multi-service builds
+   - Environment deployments
+   - Security scanning
+4. Use matrix strategy for:
+   - Building 12 services
+   - Deploying to 3 environments
+
 ## Common Pitfalls
 
 1. **Forgetting to source .envrc**: AWS commands fail with "credentials not found"
