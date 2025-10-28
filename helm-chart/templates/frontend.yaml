@@ -42,8 +42,6 @@ spec:
     metadata:
       labels:
         app: {{ .Values.frontend.name }}
-      annotations:
-        sidecar.istio.io/rewriteAppHTTPProbers: "true"
     spec:
       {{- if .Values.serviceAccounts.create }}
       serviceAccountName: {{ .Values.frontend.name }}

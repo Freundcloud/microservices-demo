@@ -130,17 +130,14 @@ jobs:
           if ! kubectl get namespace $NAMESPACE 2>/dev/null; then
             echo "⚠️ Namespace $NAMESPACE does not exist, creating..."
             kubectl create namespace $NAMESPACE
-            kubectl label namespace $NAMESPACE istio-injection=enabled --overwrite
-            echo "✅ Namespace created and labeled for Istio injection"
+            echo "✅ Namespace created"
 
             echo "### 🆕 Namespace Created" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Created namespace \`$NAMESPACE\` with Istio injection enabled" >> $GITHUB_STEP_SUMMARY
+            echo "Created namespace \`$NAMESPACE\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           else
             echo "✅ Namespace $NAMESPACE exists"
-            # Ensure Istio injection label is set
-            kubectl label namespace $NAMESPACE istio-injection=enabled --overwrite
           fi
 
       - name: Preview Kustomize Configuration
@@ -255,8 +252,8 @@ jobs:
       - name: Get Frontend URL
         id: get-url
         run: |
-          # Get Istio Ingress Gateway URL
-          FRONTEND_URL=$(kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          # Get AWS ALB Ingress URL
+          FRONTEND_URL=$(kubectl get ingress frontend-ingress -n microservices-${{ inputs.environment }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
 
           if [ -z "$FRONTEND_URL" ]; then
             echo "⚠️ Frontend URL not available yet (LoadBalancer still provisioning)"

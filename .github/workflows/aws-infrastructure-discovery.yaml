@@ -13,7 +13,7 @@ name: AWS Infrastructure Discovery (Terraform State)
 # ✅ ECR repositories (all 12 microservices)
 # ✅ IAM Roles, Policies, IRSA configurations
 # ✅ Load Balancers, Auto Scaling Groups
-# ✅ Helm releases (Istio)
+# ✅ Helm releases (ALB Controller, Metrics Server)
 #
 # ServiceNow CMDB Tables Used:
 # - cmdb_ci_network (VPC)
@@ -435,7 +435,7 @@ jobs:
 
           echo "iam_role_count=$IAM_ROLE_COUNT" >> $GITHUB_OUTPUT
 
-      - name: Discover Helm releases (Istio)
+      - name: Discover Helm releases (ALB Controller, Metrics Server)
         id: discover-helm
         run: |
           echo "### ⎈ Helm Releases Discovery" >> $GITHUB_STEP_SUMMARY

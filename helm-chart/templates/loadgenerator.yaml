@@ -43,8 +43,6 @@ spec:
     metadata:
       labels:
         app: {{ .Values.loadGenerator.name }}
-      annotations:
-        sidecar.istio.io/rewriteAppHTTPProbers: "true"
     spec:
       {{- if .Values.serviceAccounts.create }}
       serviceAccountName: {{ .Values.loadGenerator.name }}

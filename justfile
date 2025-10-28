@@ -45,7 +45,6 @@ setup-tools:
     @echo "Installing pre-commit hooks..."
     @pip install --user pre-commit 2>/dev/null || echo "⚠️  pip not found, skipping pre-commit"
     @echo "Installing useful tools (optional)..."
-    @echo "  - istioctl: For Istio debugging"
     @echo "  - k9s: Terminal UI for Kubernetes"
     @echo "  - helm: Package manager for Kubernetes"
     @echo "  - grpcurl: Test gRPC services"
@@ -55,8 +54,6 @@ setup-tools:
 # Install optional development tools
 install-optional-tools:
     @echo "📦 Installing optional tools..."
-    @echo "Installing istioctl..."
-    @curl -L https://istio.io/downloadIstio | sh - || echo "⚠️  Failed to install istioctl"
     @echo "Installing k9s..."
     @brew install k9s || echo "⚠️  brew not found, install k9s manually"
     @echo "Installing helm..."
@@ -166,7 +163,7 @@ k8s-config:
 k8s-deploy:
     @echo "🚢 Deploying application to Kubernetes..."
     kubectl apply -f release/kubernetes-manifests.yaml
-    kubectl apply -f istio-manifests/
+    kubectl apply -f kubernetes-manifests/frontend-ingress.yaml
 
 # Get status of all pods
 k8s-status:
@@ -190,7 +187,7 @@ k8s-forward service port:
 # Get application URL
 k8s-url:
     @echo "🌐 Application URL:"
-    @kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+    @kubectl get ingress frontend-ingress -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
     @echo ""
 
 # Restart a deployment
@@ -202,44 +199,6 @@ k8s-restart service:
 k8s-scale service replicas:
     @echo "⚖️  Scaling {{service}} to {{replicas}} replicas..."
     kubectl scale deployment/{{service}} --replicas={{replicas}} -n default
-
-# ==============================================================================
-# Istio Service Mesh
-# ==============================================================================
-
-# Access Kiali dashboard
-istio-kiali:
-    @echo "🎨 Opening Kiali dashboard..."
-    @echo "Access at: http://localhost:20001"
-    kubectl port-forward svc/kiali-server -n istio-system 20001:20001
-
-# Access Grafana dashboard
-istio-grafana:
-    @echo "📊 Opening Grafana dashboard..."
-    @echo "Access at: http://localhost:3000"
-    kubectl port-forward svc/grafana -n istio-system 3000:80
-
-# Access Jaeger tracing UI
-istio-jaeger:
-    @echo "🔍 Opening Jaeger tracing UI..."
-    @echo "Access at: http://localhost:16686"
-    kubectl port-forward svc/jaeger-query -n istio-system 16686:16686
-
-# Access Prometheus
-istio-prometheus:
-    @echo "📈 Opening Prometheus..."
-    @echo "Access at: http://localhost:9090"
-    kubectl port-forward svc/prometheus-server -n istio-system 9090:80
-
-# Analyze Istio configuration
-istio-analyze:
-    @echo "🔍 Analyzing Istio configuration..."
-    istioctl analyze -n default
-
-# Check Istio proxy status
-istio-status:
-    @echo "📊 Istio proxy status:"
-    istioctl proxy-status
 
 # ==============================================================================
 # Container Operations
@@ -316,20 +275,6 @@ validate:
 # Development Workflows
 # ==============================================================================
 
-# Run development environment (all dashboards)
-dev-dashboards:
-    @echo "🎨 Starting all development dashboards..."
-    @echo "This will open multiple port forwards. Press Ctrl+C to stop all."
-    @echo ""
-    @echo "Kiali: http://localhost:20001"
-    @echo "Grafana: http://localhost:3000"
-    @echo "Jaeger: http://localhost:16686"
-    @echo ""
-    @parallel -j 3 \
-        kubectl port-forward svc/kiali-server -n istio-system 20001:20001 ::: \
-        kubectl port-forward svc/grafana -n istio-system 3000:80 ::: \
-        kubectl port-forward svc/jaeger-query -n istio-system 16686:16686
-
 # Clean up local Docker images
 clean-docker:
     @echo "🧹 Cleaning up local Docker images..."
@@ -382,7 +327,7 @@ dev-help:
     @echo "  just tf-apply         - Deploy infrastructure"
     @echo "  just k8s-deploy           - Deploy application"
     @echo "  just k8s-status           - Check cluster status"
-    @echo "  just istio-kiali          - Open service mesh dashboard"
+    @echo "  just k8s-url              - Get application URL"
     @echo "  just validate             - Run all checks"
     @echo ""
     @echo "Run 'just' to see all available commands"
@@ -422,9 +367,6 @@ quickstart:
     @echo ""
     @echo "4. Access the application:"
     @echo "   just k8s-url"
-    @echo ""
-    @echo "5. View dashboards:"
-    @echo "   just istio-kiali"
     @echo ""
     @echo "For more details, see docs/README.md"
 
@@ -790,7 +732,7 @@ cluster-status:
     @kubectl get nodes -L workload -L environment --sort-by=.metadata.labels.workload
     @echo ""
     @echo "📦 Pods by Namespace:"
-    @kubectl get pods --all-namespaces | grep -E "NAMESPACE|istio-system|microservices|kube-system" | grep -v "Completed"
+    @kubectl get pods --all-namespaces | grep -E "NAMESPACE|microservices|kube-system" | grep -v "Completed"
     @echo ""
     @echo "🔧 Cluster Add-ons:"
     @kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller,app.kubernetes.io/name=cluster-autoscaler
@@ -860,9 +802,6 @@ health-check:
     @echo "✅ Checking System Pods..."
     @kubectl get pods -n kube-system --no-headers | grep -v Running | grep -v Completed || echo "  All system pods running"
     @echo ""
-    @echo "✅ Checking Istio..."
-    @kubectl get pods -n istio-system --no-headers | grep -v Running | grep -v Completed || echo "  All Istio pods running"
-    @echo ""
     @echo "✅ Checking Add-ons..."
     @kubectl get deploy -n kube-system aws-load-balancer-controller metrics-server cluster-autoscaler 2>/dev/null | tail -n +2 || echo "  ⚠️  Some add-ons not found"
 
@@ -887,46 +826,10 @@ quotas-info NAMESPACE="":
         kubectl describe limitrange -n {{NAMESPACE}}
     fi
 
-# Monitor Istio service mesh health
-istio-health:
-    @echo "🕸️  Istio Service Mesh Health"
-    @echo "============================"
-    @echo ""
-    @echo "Control Plane:"
-    @kubectl get pods -n istio-system -l app=istiod
-    @echo ""
-    @echo "Ingress Gateway:"
-    @kubectl get pods -n istio-system -l app=istio-ingressgateway
-    @echo ""
-    @echo "Proxy Status:"
-    @istioctl proxy-status 2>/dev/null || echo "⚠️  istioctl not installed"
-    @echo ""
-    @echo "Configuration Analysis:"
-    @istioctl analyze --all-namespaces 2>/dev/null || echo "⚠️  istioctl not installed"
-
-# Show Istio ingress gateway URL and status
-istio-ingress-info:
-    @echo "🌐 Istio Ingress Gateway Information"
-    @echo "===================================="
-    @echo ""
-    @echo "Gateway Service:"
-    @kubectl get svc -n istio-system istio-ingressgateway
-    @echo ""
-    @echo "External URL:"
-    @echo "  http://$(kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
-    @echo ""
-    @echo "Gateway Configuration:"
-    @kubectl get gateway -n default
-
 # Tail logs from all pods in a deployment
 logs-tail DEPLOYMENT NAMESPACE="default":
     @echo "📜 Tailing logs for {{DEPLOYMENT}} in {{NAMESPACE}}..."
     @kubectl logs -f -n {{NAMESPACE}} -l app={{DEPLOYMENT}} --all-containers=true --tail=50
-
-# Show logs from Istio sidecar proxy
-logs-proxy POD NAMESPACE="default":
-    @echo "📜 Istio proxy logs for {{POD}} in {{NAMESPACE}}..."
-    @kubectl logs -n {{NAMESPACE}} {{POD}} -c istio-proxy --tail=100
 
 # Describe a pod with full details
 pod-describe POD NAMESPACE="default":
@@ -1048,14 +951,10 @@ diagnostics OUTPUT_DIR="./diagnostics":
     kubectl get pods --all-namespaces -o wide > {{OUTPUT_DIR}}/pods.txt
     kubectl get events --all-namespaces --sort-by=.metadata.creationTimestamp > {{OUTPUT_DIR}}/events.txt
     
-    echo "Collecting Istio info..."
-    kubectl get all -n istio-system > {{OUTPUT_DIR}}/istio-resources.txt 2>&1
-    istioctl proxy-status > {{OUTPUT_DIR}}/istio-proxy-status.txt 2>&1 || true
-    
     echo "Collecting logs..."
     mkdir -p {{OUTPUT_DIR}}/logs
-    for ns in kube-system istio-system default; do
-        for pod in $(kubectl get pods -n $ns -o name); do
+    for ns in kube-system default microservices-dev microservices-qa microservices-prod; do
+        for pod in $(kubectl get pods -n $ns -o name 2>/dev/null); do
             podname=$(echo $pod | cut -d'/' -f2)
             kubectl logs -n $ns $pod --all-containers=true > {{OUTPUT_DIR}}/logs/${ns}-${podname}.log 2>&1 || true
         done
@@ -1076,12 +975,6 @@ cluster-help:
     @echo "  just nodes-usage             - Node resource usage"
     @echo "  just pods-usage [NAMESPACE]  - Pod resource usage"
     @echo ""
-    @echo "🕸️  Istio Service Mesh:"
-    @echo "  just istio-health            - Istio control plane status"
-    @echo "  just istio-ingress-info      - Gateway URL and status"
-    @echo "  just istio-kiali             - Open Kiali dashboard"
-    @echo "  just istio-grafana           - Open Grafana dashboard"
-    @echo ""
     @echo "📜 Logs & Events:"
     @echo "  just logs-tail DEPLOYMENT [NS]  - Stream deployment logs"
     @echo "  just events-watch [NAMESPACE]   - Watch events live"
@@ -1095,7 +988,6 @@ cluster-help:
     @echo "🔍 Troubleshooting:"
     @echo "  just diagnostics [DIR]       - Generate diagnostic bundle"
     @echo "  just pod-describe POD [NS]   - Pod details"
-    @echo "  just logs-proxy POD [NS]     - Istio sidecar logs"
     @echo ""
     @echo "Run 'just' to see all commands"
 

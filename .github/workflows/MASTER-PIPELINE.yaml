@@ -540,7 +540,7 @@ jobs:
       - name: Test Frontend Endpoint
         id: test-frontend
         run: |
-          # Get frontend URL from Istio ingress
+          # Get frontend URL from AWS ALB Ingress
           FRONTEND_URL=$(kubectl get svc -n istio-system istio-ingressgateway \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
 
