@@ -401,8 +401,11 @@ echo "2. Check ServiceNow Change Requests:"
 echo "   https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/change_request_list.do"
 echo ""
 echo "3. View frontend applications:"
-echo "   - DEV: \`just k8s-url\`"
-echo "   - QA: Check Istio ingress gateway"
-echo "   - PROD: Check Istio ingress gateway"
+DEV_URL=$(kubectl get ingress frontend-ingress -n microservices-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not deployed yet")
+QA_URL=$(kubectl get ingress frontend-ingress -n microservices-qa -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not deployed yet")
+PROD_URL=$(kubectl get ingress frontend-ingress -n microservices-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not deployed yet")
+echo "   - DEV: http://$DEV_URL"
+echo "   - QA: http://$QA_URL"
+echo "   - PROD: http://$PROD_URL"
 echo ""
 echo "✨ Done!"
