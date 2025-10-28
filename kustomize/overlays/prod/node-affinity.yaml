@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # This patch adds node affinity and tolerations to ensure pods
-# can be scheduled on the ultra-minimal single-node cluster
-# Configuration for: 1x t3.large "all-in-one" node with role=all-in-one, workload=shared
+# can be scheduled on the multi-node cluster
+# Configuration for: 4x t3.large nodes with role=general, workload=multi-env
 
 apiVersion: apps/v1
 kind: Deployment
@@ -23,15 +23,15 @@ metadata:
 spec:
   template:
     spec:
-      # Node selector - target shared all-in-one node
+      # Node selector - target general multi-environment nodes
       nodeSelector:
-        role: all-in-one
-        workload: shared
+        role: general
+        workload: multi-env
 
-      # No tolerations needed - all-in-one node has no taints
+      # No tolerations needed - nodes have no taints
       tolerations: []
 
-      # Node affinity - target the all-in-one node
+      # Node affinity - prefer general nodes for multi-environment workloads
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -41,8 +41,8 @@ spec:
               - key: role
                 operator: In
                 values:
-                - all-in-one
+                - general
               - key: workload
                 operator: In
                 values:
-                - shared
+                - multi-env
