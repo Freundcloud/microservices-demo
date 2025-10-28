@@ -217,7 +217,7 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
     -d "$VUL_ITEM_PAYLOAD" \
     "$SERVICENOW_INSTANCE_URL/api/now/table/sn_vul_vulnerable_item")
 
-  VUL_ITEM_SYS_ID=$(echo "$VUL_ITEM_CREATE" | jq -r '.result.sys_id')
+  VUL_ITEM_SYS_ID=$(echo "$VUL_ITEM_CREATE" | jq -r '.result.sys_id // empty')
 
   if [ -n "$VUL_ITEM_SYS_ID" ] && [ "$VUL_ITEM_SYS_ID" != "null" ]; then
     ((UPLOAD_COUNT++))
@@ -225,7 +225,17 @@ for i in $(seq 0 $((VUL_ARRAY_LENGTH - 1))); do
   else
     ((ERROR_COUNT++))
     echo -e "  ${RED}✗${NC} $CVE_ID - Failed to create vulnerable item"
-    echo "  API Response: $(echo "$VUL_ITEM_CREATE" | jq -c '.')"
+    # Print full API response for debugging
+    ERROR_MSG=$(echo "$VUL_ITEM_CREATE" | jq -r '.error.message // .error // "Unknown error"')
+    ERROR_DETAIL=$(echo "$VUL_ITEM_CREATE" | jq -r '.error.detail // empty')
+    echo "    Error: $ERROR_MSG"
+    if [ -n "$ERROR_DETAIL" ]; then
+      echo "    Detail: $ERROR_DETAIL"
+    fi
+    # Print full response in debug mode (first 500 chars)
+    if [ "${DEBUG:-false}" = "true" ]; then
+      echo "    Full response: $(echo "$VUL_ITEM_CREATE" | jq -c '.' | cut -c1-500)"
+    fi
   fi
 done
 
