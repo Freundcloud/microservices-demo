@@ -25,9 +25,11 @@ for SARIF_FILE in "$@"; do
         echo "$GIT_URIS" | sed 's/^/     /'
     else
         echo "   No git:// URIs found (file may already be fixed)"
+        # Skip processing if no URIs to fix
+        continue
     fi
 
-    # Create backup
+    # Create backup (only if we need to fix URIs)
     cp "$SARIF_FILE" "${SARIF_FILE}.bak"
 
     # Replace git:// with file:// in URIs
