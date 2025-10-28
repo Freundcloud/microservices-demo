@@ -27,6 +27,13 @@ echo "Version: $VERSION"
 echo "Services: $SERVICES"
 echo ""
 
+# Set default repository for gh CLI if not already set
+REPO_OWNER=$(git remote get-url origin | sed -n 's#.*/\([^/]*\)/\([^/]*\)\.git#\1#p' || echo "")
+REPO_NAME=$(git remote get-url origin | sed -n 's#.*/\([^/]*\)/\([^/]*\)\.git#\2#p' || echo "")
+if [ -n "$REPO_OWNER" ] && [ -n "$REPO_NAME" ]; then
+    gh repo set-default "$REPO_OWNER/$REPO_NAME" 2>/dev/null || true
+fi
+
 # Ensure we're on main and up to date
 echo "📥 Ensuring main branch is up to date..."
 git checkout main 2>/dev/null || true
