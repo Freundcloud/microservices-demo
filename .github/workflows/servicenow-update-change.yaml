@@ -1,3 +1,4 @@
+---
 name: "ServiceNow Update Change Request"
 
 on:
@@ -36,7 +37,7 @@ on:
         description: 'Use token-based authentication (v2.0+) instead of basic auth'
         required: false
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -185,7 +186,7 @@ Please review workflow logs for error details."
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Update Change Request (Token Auth)
-        if: inputs.use_token_auth
+        if: inputs.use_token_auth == true
         id: update-token
         continue-on-error: true
         uses: ServiceNow/servicenow-devops-update-change@v2.0.0
