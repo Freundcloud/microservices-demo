@@ -199,10 +199,9 @@ jobs:
           sleep 3
           echo "✅ Deployment complete"
 
-      # Update Change to add work notes and move to Implement state
-      # Note: Can't jump directly to Closed (state 3) due to state transition rules
-      # State -1 (Draft) → State 2 (Implement) is a valid transition
-      - name: Update Change Request (Implement)
+      # Update Change to add work notes
+      # Note: Only updating work_notes, not changing state due to strict transition rules
+      - name: Update Change Request (Add Work Notes)
         uses: ServiceNow/servicenow-devops-update-change@v3.1.0
         id: update-change
         continue-on-error: true
@@ -215,8 +214,7 @@ jobs:
           change-request-number: ${{ steps.create-rest.outputs.change_number }}
           change-request-details: >-
             {
-              "work_notes":"✅ Deployment to ${{ inputs.environment }} completed successfully\n\nWorkflow: ${{ github.workflow }}\nRun ID: ${{ github.run_id }}\nActor: ${{ github.actor }}\n\nTested Actions:\n- Create Change (REST API): ${{ steps.create-rest.outputs.change_number }}\n- Get Change: ${{ steps.get-change.outputs.status }}\n- Update Change: Testing now...",
-              "state":"2"
+              "work_notes":"✅ Deployment to ${{ inputs.environment }} completed successfully\n\nWorkflow: ${{ github.workflow }}\nRun ID: ${{ github.run_id }}\nActor: ${{ github.actor }}\n\nTested Actions:\n- Create Change (REST API): ${{ steps.create-rest.outputs.change_number }}\n- DevOps Change: Registered deployment\n- Get Change: ${{ steps.get-change.outputs.status }}\n- Update Change: Adding work notes now"
             }
 
       - name: Deployment Summary
@@ -236,7 +234,7 @@ jobs:
             echo "1. **Create Change (REST API):** ✅ ${{ steps.create-rest.outputs.change_number }}"
             echo "2. **Get Change Details:** ${{ steps.get-change.outputs.status == 'success' && '✅' || '❌' }} Status: ${{ steps.get-change.outputs.status }}"
             echo "3. **DevOps Change Action:** ${{ steps.create.conclusion == 'success' && '✅' || '⚠️' }} (DevOps registration)"
-            echo "4. **Update Change (Move to Implement):** ${{ steps.update-change.outputs.status == 'success' && '✅' || '❌' }} Status: ${{ steps.update-change.outputs.status }}"
+            echo "4. **Update Change (Add Work Notes):** ${{ steps.update-change.outputs.status == 'success' && '✅' || '❌' }} Status: ${{ steps.update-change.outputs.status }}"
             echo ""
 
             echo "### ServiceNow Update Change Action (v3.1.0)"
