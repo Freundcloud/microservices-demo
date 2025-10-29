@@ -207,8 +207,6 @@ jobs:
           filters: |
             terraform:
               - 'terraform-aws/**'
-              - '.github/workflows/MASTER-PIPELINE.yaml'
-              - '.github/workflows/terraform-*.yaml'
 
   terraform-plan:
     name: "📊 Terraform Plan"
@@ -223,7 +221,7 @@ jobs:
 
   terraform-apply:
     name: "🏗️ Deploy Infrastructure"
-    needs: [pipeline-init, terraform-plan, security-scans]
+    needs: [pipeline-init, detect-terraform-changes, terraform-plan, security-scans]
     if: |
       needs.detect-terraform-changes.outputs.terraform_changed == 'true' &&
       !inputs.skip_terraform &&
