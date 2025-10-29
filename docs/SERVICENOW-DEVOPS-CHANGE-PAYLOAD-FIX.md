@@ -92,14 +92,45 @@ curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 "subcategory": "Deployment",           // ❌ May not exist in change_request table
 "assigned_to": "Olaf Krasicki-Freund", // ❌ Should be sys_id, not display name
 "justification": "..."                 // ❌ Not a standard change_request field
+"risk": "3",                           // ❌ EXPLICITLY FORBIDDEN by ServiceNow
+"impact": "3"                          // ❌ EXPLICITLY FORBIDDEN by ServiceNow
 ```
 
 **Why These Failed**:
 - `subcategory`: Field may not exist in `change_request` table or may require specific values
 - `assigned_to`: Same issue as `assignment_group` - requires sys_id, not display name
 - `justification`: Not a standard field in `change_request` table (custom field would need to be created)
+- **`risk` and `impact`**: **EXPLICITLY FORBIDDEN** by ServiceNow DevOps Change action documentation
 
 **Result**: ServiceNow rejected the payload due to invalid/unsupported fields.
+
+#### 4. Forbidden Fields (CRITICAL)
+
+**Official ServiceNow Documentation States**:
+
+> "All fields in the Change Request table are supported **except risk, impact and risk_impact_analysis**."
+
+**Source**: [ServiceNow DevOps Change GitHub Documentation](https://github.com/ServiceNow/servicenow-devops-change)
+
+These three fields **MUST NOT** be included in the change-request payload:
+- ❌ `risk` - Explicitly forbidden
+- ❌ `impact` - Explicitly forbidden
+- ❌ `risk_impact_analysis` - Explicitly forbidden
+
+**Failing Workflow** (BEFORE fix):
+```json
+"priority": "${{ inputs.environment == 'prod' && '2' || '3' }}",  // ✅ Supported
+"risk": "${{ inputs.environment == 'prod' && '2' || '3' }}",       // ❌ FORBIDDEN
+"impact": "${{ inputs.environment == 'prod' && '2' || '3' }}"      // ❌ FORBIDDEN
+```
+
+**Fixed Workflow** (AFTER fix):
+```json
+"priority": "${{ inputs.environment == 'prod' && '2' || '3' }}"   // ✅ Supported
+// risk and impact fields REMOVED
+```
+
+**Why This Matters**: Including forbidden fields causes ServiceNow API to return internal server error (500 status). The action cannot process change requests with these fields present.
 
 ## Solution Implemented
 
@@ -133,6 +164,8 @@ curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 4. ✅ **Removed** `"subcategory": "Deployment"`
 5. ✅ **Removed** `"assigned_to": "Olaf Krasicki-Freund"`
 6. ✅ **Removed** `"justification": "..."`
+7. ✅ **Removed** `"risk": "3"` (FORBIDDEN field)
+8. ✅ **Removed** `"impact": "3"` (FORBIDDEN field)
 
 ### Workflow File Updated
 
@@ -140,7 +173,9 @@ curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 
 **Lines Changed**: 95-116
 
-**Commit**: `e7d6f062`
+**Commits**:
+- `e7d6f062` - Initial fix (assignment_group to sys_id, add top-level fields, remove invalid fields)
+- `d11a637d` - Remove forbidden risk/impact fields
 
 ## Verification Steps
 
@@ -187,6 +222,34 @@ https://calitiiltddemo3.service-now.com/nav_to.do?uri=change_request.do?sysparm_
 - **Priority**: 3
 - **Risk**: 3
 - **Impact**: 3
+
+## Supported vs Forbidden Fields
+
+### Explicitly Supported Fields
+
+According to [ServiceNow DevOps Change documentation](https://github.com/ServiceNow/servicenow-devops-change):
+
+✅ **Core Fields**:
+- `short_description` - Brief summary of the change
+- `description` - Detailed description
+- `assignment_group` - Group responsible (MUST be sys_id)
+- `implementation_plan` - How to implement
+- `backout_plan` - How to rollback
+- `test_plan` - How to verify
+
+✅ **Additional Supported Fields**:
+- `type` - Change type (standard, normal, emergency)
+- `category` - Change category
+- `priority` - Change priority (1-5)
+- `state` - Change state
+- All other standard change_request table fields
+
+❌ **Explicitly FORBIDDEN Fields**:
+- `risk` - Cannot be set via DevOps Change action
+- `impact` - Cannot be set via DevOps Change action
+- `risk_impact_analysis` - Cannot be set via DevOps Change action
+
+**Important**: These three fields are explicitly excluded from the DevOps Change action. If you need to set risk/impact, you must use a different method (direct REST API, Business Rules, etc.).
 
 ## Lessons Learned
 
