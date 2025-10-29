@@ -135,6 +135,25 @@ kubectl get pods -n microservices-dev
 
 ## 📖 Additional Documentation
 
+### ServiceNow DevOps Action Reference
+
+Official ServiceNow DevOps Change action documentation:
+
+- **[ServiceNow DevOps Action Success Guide](SERVICENOW-DEVOPS-ACTION-SUCCESS.md)** - Working configuration
+  - Authentication setup (Basic Auth vs Token)
+  - Test results and verification
+  - Comparison with REST API integration
+
+- **[ServiceNow DevOps Action Troubleshooting](SERVICENOW-DEVOPS-ACTION-TROUBLESHOOTING.md)** - Complete troubleshooting guide
+  - Prerequisites and plugin installation
+  - Authentication issues and solutions
+  - Demo instance limitations
+
+- **[ServiceNow DevOps Changes Troubleshooting](SERVICENOW-DEVOPS-CHANGES-TROUBLESHOOTING.md)** - UI visibility issues
+  - Why changes don't appear in DevOps UI
+  - changeControl: false behavior
+  - Alternative table locations
+
 ### Still Available (in _archive)
 - Detailed architecture guides
 - Development workflows
