@@ -3,6 +3,25 @@ name: "☁️ SonarCloud Code Quality"
 
 "on":
   workflow_call:  # Reusable workflow
+    outputs:
+      quality_gate:
+        description: "Quality gate status (passed/failed/warning)"
+        value: ${{ jobs.sonarcloud-scan.outputs.status }}
+      bugs:
+        description: "Number of bugs detected"
+        value: ${{ jobs.sonarcloud-scan.outputs.bugs }}
+      vulnerabilities:
+        description: "Number of vulnerabilities detected"
+        value: ${{ jobs.sonarcloud-scan.outputs.vulnerabilities }}
+      code_smells:
+        description: "Number of code smells detected"
+        value: ${{ jobs.sonarcloud-scan.outputs.code_smells }}
+      coverage:
+        description: "Code coverage percentage"
+        value: ${{ jobs.sonarcloud-scan.outputs.coverage }}
+      duplications:
+        description: "Duplication percentage"
+        value: ${{ jobs.sonarcloud-scan.outputs.duplications }}
     secrets:
       SONAR_TOKEN:
         description: 'SonarCloud authentication token'
@@ -34,6 +53,13 @@ jobs:
   sonarcloud-scan:
     name: SonarCloud Analysis
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.get-results.outputs.status }}
+      bugs: ${{ steps.get-results.outputs.bugs }}
+      vulnerabilities: ${{ steps.get-results.outputs.vulnerabilities }}
+      code_smells: ${{ steps.get-results.outputs.code_smells }}
+      coverage: ${{ steps.get-results.outputs.coverage }}
+      duplications: ${{ steps.get-results.outputs.duplications }}
 
     steps:
       - name: Checkout Code
@@ -101,6 +127,65 @@ jobs:
           args: >
             -Dsonar.organization=freundcloud
             -Dsonar.projectKey=Freundcloud_microservices-demo
+
+      - name: Get SonarCloud Results
+        id: get-results
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "Waiting for SonarCloud analysis to complete..."
+          sleep 30
+
+          PROJECT_KEY="Freundcloud_microservices-demo"
+
+          # Get quality gate status
+          echo "Fetching quality gate status..."
+          QUALITY_GATE=$(curl -s -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/qualitygates/project_status?projectKey=$PROJECT_KEY" \
+            | jq -r '.projectStatus.status // "NONE"')
+
+          echo "Quality Gate: $QUALITY_GATE"
+
+          # Get metrics
+          echo "Fetching project metrics..."
+          METRICS=$(curl -s -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/measures/component?component=$PROJECT_KEY&metricKeys=bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density" \
+            | jq '.component.measures // []')
+
+          # Extract individual metrics
+          BUGS=$(echo "$METRICS" | jq -r '.[] | select(.metric=="bugs") | .value // "0"')
+          VULNS=$(echo "$METRICS" | jq -r '.[] | select(.metric=="vulnerabilities") | .value // "0"')
+          SMELLS=$(echo "$METRICS" | jq -r '.[] | select(.metric=="code_smells") | .value // "0"')
+          COVERAGE=$(echo "$METRICS" | jq -r '.[] | select(.metric=="coverage") | .value // "0"')
+          DUPS=$(echo "$METRICS" | jq -r '.[] | select(.metric=="duplicated_lines_density") | .value // "0"')
+
+          # Map quality gate status to simple values
+          if [ "$QUALITY_GATE" = "OK" ]; then
+            STATUS="passed"
+          elif [ "$QUALITY_GATE" = "ERROR" ]; then
+            STATUS="failed"
+          elif [ "$QUALITY_GATE" = "WARN" ]; then
+            STATUS="warning"
+          else
+            STATUS="unknown"
+          fi
+
+          # Output results
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "bugs=${BUGS}" >> $GITHUB_OUTPUT
+          echo "vulnerabilities=${VULNS}" >> $GITHUB_OUTPUT
+          echo "code_smells=${SMELLS}" >> $GITHUB_OUTPUT
+          echo "coverage=${COVERAGE}%" >> $GITHUB_OUTPUT
+          echo "duplications=${DUPS}%" >> $GITHUB_OUTPUT
+
+          # Display summary
+          echo "✓ SonarCloud Results Retrieved:"
+          echo "  Quality Gate: $QUALITY_GATE ($STATUS)"
+          echo "  Bugs: ${BUGS}"
+          echo "  Vulnerabilities: ${VULNS}"
+          echo "  Code Smells: ${SMELLS}"
+          echo "  Coverage: ${COVERAGE}%"
+          echo "  Duplications: ${DUPS}%"
 
       - name: Upload SonarCloud Results to ServiceNow
         if: ${{ !inputs.skip_servicenow && !github.event.pull_request }}
