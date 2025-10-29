@@ -450,12 +450,7 @@ jobs:
       description: |
         Kubernetes deployment of microservices application to ${{ needs.pipeline-init.outputs.environment }} environment.
 
-        Environment: ${{ needs.pipeline-init.outputs.environment }}
-        Namespace: microservices-${{ needs.pipeline-init.outputs.environment }}
-        Deployment Method: Kustomize overlays
-        Triggered by: ${{ github.actor }}
-        Commit: ${{ github.sha }}
-        Workflow: ${{ github.workflow }}
+        All deployment metadata is available in dedicated custom fields below.
       implementation_plan: |
         1. Configure kubectl access to EKS cluster
         2. Ensure namespace microservices-${{ needs.pipeline-init.outputs.environment }} exists

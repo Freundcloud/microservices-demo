@@ -239,9 +239,10 @@ jobs:
           APPLICATION_URL="${{ inputs.application_url }}"
 
           # Build the JSON payload using jq
+          # Note: Detailed metadata (repository, commit, environment, etc.) is now stored in dedicated custom fields
           PAYLOAD=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
-            --arg description "$DESCRIPTION\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nRepository: ${{ github.repository }}\n\nSecurity Scan: $SECURITY_STATUS (Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM)" \
+            --arg description "$DESCRIPTION" \
             --arg type "standard" \
             --arg state "$STATE" \
             --arg priority "$PRIORITY" \

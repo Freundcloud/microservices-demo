@@ -131,10 +131,12 @@ jobs:
             --arg work_notes "${{ steps.work-notes.outputs.work_notes }}" \
             --arg close_code "${{ steps.determine-state.outputs.close_code }}" \
             --arg close_notes "${{ steps.determine-state.outputs.close_notes }}" \
+            --arg application_url "${{ inputs.frontend_url || '' }}" \
             '{
               "work_notes": $work_notes,
               "close_code": $close_code,
-              "close_notes": $close_notes
+              "close_notes": $close_notes,
+              "u_application_url": $application_url
             }')
 
           echo "Payload (without state field):"
