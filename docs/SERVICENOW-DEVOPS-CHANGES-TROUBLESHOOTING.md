@@ -79,9 +79,10 @@ curl -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 **Solution:**
 If you need traditional change requests created, configure ServiceNow DevOps plugin to enable `changeControl`.
 
-**Alternative - View Deployments Instead:**
-- Go to **DevOps > Deployments**
-- These show all deployment registrations regardless of `changeControl` setting
+**Alternative - View Task Executions Instead:**
+- Go to **DevOps > Task Executions**
+- These show all deployment executions regardless of `changeControl` setting
+- URL: `https://calitiiltddemo3.service-now.com/sn_devops_task_execution_list.do`
 
 #### 4. **Wrong Table/View**
 
@@ -89,17 +90,30 @@ You might be looking in the wrong ServiceNow table.
 
 **Different Places to Check:**
 
-| Table | URL | What It Shows |
-|-------|-----|---------------|
-| Traditional Change Requests | `/change_request_list.do` | All CRs (including non-DevOps) |
-| DevOps Change Requests | `/sn_devops_change_request_list.do` | DevOps-created CRs only |
-| DevOps Deployments | `/sn_devops_deployment_list.do` | All deployment registrations |
-| DevOps Task Executions | `/sn_devops_task_execution_list.do` | Pipeline task executions |
+| Table | URL | What It Shows | Exists in Demo Instance |
+|-------|-----|---------------|------------------------|
+| Traditional Change Requests | `/change_request_list.do` | All CRs (including non-DevOps) | ✅ Yes |
+| DevOps Task Executions | `/sn_devops_task_execution_list.do` | Pipeline task executions | ✅ Yes |
+| DevOps Pipelines | `/sn_devops_pipeline_list.do` | Registered pipelines | ✅ Yes |
+| DevOps Change Requests | `/sn_devops_change_request_list.do` | DevOps-created CRs only | ❌ No (table doesn't exist) |
+| DevOps Deployments | `/sn_devops_deployment_list.do` | All deployment registrations | ❌ No (table doesn't exist) |
 
-**Try:**
-```
-https://<instance>.service-now.com/now/nav/ui/classic/params/target/sn_devops_deployment_list.do
-```
+**Working URLs for this instance:**
+
+1. **Task Executions** (✅ This is where deployment data is):
+   ```
+   https://calitiiltddemo3.service-now.com/sn_devops_task_execution_list.do
+   ```
+
+2. **Pipelines** (shows registered GitHub workflows):
+   ```
+   https://calitiiltddemo3.service-now.com/sn_devops_pipeline_list.do
+   ```
+
+3. **Alternative format** (with navigation path):
+   ```
+   https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_task_execution_list.do
+   ```
 
 #### 5. **Plugin Not Configured**
 
@@ -189,13 +203,16 @@ If `changeControl: true`, check traditional CRs:
 https://<instance>.service-now.com/change_request_list.do?sysparm_query=u_source=GitHub%20Actions
 ```
 
-### Step 4: Check DevOps Deployments Table
+### Step 4: Check DevOps Task Executions Table
 
+**Correct URL** (this table exists in demo instance):
 ```
-https://<instance>.service-now.com/sn_devops_deployment_list.do
+https://calitiiltddemo3.service-now.com/sn_devops_task_execution_list.do
 ```
 
-This shows ALL deployments, regardless of `changeControl` setting.
+This shows ALL pipeline task executions, regardless of `changeControl` setting.
+
+**Note**: The `sn_devops_deployment` table does NOT exist in the demo instance. Use `sn_devops_task_execution` instead.
 
 ## Expected Behavior
 
@@ -215,8 +232,9 @@ ServiceNow/servicenow-devops-change@v6.1.0
 - If `changeControl: false` ➜ NO CR, only DevOps registration
 
 **4. Visible In:**
-- ✅ DevOps Deployments table (always)
-- ✅ DevOps Changes view (if `changeControl: true`)
+- ✅ DevOps Task Executions table (always) - `sn_devops_task_execution_list.do`
+- ✅ DevOps Pipelines table (always) - `sn_devops_pipeline_list.do`
+- ✅ DevOps Changes view (if `changeControl: true` and table exists)
 - ✅ Traditional Change Requests table (if `changeControl: true`)
 
 ## Quick Resolution
@@ -230,15 +248,22 @@ ServiceNow/servicenow-devops-change@v6.1.0
 
 2. **Wait for completion** (~5-10 minutes)
 
-3. **Check DevOps Deployments:**
+3. **Check DevOps Task Executions** (this is where data appears):
    ```
-   https://<instance>.service-now.com/sn_devops_deployment_list.do
+   https://calitiiltddemo3.service-now.com/sn_devops_task_execution_list.do
    ```
 
-4. **Check DevOps Changes (if changeControl enabled):**
+4. **Check DevOps Pipelines** (shows registered workflows):
+   ```
+   https://calitiiltddemo3.service-now.com/sn_devops_pipeline_list.do
+   ```
+
+5. **Check DevOps Changes** (only if `changeControl: true` and table exists):
    ```
    https://<instance>.service-now.com/sn_devops_change_request_list.do
    ```
+
+   **Note**: This table does NOT exist in the demo instance - use Task Executions instead.
 
 ## Still No Changes?
 
