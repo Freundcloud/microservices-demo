@@ -541,6 +541,35 @@ Example data from actual run:
 - **Traceability**: Can track infrastructure and application changes separately
 - **Timing**: Infrastructure must be ready before application deployment
 
+### When Are Infrastructure Change Requests Created?
+
+**Infrastructure CRs are ONLY created when Terraform code changes** (files in `terraform-aws/`).
+
+**Change Detection Logic**:
+```yaml
+# In .github/workflows/MASTER-PIPELINE.yaml
+filters: |
+  terraform:
+    - 'terraform-aws/**'
+```
+
+**Examples**:
+
+✅ **Creates Infrastructure CR**:
+- Edit `terraform-aws/eks.tf` → Terraform plan/apply runs → Infrastructure CR created
+- Edit `terraform-aws/vpc.tf` → Terraform plan/apply runs → Infrastructure CR created
+- Edit `terraform-aws/variables.tf` → Terraform plan/apply runs → Infrastructure CR created
+
+❌ **Does NOT create Infrastructure CR**:
+- Edit `.github/workflows/MASTER-PIPELINE.yaml` → Terraform jobs skipped → No infrastructure CR
+- Edit `.github/workflows/terraform-apply.yaml` → Terraform jobs skipped → No infrastructure CR
+- Edit `src/frontend/main.go` → Terraform jobs skipped → No infrastructure CR
+- Edit `docs/README.md` → Terraform jobs skipped → No infrastructure CR
+
+**Result**:
+- Most deployments: **1 CR** (application deployment only)
+- Infrastructure changes: **2 CRs** (infrastructure + application deployment)
+
 ### Which One Should Approvers Review?
 
 **For Application Quality Approval**: Review the **Application Deployment** change request
