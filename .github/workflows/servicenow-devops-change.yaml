@@ -167,7 +167,7 @@ jobs:
             {
               "build_number": "${{ github.run_id }}/attempts/${{ github.run_attempt }}",
               "pipeline_name": "${{ github.repository }}/${{ github.workflow }}",
-              "stage_name": "devops-change"
+              "stage_name": "Register Deployment (${{ inputs.environment }})"
             }
 
       - name: Output Get Change Results
