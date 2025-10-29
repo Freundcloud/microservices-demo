@@ -194,14 +194,16 @@ jobs:
           # Determine state based on environment
           # ServiceNow state values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed, 4=Canceled
           # State flow enforced by business rules: New → Assess → Authorize → Scheduled → Implement → Review → Closed
+          # Dev: Auto-deploy (Scheduled state, no approval needed)
+          # QA/Prod: Requires manual approval (Assess state)
           if [ "${{ inputs.environment }}" = "dev" ]; then
-            STATE="-2"  # Scheduled (approved and scheduled, ready to deploy)
+            STATE="-2"  # Scheduled (auto-approved, ready to deploy)
             PRIORITY="3"       # Low priority
           elif [ "${{ inputs.environment }}" = "qa" ]; then
-            STATE="-2"  # Scheduled (approved and scheduled, ready to deploy)
+            STATE="-4"  # Assess (requires manual approval for QA)
             PRIORITY="3"       # Medium priority
           else
-            STATE="-4"  # Assess (requires manual approval/authorization for production)
+            STATE="-4"  # Assess (requires manual approval for production)
             PRIORITY="2"       # High priority (production)
           fi
 
@@ -517,12 +519,13 @@ jobs:
 
             # Accept if:
             # 1. State is Scheduled (-2) or Implement (-1) - already authorized, ready to deploy
-            # 2. State is Review (0) with approval=approved
+            # 2. Approval is approved (any state except Assess/New)
+            # 3. State is Review (0) - post-deployment
             if [ "$STATE" = "-2" ] || [ "$STATE" = "-1" ]; then
               echo "✅ Change Request authorized (state: $STATE) - ready for deployment"
               exit 0
-            elif [ "$APPROVAL" = "approved" ] && [ "$STATE" = "0" ]; then
-              echo "✅ Change Request approved in Review state - ready for deployment"
+            elif [ "$APPROVAL" = "approved" ]; then
+              echo "✅ Change Request approved (approval: $APPROVAL, state: $STATE) - ready for deployment"
               exit 0
             elif [ "$APPROVAL" = "rejected" ]; then
               echo "❌ Change Request was rejected"
