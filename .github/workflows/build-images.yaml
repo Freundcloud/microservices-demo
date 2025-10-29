@@ -541,6 +541,245 @@ jobs:
           DEBUG: 'true'
         continue-on-error: true
 
+      # ============================================================
+      # SBOM GENERATION (No OCI storage - artifacts only)
+      # ============================================================
+
+      - name: Generate SBOM with Syft (CycloneDX)
+        if: inputs.push_images
+        uses: anchore/sbom-action@v0.17.2
+        with:
+          image: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+          artifact-name: sbom-${{ matrix.service }}-cyclonedx
+          output-file: sbom-${{ matrix.service }}.cyclonedx.json
+          format: cyclonedx-json
+          upload-artifact: true
+          upload-artifact-retention: 90
+
+      - name: Generate SBOM with Syft (SPDX)
+        if: inputs.push_images
+        uses: anchore/sbom-action@v0.17.2
+        with:
+          image: ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+          artifact-name: sbom-${{ matrix.service }}-spdx
+          output-file: sbom-${{ matrix.service }}.spdx.json
+          format: spdx-json
+          upload-artifact: true
+          upload-artifact-retention: 90
+
+      - name: Generate SBOM Summary
+        if: inputs.push_images
+        run: |
+          echo "## 📦 Software Bill of Materials" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count total components
+          if [ -f "sbom-${{ matrix.service }}.cyclonedx.json" ]; then
+            TOTAL=$(jq '.components | length' sbom-${{ matrix.service }}.cyclonedx.json)
+            echo "**Total Components:** $TOTAL" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Count by type
+            echo "**Component Types:**" >> $GITHUB_STEP_SUMMARY
+            jq -r '.components | group_by(.type) | .[] | "- \(length) \(.[0].type)s"' sbom-${{ matrix.service }}.cyclonedx.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # List top 10 components
+            echo "**Top Components:**" >> $GITHUB_STEP_SUMMARY
+            jq -r '.components[:10] | .[] | "- \(.name) \(.version // "unknown")"' sbom-${{ matrix.service }}.cyclonedx.json >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # ============================================================
+      # IMAGE SIGNING (Keyless with Cosign - no OCI attachment)
+      # ============================================================
+
+      - name: Install Cosign
+        if: inputs.push_images
+        uses: sigstore/cosign-installer@v3.7.0
+
+      - name: Sign Container Image (Keyless - signature to file)
+        if: inputs.push_images
+        run: |
+          # Sign image and save signature to file (not OCI registry)
+          cosign sign --yes \
+            --output-signature=signature-${{ matrix.service }}.sig \
+            --output-certificate=certificate-${{ matrix.service }}.pem \
+            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}
+
+          echo "✅ Image signed successfully"
+          echo "   Signature: signature-${{ matrix.service }}.sig"
+          echo "   Certificate: certificate-${{ matrix.service }}.pem"
+
+          # Display certificate details
+          openssl x509 -in certificate-${{ matrix.service }}.pem -text -noout | grep -A 3 "Subject:"
+        continue-on-error: true
+
+      - name: Upload Signature and Certificate as Artifacts
+        if: inputs.push_images
+        uses: actions/upload-artifact@v4
+        with:
+          name: signatures-${{ matrix.service }}
+          path: |
+            signature-${{ matrix.service }}.sig
+            certificate-${{ matrix.service }}.pem
+          retention-days: 90
+
+      # ============================================================
+      # SERVICENOW INTEGRATION
+      # ============================================================
+
+      - name: Upload SBOM to ServiceNow
+        if: inputs.push_images
+        run: |
+          # Read SBOM
+          if [ ! -f "sbom-${{ matrix.service }}.cyclonedx.json" ]; then
+            echo "⚠️ SBOM file not found, skipping upload"
+            exit 0
+          fi
+
+          SBOM_DATA=$(cat sbom-${{ matrix.service }}.cyclonedx.json | jq -c '.')
+          COMPONENT_COUNT=$(echo "$SBOM_DATA" | jq '.components | length')
+
+          # Create compact SBOM summary (to avoid 413 errors)
+          SBOM_SUMMARY=$(echo "$SBOM_DATA" | jq -c '{
+            bomFormat: .bomFormat,
+            specVersion: .specVersion,
+            serialNumber: .serialNumber,
+            version: .version,
+            metadata: .metadata,
+            componentCount: (.components | length),
+            components: [.components[] | {name, version, type, purl}]
+          }')
+
+          # Create ServiceNow payload
+          PAYLOAD=$(jq -n \
+            --arg service "${{ matrix.service }}" \
+            --arg version "${{ inputs.environment }}-${{ github.sha }}" \
+            --arg image "${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}" \
+            --arg sbom_summary "$SBOM_SUMMARY" \
+            --arg format "CycloneDX 1.5 JSON" \
+            --arg component_count "$COMPONENT_COUNT" \
+            --arg generated_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg repository "${{ github.repository }}" \
+            --arg commit "${{ github.sha }}" \
+            --arg workflow_run "${{ github.run_id }}" \
+            --arg artifact_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              u_service_name: $service,
+              u_image_version: $version,
+              u_image_uri: $image,
+              u_sbom_summary: $sbom_summary,
+              u_sbom_format: $format,
+              u_component_count: $component_count,
+              u_generated_at: $generated_at,
+              u_repository: $repository,
+              u_commit_sha: $commit,
+              u_workflow_run: $workflow_run,
+              u_artifact_url: $artifact_url
+            }')
+
+          # Upload to ServiceNow (u_container_sbom table)
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/u_container_sbom")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            SBOM_SYSID=$(echo "$BODY" | jq -r '.result.sys_id')
+            echo "✅ SBOM uploaded to ServiceNow (sys_id: $SBOM_SYSID)"
+            echo "   Components: $COMPONENT_COUNT"
+          else
+            echo "⚠️ SBOM upload failed (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+          fi
+        continue-on-error: true
+
+      - name: Upload Image Provenance to ServiceNow
+        if: inputs.push_images
+        run: |
+          # Check if signature files exist
+          SIGNED="false"
+          if [ -f "signature-${{ matrix.service }}.sig" ] && [ -f "certificate-${{ matrix.service }}.pem" ]; then
+            SIGNED="true"
+
+            # Extract certificate details
+            CERT_SUBJECT=$(openssl x509 -in certificate-${{ matrix.service }}.pem -noout -subject | sed 's/subject=//')
+            CERT_ISSUER=$(openssl x509 -in certificate-${{ matrix.service }}.pem -noout -issuer | sed 's/issuer=//')
+            CERT_FINGERPRINT=$(openssl x509 -in certificate-${{ matrix.service }}.pem -noout -fingerprint -sha256 | cut -d'=' -f2)
+          else
+            CERT_SUBJECT=""
+            CERT_ISSUER=""
+            CERT_FINGERPRINT=""
+          fi
+
+          # Create provenance payload
+          PAYLOAD=$(jq -n \
+            --arg service "${{ matrix.service }}" \
+            --arg version "${{ inputs.environment }}-${{ github.sha }}" \
+            --arg image "${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ inputs.environment }}" \
+            --arg signed "$SIGNED" \
+            --arg signature_method "cosign-keyless" \
+            --arg oidc_issuer "https://token.actions.githubusercontent.com" \
+            --arg certificate_identity "${{ github.repository }}" \
+            --arg cert_subject "$CERT_SUBJECT" \
+            --arg cert_issuer "$CERT_ISSUER" \
+            --arg cert_fingerprint "$CERT_FINGERPRINT" \
+            --arg workflow_run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg artifact_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg built_by "${{ github.actor }}" \
+            --arg built_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg commit_sha "${{ github.sha }}" \
+            --arg branch "${{ github.ref_name }}" \
+            '{
+              u_service_name: $service,
+              u_image_version: $version,
+              u_image_uri: $image,
+              u_signed: $signed,
+              u_signature_method: $signature_method,
+              u_oidc_issuer: $oidc_issuer,
+              u_certificate_identity: $certificate_identity,
+              u_certificate_subject: $cert_subject,
+              u_certificate_issuer: $cert_issuer,
+              u_certificate_fingerprint: $cert_fingerprint,
+              u_workflow_run_url: $workflow_run,
+              u_signature_artifact_url: $artifact_url,
+              u_built_by: $built_by,
+              u_built_at: $built_at,
+              u_commit_sha: $commit_sha,
+              u_branch: $branch
+            }')
+
+          # Upload to ServiceNow (u_container_provenance table)
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/u_container_provenance")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            PROV_SYSID=$(echo "$BODY" | jq -r '.result.sys_id')
+            echo "✅ Provenance uploaded to ServiceNow (sys_id: $PROV_SYSID)"
+            echo "   Signed: $SIGNED"
+            echo "   Certificate Fingerprint: $CERT_FINGERPRINT"
+          else
+            echo "⚠️ Provenance upload failed (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+          fi
+        continue-on-error: true
+
       - name: Push to ECR
         if: inputs.push_images
         uses: docker/build-push-action@v5
