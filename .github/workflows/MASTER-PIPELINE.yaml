@@ -480,6 +480,11 @@ jobs:
       security_scanners: 'CodeQL, Trivy, Semgrep, OWASP Dependency Check, Gitleaks, Checkov, Kubesec'
       pr_number: ${{ github.event.pull_request.number || '' }}
       previous_version: '${{ needs.get-deployed-version.outputs.previous_version }}'
+      # Security scan results from dependency-review job
+      security_scan_status: '${{ needs.security-scans.outputs.test_result }}'
+      critical_vulnerabilities: '${{ needs.security-scans.outputs.critical_count }}'
+      high_vulnerabilities: '${{ needs.security-scans.outputs.high_count }}'
+      medium_vulnerabilities: '${{ needs.security-scans.outputs.medium_count }}'
 
   deploy-to-environment:
     name: "🚀 Deploy Application"

@@ -3,6 +3,28 @@ name: "Security Scanning (Reusable)"
 
 "on":
   workflow_call:  # Primary trigger for reusable workflow
+    outputs:
+      test_result:
+        description: "Overall security scan result (passed/failed)"
+        value: ${{ jobs.dependency-review.outputs.test_result }}
+      critical_count:
+        description: "Number of critical vulnerabilities"
+        value: ${{ jobs.dependency-review.outputs.critical_count }}
+      high_count:
+        description: "Number of high vulnerabilities"
+        value: ${{ jobs.dependency-review.outputs.high_count }}
+      medium_count:
+        description: "Number of medium vulnerabilities"
+        value: ${{ jobs.dependency-review.outputs.medium_count }}
+      low_count:
+        description: "Number of low vulnerabilities"
+        value: ${{ jobs.dependency-review.outputs.low_count }}
+      total_count:
+        description: "Total number of vulnerabilities"
+        value: ${{ jobs.dependency-review.outputs.total_count }}
+      summary:
+        description: "Security scan summary"
+        value: ${{ jobs.dependency-review.outputs.summary }}
   workflow_dispatch:  # Allow manual runs for testing
 
 permissions:

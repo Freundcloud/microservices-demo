@@ -69,6 +69,27 @@ on:
         required: false
         type: string
         default: ''
+      # Security scan results
+      security_scan_status:
+        description: 'Overall security scan status (passed/failed/warning)'
+        required: false
+        type: string
+        default: ''
+      critical_vulnerabilities:
+        description: 'Count of critical severity vulnerabilities'
+        required: false
+        type: string
+        default: '0'
+      high_vulnerabilities:
+        description: 'Count of high severity vulnerabilities'
+        required: false
+        type: string
+        default: '0'
+      medium_vulnerabilities:
+        description: 'Count of medium severity vulnerabilities'
+        required: false
+        type: string
+        default: '0'
     outputs:
       change_number:
         description: "ServiceNow Change Request Number"
@@ -179,10 +200,28 @@ jobs:
             SERVICE_NAME="Online Boutique (PROD)"
           fi
 
+          # Determine security scan status
+          SECURITY_STATUS="${{ inputs.security_scan_status }}"
+          CRITICAL="${{ inputs.critical_vulnerabilities }}"
+          HIGH="${{ inputs.high_vulnerabilities }}"
+          MEDIUM="${{ inputs.medium_vulnerabilities }}"
+
+          # Auto-determine status if not provided
+          if [ -z "$SECURITY_STATUS" ]; then
+            if [ "$CRITICAL" != "0" ] || [ "$HIGH" != "0" ]; then
+              SECURITY_STATUS="warning"
+            else
+              SECURITY_STATUS="passed"
+            fi
+          fi
+
+          # Build security scan URL
+          SECURITY_URL="https://github.com/${{ github.repository }}/security/code-scanning"
+
           # Build the JSON payload using jq
           PAYLOAD=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
-            --arg description "$DESCRIPTION\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nRepository: ${{ github.repository }}" \
+            --arg description "$DESCRIPTION\n\nTriggered by: ${{ github.actor }}\nCommit: ${{ github.sha }}\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nRepository: ${{ github.repository }}\n\nSecurity Scan: $SECURITY_STATUS (Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM)" \
             --arg type "standard" \
             --arg state "$STATE" \
             --arg priority "$PRIORITY" \
@@ -193,7 +232,7 @@ jobs:
             --arg risk "$RISK" \
             --arg impact "$IMPACT" \
             --arg urgency "3" \
-            --arg justification "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow." \
+            --arg justification "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow. Security scans: $SECURITY_STATUS" \
             --arg impl_plan "$IMPL_PLAN" \
             --arg backout_plan "$BACKOUT_PLAN" \
             --arg test_plan "$TEST_PLAN" \
@@ -217,6 +256,11 @@ jobs:
             --arg u_security_scanners "$SCANNERS" \
             --arg u_previous_version "${{ inputs.previous_version }}" \
             --arg u_commit_message "$COMMIT_MESSAGE" \
+            --arg u_security_scan_status "$SECURITY_STATUS" \
+            --arg u_critical_vulnerabilities "$CRITICAL" \
+            --arg u_high_vulnerabilities "$HIGH" \
+            --arg u_medium_vulnerabilities "$MEDIUM" \
+            --arg u_security_scan_url "$SECURITY_URL" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -253,7 +297,12 @@ jobs:
               u_infrastructure_changes: $u_infrastructure_changes,
               u_security_scanners: $u_security_scanners,
               u_previous_version: $u_previous_version,
-              u_commit_message: $u_commit_message
+              u_commit_message: $u_commit_message,
+              u_security_scan_status: $u_security_scan_status,
+              u_critical_vulnerabilities: $u_critical_vulnerabilities,
+              u_high_vulnerabilities: $u_high_vulnerabilities,
+              u_medium_vulnerabilities: $u_medium_vulnerabilities,
+              u_security_scan_url: $u_security_scan_url
             }'
           )
 
