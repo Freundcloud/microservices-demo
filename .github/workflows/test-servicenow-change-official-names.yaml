@@ -1,0 +1,88 @@
+name: 🧪 Test ServiceNow Change with Official Secret Names
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+        default: 'dev'
+
+jobs:
+  test-official-secrets:
+    name: Test with Official Secret Names
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 🎯 Create Change with Official Action (Official Secret Names)
+        id: create-change
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        with:
+          # Using EXACT secret names from official documentation
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
+          # GitHub context (required)
+          context-github: ${{ toJSON(github) }}
+
+          # Job name (must match job name attribute)
+          job-name: 'test-official-secrets'
+
+          # Change request (using format from official docs)
+          change-request: |
+            {
+              "attributes": {
+                "short_description": "TEST - Official Secret Names - ${{ inputs.environment }}",
+                "description": "Testing with exact secret names from official ServiceNow documentation",
+                "assignment_group": "DevOps Team",
+                "implementation_plan": "Test deployment using official secret names",
+                "backout_plan": "Rollback test",
+                "test_plan": "Verify change request creation"
+              }
+            }
+
+          # Timeouts
+          interval: '100'
+          timeout: '3600'
+          changeCreationTimeOut: '3600'
+        continue-on-error: true
+
+      - name: 📊 Display Result
+        run: |
+          echo "=========================================="
+          echo "Test Result"
+          echo "=========================================="
+          echo ""
+
+          if [ "${{ steps.create-change.outcome }}" = "success" ]; then
+            echo "✅ SUCCESS! Official action works with official secret names!"
+            echo ""
+            echo "Change Request:"
+            echo "  Number: ${{ steps.create-change.outputs.change-request-number }}"
+            echo "  Sys ID: ${{ steps.create-change.outputs.change-request-sys-id }}"
+            echo ""
+            echo "🎉 This means we can use the official action!"
+            echo ""
+            echo "Benefits:"
+            echo "  ✅ Maintained by ServiceNow"
+            echo "  ✅ Enhanced error logging"
+            echo "  ✅ Built-in retry logic"
+            echo "  ✅ Auto-close support"
+          else
+            echo "❌ FAILED - Same issue persists"
+            echo ""
+            echo "This confirms the issue is NOT about secret names."
+            echo "The problem is the callback URL requirement for deployment gates."
+            echo ""
+            echo "Continue with Custom REST API approach."
+          fi
