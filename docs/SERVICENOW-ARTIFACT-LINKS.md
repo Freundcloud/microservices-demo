@@ -17,25 +17,25 @@ Every change request created by GitHub Actions now includes **direct links** to 
 
 ### 2. Scroll to Custom Fields Section
 
-The artifact links are located in custom URL fields near the bottom of the change request form:
+The artifact links are located in custom URL fields near the bottom of the change request form. They display as **clickable hyperlinks**:
 
-| Field Name | What It Links To | When Available |
-|-----------|------------------|----------------|
-| **SBOM URL** (`u_sbom_url`) | Software Bill of Materials in CycloneDX JSON format | Every deployment |
-| **Signatures URL** (`u_signatures_url`) | Cosign signatures and certificates for all Docker images | When images are built |
-| **SARIF Results URL** (`u_sarif_results_url`) | Security scan results in GitHub Security Tab (CodeQL, Trivy, etc.) | Every deployment |
-| **Infrastructure Report URL** (`u_infrastructure_report_url`) | Infrastructure discovery report (Markdown + JSON) | When discovery runs |
-| **GitHub Artifacts URL** (`u_github_artifacts_url`) | All artifacts in one page (SBOM, signatures, reports) | Every deployment |
+| Field Label in ServiceNow | Field Name | What It Links To | When Available |
+|---------------------------|-----------|------------------|----------------|
+| **SBOM Artifact** | `u_sbom_url` | Software Bill of Materials in CycloneDX JSON format | Every deployment |
+| **Image Signatures** | `u_signatures_url` | Cosign signatures and certificates for all Docker images | When images are built |
+| **Security Scan Results** | `u_sarif_results_url` | Security scan results in GitHub Security Tab (CodeQL, Trivy, etc.) | Every deployment |
+| **Infrastructure Report** | `u_infrastructure_report_url` | Infrastructure discovery report (Markdown + JSON) | When discovery runs |
+| **All GitHub Artifacts** | `u_github_artifacts_url` | All artifacts in one page (SBOM, signatures, reports) | Every deployment |
 
 ### 3. Click the Links
 
 Each URL field is clickable and takes you directly to the artifact in GitHub:
 
-- **SBOM URL** → Opens GitHub Actions run, scrolls to SBOM artifact
-- **Signatures URL** → Opens GitHub Actions run, scrolls to signature artifacts
-- **SARIF Results URL** → Opens GitHub Security → Code Scanning tab with results
-- **Infrastructure Report URL** → Opens GitHub Actions run, scrolls to discovery report
-- **GitHub Artifacts URL** → Opens GitHub Actions run artifacts section (all files)
+- **SBOM Artifact** → Opens GitHub Actions run, scrolls to SBOM artifact
+- **Image Signatures** → Opens GitHub Actions run, scrolls to signature artifacts
+- **Security Scan Results** → Opens GitHub Security → Code Scanning tab with results
+- **Infrastructure Report** → Opens GitHub Actions run, scrolls to discovery report
+- **All GitHub Artifacts** → Opens GitHub Actions run artifacts section (all files)
 
 ## What You Can Download
 
