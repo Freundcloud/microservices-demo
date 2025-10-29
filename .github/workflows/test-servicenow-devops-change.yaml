@@ -77,10 +77,30 @@ jobs:
             {"environment":"${{ inputs.environment }}",
             "jobName":"Deploy to ${{ inputs.environment }}"}
 
+      - name: Get Change Details
+        if: steps.create.outputs.change-request-number != ''
+        uses: ServiceNow/servicenow-devops-get-change@v3.1.0
+        id: get-change
+        with:
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          change-details: >-
+            {"change_request_number":"${{ steps.create.outputs.change-request-number }}"}
+
       - name: Output Change Request Details
         if: always()
         run: |
           echo "change-request-number = ${{ steps.create.outputs.change-request-number }}"
+          echo "change-request-sys-id = ${{ steps.create.outputs.change-request-sys-id }}"
+
+          # Output from Get Change action
+          if [ -n "${{ steps.get-change.outputs.change-request-details }}" ]; then
+            echo "Change details retrieved successfully"
+            echo "${{ steps.get-change.outputs.change-request-details }}"
+          fi
 
           # Add to job summary
           if [ -n "${{ steps.create.outputs.change-request-number }}" ]; then
@@ -88,19 +108,34 @@ jobs:
               echo "## 📝 ServiceNow Change Request Created"
               echo ""
               echo "**Change Number:** ${{ steps.create.outputs.change-request-number }}"
+              echo "**Change Sys ID:** ${{ steps.create.outputs.change-request-sys-id }}"
               echo "**Environment:** ${{ inputs.environment }}"
               echo ""
+
+              if [ -n "${{ steps.get-change.outputs.change-request-details }}" ]; then
+                echo "### Change Details"
+                echo '```json'
+                echo '${{ steps.get-change.outputs.change-request-details }}' | jq '.'
+                echo '```'
+                echo ""
+              fi
+
               SN_URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"
               CR_NUM="${{ steps.create.outputs.change-request-number }}"
               echo "🔗 [View in ServiceNow](${SN_URL}/nav_to.do?uri=change_request.do?sysparm_query=number=${CR_NUM})"
             } >> $GITHUB_STEP_SUMMARY
           else
             {
-              echo "## ❌ ServiceNow Change Request Failed"
+              echo "## ⚠️  ServiceNow DevOps Change Registered"
               echo ""
               echo "**Environment:** ${{ inputs.environment }}"
+              echo "**Status:** Deployment registered in DevOps system"
               echo ""
-              echo "See job logs for details."
+              echo "Note: Modern DevOps workflow (no traditional change request created)"
+              echo ""
+              echo "Check ServiceNow DevOps tables:"
+              echo "- sn_devops_task_execution"
+              echo "- sn_devops_pipeline"
             } >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -110,6 +145,25 @@ jobs:
           echo "Change Request: ${{ steps.create.outputs.change-request-number }}"
           sleep 3
           echo "✅ Deployment complete"
+
+      - name: Update Change Request (Close)
+        if: steps.create.outputs.change-request-number != ''
+        uses: ServiceNow/servicenow-devops-update-change@v3.1.0
+        id: update-change
+        with:
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          change-request-number: ${{ steps.create.outputs.change-request-number }}
+          change-request-details: >-
+            {
+              "state":"3",
+              "close_code":"successful",
+              "close_notes":"Deployment completed successfully via GitHub Actions",
+              "work_notes":"Deployment to ${{ inputs.environment }} environment completed.\nWorkflow: ${{ github.workflow }}\nRun ID: ${{ github.run_id }}\nActor: ${{ github.actor }}"
+            }
 
       - name: Deployment Summary
         if: always()
@@ -126,7 +180,12 @@ jobs:
             echo ""
             if [ -n "${{ steps.create.outputs.change-request-number }}" ]; then
               echo "✅ ServiceNow change request created successfully"
+              if [ "${{ steps.update-change.outputs.status }}" = "success" ]; then
+                echo "✅ Change request closed successfully"
+              elif [ -n "${{ steps.update-change.outputs.status }}" ]; then
+                echo "⚠️  Change request update status: ${{ steps.update-change.outputs.status }}"
+              fi
             else
-              echo "⚠️  ServiceNow change request creation failed or skipped"
+              echo "⚠️  ServiceNow DevOps change registered (no traditional CR)"
             fi
           } >> $GITHUB_STEP_SUMMARY
