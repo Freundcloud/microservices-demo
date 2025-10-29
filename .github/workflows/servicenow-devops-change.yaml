@@ -99,21 +99,12 @@ jobs:
           # These fields must be omitted from the change-request payload
           # Reference: https://github.com/ServiceNow/servicenow-devops-change
           change-request: >-
-            {
-              "setCloseCode": "false",
-              "autoCloseChange": false,
-              "attributes": {
-                "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
-                "description": "Automated deployment to ${{ inputs.environment }} via GitHub Actions\n\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nActor: ${{ github.actor }}\n\nServices: ${{ inputs.services_deployed }}\nInfrastructure Changes: ${{ inputs.infrastructure_changes }}\n\nSecurity Status: ${{ inputs.security_scan_status }}\nCritical: ${{ inputs.critical_vulnerabilities }}, High: ${{ inputs.high_vulnerabilities }}",
-                "type": "${{ inputs.environment == 'dev' && 'standard' || 'normal' }}",
-                "category": "DevOps",
-                "assignment_group": "a715cd759f2002002920bde8132e7018",
-                "priority": "${{ inputs.environment == 'prod' && '2' || '3' }}",
-                "implementation_plan": "1. Configure kubectl access\n2. Apply Kustomize overlays\n3. Monitor rollout\n4. Verify pods healthy\n5. Test endpoints",
-                "backout_plan": "1. Execute rollout undo\n2. Verify rollback\n3. Monitor status\n4. Test functionality",
-                "test_plan": "1. Verify rollout complete\n2. Check pods Running\n3. Verify endpoints\n4. Test frontend\n5. Monitor metrics"
-              }
-            }
+            {"setCloseCode":"false","autoCloseChange":false,"attributes":{"short_description":"${{ inputs.short_description }} [${{ inputs.environment }}]","description":"Automated deployment to ${{ inputs.environment }} via GitHub Actions\n\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nActor: ${{ github.actor }}\n\nServices: ${{ inputs.services_deployed }}\nInfrastructure Changes: ${{ inputs.infrastructure_changes }}\n\nSecurity Status: ${{ inputs.security_scan_status }}\nCritical: ${{ inputs.critical_vulnerabilities }}, High: ${{ inputs.high_vulnerabilities }}","type":"${{ inputs.environment == 'dev' && 'standard' || 'normal' }}","category":"DevOps","assignment_group":"a715cd759f2002002920bde8132e7018","priority":"${{ inputs.environment == 'prod' && '2' || '3' }}","implementation_plan":"1. Configure kubectl access\n2. Apply Kustomize overlays\n3. Monitor rollout\n4. Verify pods healthy\n5. Test endpoints","backout_plan":"1. Execute rollout undo\n2. Verify rollback\n3. Monitor status\n4. Test functionality","test_plan":"1. Verify rollout complete\n2. Check pods Running\n3. Verify endpoints\n4. Test frontend\n5. Monitor metrics"}}
+
+          # Timeout and interval settings
+          interval: '100'
+          timeout: '3600'
+          changeCreationTimeOut: '3600'
 
           # Abort on change creation failure (only for prod)
           abortOnChangeCreationFailure: ${{ inputs.environment == 'prod' }}
