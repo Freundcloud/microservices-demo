@@ -154,6 +154,17 @@ Official ServiceNow DevOps Change action documentation:
   - changeControl: false behavior
   - Alternative table locations
 
+- **[Enable changeControl Guide](SERVICENOW-ENABLE-CHANGE-CONTROL.md)** - How to enable traditional CRs
+  - ✅ SOLUTION: Remove deployment-gate parameter
+  - Source code analysis and explanation
+  - Traditional CR vs Deployment Gate comparison
+
+- **[Auto-Approval Setup Guide](SERVICENOW-AUTO-APPROVAL-SETUP.md)** - Configure auto-approval for dev
+  - Standard change type configuration
+  - Auto-approval rules and templates
+  - Hybrid approach (fast dev, compliant qa/prod)
+  - Troubleshooting approval issues
+
 ### Still Available (in _archive)
 - Detailed architecture guides
 - Development workflows

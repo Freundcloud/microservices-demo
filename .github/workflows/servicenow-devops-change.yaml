@@ -90,11 +90,14 @@ jobs:
           #   }
 
           # Change request details
+          # For DEV: Uses 'standard' type for auto-approval
+          # For QA/PROD: Uses 'normal' type for manual approval
           change-request: >-
             {
               "attributes": {
                 "short_description": "${{ inputs.short_description }} [${{ inputs.environment }}]",
                 "description": "Automated deployment to ${{ inputs.environment }} via GitHub Actions\n\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_id }}\nActor: ${{ github.actor }}\n\nServices: ${{ inputs.services_deployed }}\nInfrastructure Changes: ${{ inputs.infrastructure_changes }}\n\nSecurity Status: ${{ inputs.security_scan_status }}\nCritical: ${{ inputs.critical_vulnerabilities }}, High: ${{ inputs.high_vulnerabilities }}",
+                "type": "${{ inputs.environment == 'dev' && 'standard' || 'normal' }}",
                 "category": "DevOps",
                 "subcategory": "Deployment",
                 "assignment_group": "GitHubARC DevOps Admin",
@@ -104,7 +107,8 @@ jobs:
                 "impact": "${{ inputs.environment == 'prod' && '2' || '3' }}",
                 "implementation_plan": "1. Configure kubectl access\n2. Apply Kustomize overlays\n3. Monitor rollout\n4. Verify pods healthy\n5. Test endpoints",
                 "backout_plan": "1. Execute rollout undo\n2. Verify rollback\n3. Monitor status\n4. Test functionality",
-                "test_plan": "1. Verify rollout complete\n2. Check pods Running\n3. Verify endpoints\n4. Test frontend\n5. Monitor metrics"
+                "test_plan": "1. Verify rollout complete\n2. Check pods Running\n3. Verify endpoints\n4. Test frontend\n5. Monitor metrics",
+                "justification": "${{ inputs.environment == 'dev' && 'Development environment - low risk deployment with automated testing' || '' }}"
               }
             }
 
