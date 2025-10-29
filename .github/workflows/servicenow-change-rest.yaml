@@ -325,6 +325,25 @@ jobs:
           SONARCLOUD_DUPS="${{ inputs.sonarcloud_duplications }}"
           SONARCLOUD_URL="${{ inputs.sonarcloud_url }}"
 
+          # Build GitHub artifact URLs for approver access
+          # Base URL for this workflow run's artifacts
+          BASE_ARTIFACTS_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Direct link to all artifacts (approvers can download everything from here)
+          GITHUB_ARTIFACTS_URL="${BASE_ARTIFACTS_URL}#artifacts"
+
+          # Security scan results in GitHub Security tab
+          SARIF_RESULTS_URL="https://github.com/${{ github.repository }}/security/code-scanning?query=is:open+ref:refs/heads/$BRANCH_NAME"
+
+          # SBOM artifact (uploaded by security-scan workflow)
+          SBOM_URL="${BASE_ARTIFACTS_URL}#:~:text=sbom.cyclonedx.json"
+
+          # Signatures artifacts (uploaded by build-images workflow)
+          SIGNATURES_URL="${BASE_ARTIFACTS_URL}#:~:text=signatures-"
+
+          # Infrastructure discovery report (if exists)
+          INFRASTRUCTURE_REPORT_URL="${BASE_ARTIFACTS_URL}#:~:text=infrastructure-discovery-"
+
           # Build the JSON payload using jq
           # Note: Detailed metadata (repository, commit, environment, etc.) is now stored in dedicated custom fields
           PAYLOAD=$(jq -n \
@@ -385,6 +404,11 @@ jobs:
             --arg u_sonarcloud_coverage "$SONARCLOUD_COVERAGE" \
             --arg u_sonarcloud_duplications "$SONARCLOUD_DUPS" \
             --arg u_sonarcloud_url "$SONARCLOUD_URL" \
+            --arg u_sbom_url "$SBOM_URL" \
+            --arg u_signatures_url "$SIGNATURES_URL" \
+            --arg u_sarif_results_url "$SARIF_RESULTS_URL" \
+            --arg u_infrastructure_report_url "$INFRASTRUCTURE_REPORT_URL" \
+            --arg u_github_artifacts_url "$GITHUB_ARTIFACTS_URL" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -442,7 +466,12 @@ jobs:
               u_sonarcloud_code_smells: $u_sonarcloud_code_smells,
               u_sonarcloud_coverage: $u_sonarcloud_coverage,
               u_sonarcloud_duplications: $u_sonarcloud_duplications,
-              u_sonarcloud_url: $u_sonarcloud_url
+              u_sonarcloud_url: $u_sonarcloud_url,
+              u_sbom_url: $u_sbom_url,
+              u_signatures_url: $u_signatures_url,
+              u_sarif_results_url: $u_sarif_results_url,
+              u_infrastructure_report_url: $u_infrastructure_report_url,
+              u_github_artifacts_url: $u_github_artifacts_url
             }'
           )
 
