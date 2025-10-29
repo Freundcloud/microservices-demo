@@ -193,14 +193,15 @@ jobs:
         run: |
           # Determine state based on environment
           # ServiceNow state values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed, 4=Canceled
+          # State flow enforced by business rules: New → Assess → Authorize → Scheduled → Implement → Review → Closed
           if [ "${{ inputs.environment }}" = "dev" ]; then
-            STATE="-1"  # Implement (auto-approved, ready to deploy)
+            STATE="-2"  # Scheduled (approved and scheduled, ready to deploy)
             PRIORITY="3"       # Low priority
           elif [ "${{ inputs.environment }}" = "qa" ]; then
-            STATE="-1"  # Implement (auto-approved for QA)
+            STATE="-2"  # Scheduled (approved and scheduled, ready to deploy)
             PRIORITY="3"       # Medium priority
           else
-            STATE="-4"  # Assess (requires manual approval for production)
+            STATE="-4"  # Assess (requires manual approval/authorization for production)
             PRIORITY="2"       # High priority (production)
           fi
 
@@ -515,13 +516,13 @@ jobs:
             # Approval values: not_requested, requested, approved, rejected
 
             # Accept if:
-            # 1. State is Implement (-1) - already authorized, ready to deploy
-            # 2. State is Scheduled/Review with approval=approved
-            if [ "$STATE" = "-1" ]; then
-              echo "✅ Change Request in Implement state - ready for deployment"
+            # 1. State is Scheduled (-2) or Implement (-1) - already authorized, ready to deploy
+            # 2. State is Review (0) with approval=approved
+            if [ "$STATE" = "-2" ] || [ "$STATE" = "-1" ]; then
+              echo "✅ Change Request authorized (state: $STATE) - ready for deployment"
               exit 0
-            elif [ "$APPROVAL" = "approved" ] && ([ "$STATE" = "-2" ] || [ "$STATE" = "0" ]); then
-              echo "✅ Change Request approved (state: $STATE) and ready for deployment"
+            elif [ "$APPROVAL" = "approved" ] && [ "$STATE" = "0" ]; then
+              echo "✅ Change Request approved in Review state - ready for deployment"
               exit 0
             elif [ "$APPROVAL" = "rejected" ]; then
               echo "❌ Change Request was rejected"
