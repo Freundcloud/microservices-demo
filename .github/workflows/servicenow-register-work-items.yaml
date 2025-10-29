@@ -210,12 +210,12 @@ jobs:
 
             # Build description with GitHub context
             DESCRIPTION="GitHub Issue: #$ISSUE_NUM
-Repository: ${{ github.repository }}
-URL: $ISSUE_URL
-State: $ISSUE_STATE
-Labels: $ISSUE_LABELS
+            Repository: ${{ github.repository }}
+            URL: $ISSUE_URL
+            State: $ISSUE_STATE
+            Labels: $ISSUE_LABELS
 
-$ISSUE_BODY"
+            $ISSUE_BODY"
 
             # Check if work item already exists for this GitHub issue
             CHECK_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
