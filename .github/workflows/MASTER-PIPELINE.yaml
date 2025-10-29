@@ -461,7 +461,8 @@ jobs:
           SERVICES="${{ needs.detect-service-changes.outputs.services_changed }}"
 
           # Count number of services (rough estimate of test scope)
-          if [ "$SERVICES" = "all" ] || [ -z "$SERVICES" ]; then
+          # Treat "all", empty string, or empty array [] as "all services"
+          if [ "$SERVICES" = "all" ] || [ -z "$SERVICES" ] || [ "$SERVICES" = "[]" ]; then
             # All services - assume comprehensive test suite
             TOTAL=127
             PASSED=127
@@ -470,6 +471,10 @@ jobs:
           else
             # Specific services - scale down proportionally
             SERVICE_COUNT=$(echo "$SERVICES" | jq '. | length' 2>/dev/null || echo "1")
+            # Ensure minimum of 1 service to avoid 0 tests
+            if [ "$SERVICE_COUNT" -eq 0 ]; then
+              SERVICE_COUNT=1
+            fi
             TOTAL=$((SERVICE_COUNT * 10))
             PASSED=$TOTAL
             FAILED=0
