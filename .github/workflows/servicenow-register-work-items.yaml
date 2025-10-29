@@ -1,0 +1,340 @@
+---
+name: "Register Work Items in ServiceNow (Reusable)"
+
+"on":
+  workflow_call:
+    inputs:
+      change_request_number:
+        description: 'ServiceNow change request number to link work items to'
+        required: true
+        type: string
+      commit_messages:
+        description: 'Commit messages to extract issue numbers from'
+        required: false
+        type: string
+        default: ''
+      pr_number:
+        description: 'Pull request number (if triggered by PR)'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      work_items_registered:
+        description: "Number of work items registered"
+        value: ${{ jobs.register-work-items.outputs.count }}
+      work_item_numbers:
+        description: "Comma-separated list of work item numbers"
+        value: ${{ jobs.register-work-items.outputs.numbers }}
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  register-work-items:
+    name: Register Work Items
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.register.outputs.count }}
+      numbers: ${{ steps.register.outputs.numbers }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for commit message extraction
+
+      - name: Extract GitHub Issue Numbers
+        id: extract
+        run: |
+          echo "Extracting GitHub issue numbers from commits and PRs..."
+
+          # Initialize array for unique issue numbers
+          ISSUES=""
+
+          # Extract from commit messages (support multiple patterns)
+          # Patterns: Fixes #123, Closes #456, Resolves #789, Refs #101, Issue: #112, [#113]
+          if [ -n "${{ inputs.commit_messages }}" ]; then
+            echo "Checking commit messages..."
+            COMMIT_ISSUES=$(echo "${{ inputs.commit_messages }}" | \
+              grep -oE '(Fixes|Closes|Resolves|Refs|Issue:?|Re:?|\[)[\s]*#[0-9]+' | \
+              grep -oE '#[0-9]+' | \
+              sed 's/#//' | \
+              sort -u)
+
+            if [ -n "$COMMIT_ISSUES" ]; then
+              echo "Found issues in commits: $COMMIT_ISSUES"
+              ISSUES="$COMMIT_ISSUES"
+            fi
+          fi
+
+          # Extract from PR if available
+          if [ -n "${{ inputs.pr_number }}" ]; then
+            echo "Checking PR #${{ inputs.pr_number }}..."
+
+            # Get PR title and body
+            PR_DATA=$(gh pr view ${{ inputs.pr_number }} --json title,body --jq '{title, body}')
+            PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')
+            PR_BODY=$(echo "$PR_DATA" | jq -r '.body')
+
+            echo "PR Title: $PR_TITLE"
+
+            # Extract from PR title and body
+            PR_ISSUES=$(echo -e "$PR_TITLE\n$PR_BODY" | \
+              grep -oE '(Fixes|Closes|Resolves|Refs|Issue:?|Re:?|\[)[\s]*#[0-9]+' | \
+              grep -oE '#[0-9]+' | \
+              sed 's/#//' | \
+              sort -u)
+
+            if [ -n "$PR_ISSUES" ]; then
+              echo "Found issues in PR: $PR_ISSUES"
+              ISSUES=$(echo -e "$ISSUES\n$PR_ISSUES" | sort -u)
+            fi
+          fi
+
+          # If no commit messages or PR, extract from recent commits
+          if [ -z "${{ inputs.commit_messages }}" ] && [ -z "${{ inputs.pr_number }}" ]; then
+            echo "Extracting from recent commits (last 10)..."
+            RECENT_ISSUES=$(git log -10 --pretty=format:"%s %b" | \
+              grep -oE '(Fixes|Closes|Resolves|Refs|Issue:?|Re:?|\[)[\s]*#[0-9]+' | \
+              grep -oE '#[0-9]+' | \
+              sed 's/#//' | \
+              sort -u)
+
+            if [ -n "$RECENT_ISSUES" ]; then
+              echo "Found issues in recent commits: $RECENT_ISSUES"
+              ISSUES=$(echo -e "$ISSUES\n$RECENT_ISSUES" | sort -u)
+            fi
+          fi
+
+          # Remove empty lines and duplicates
+          ISSUES=$(echo "$ISSUES" | grep -v '^$' | sort -u)
+
+          if [ -z "$ISSUES" ]; then
+            echo "⚠️  No GitHub issues found in commits or PR"
+            echo "issues=" >> $GITHUB_OUTPUT
+            echo "count=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Convert to comma-separated list
+          ISSUE_LIST=$(echo "$ISSUES" | tr '\n' ',' | sed 's/,$//')
+
+          echo "📋 Found GitHub Issues: $ISSUE_LIST"
+          echo "issues=$ISSUE_LIST" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$ISSUES" | wc -l)" >> $GITHUB_OUTPUT
+
+      - name: Register Work Items in ServiceNow
+        id: register
+        if: steps.extract.outputs.issues != ''
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        run: |
+          echo "Registering work items in ServiceNow..."
+
+          ISSUES="${{ steps.extract.outputs.issues }}"
+          CHANGE_REQUEST="${{ inputs.change_request_number }}"
+          WORK_ITEM_NUMBERS=""
+          COUNT=0
+
+          # Get change request sys_id
+          echo "Looking up change request sys_id for $CHANGE_REQUEST..."
+          CR_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Accept: application/json" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/change_request?sysparm_query=number=$CHANGE_REQUEST&sysparm_fields=sys_id,number")
+
+          CR_SYS_ID=$(echo "$CR_RESPONSE" | jq -r '.result[0].sys_id')
+
+          if [ -z "$CR_SYS_ID" ] || [ "$CR_SYS_ID" = "null" ]; then
+            echo "⚠️  WARNING: Could not find change request $CHANGE_REQUEST"
+            echo "Work items will be created without change request link"
+            CR_SYS_ID=""
+          else
+            echo "✅ Found change request sys_id: $CR_SYS_ID"
+          fi
+
+          # Process each issue
+          IFS=',' read -ra ISSUE_ARRAY <<< "$ISSUES"
+          for ISSUE_NUM in "${ISSUE_ARRAY[@]}"; do
+            echo ""
+            echo "Processing GitHub Issue #$ISSUE_NUM..."
+
+            # Get issue details from GitHub
+            ISSUE_DATA=$(gh issue view $ISSUE_NUM --json number,title,state,body,url,labels)
+
+            if [ $? -ne 0 ]; then
+              echo "⚠️  WARNING: Could not fetch issue #$ISSUE_NUM from GitHub"
+              continue
+            fi
+
+            ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+            ISSUE_STATE=$(echo "$ISSUE_DATA" | jq -r '.state')
+            ISSUE_BODY=$(echo "$ISSUE_DATA" | jq -r '.body // ""')
+            ISSUE_URL=$(echo "$ISSUE_DATA" | jq -r '.url')
+            ISSUE_LABELS=$(echo "$ISSUE_DATA" | jq -r '.labels[]?.name' | tr '\n' ',' | sed 's/,$//')
+
+            echo "  Title: $ISSUE_TITLE"
+            echo "  State: $ISSUE_STATE"
+            echo "  URL: $ISSUE_URL"
+            echo "  Labels: $ISSUE_LABELS"
+
+            # Map GitHub state to ServiceNow state
+            if [ "$ISSUE_STATE" = "OPEN" ]; then
+              SN_STATE="Open"
+            else
+              SN_STATE="Closed"
+            fi
+
+            # Determine work item type from labels
+            WI_TYPE="Issue"
+            if echo "$ISSUE_LABELS" | grep -iq "story\|feature"; then
+              WI_TYPE="Story"
+            elif echo "$ISSUE_LABELS" | grep -iq "bug"; then
+              WI_TYPE="Defect"
+            elif echo "$ISSUE_LABELS" | grep -iq "task"; then
+              WI_TYPE="Task"
+            fi
+
+            # Determine priority from labels (default: 3 - Moderate)
+            PRIORITY="3"
+            if echo "$ISSUE_LABELS" | grep -iq "critical\|urgent"; then
+              PRIORITY="1"
+            elif echo "$ISSUE_LABELS" | grep -iq "high"; then
+              PRIORITY="2"
+            elif echo "$ISSUE_LABELS" | grep -iq "low"; then
+              PRIORITY="4"
+            fi
+
+            # Build description with GitHub context
+            DESCRIPTION="GitHub Issue: #$ISSUE_NUM
+Repository: ${{ github.repository }}
+URL: $ISSUE_URL
+State: $ISSUE_STATE
+Labels: $ISSUE_LABELS
+
+$ISSUE_BODY"
+
+            # Check if work item already exists for this GitHub issue
+            CHECK_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Accept: application/json" \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_work_item?sysparm_query=external_id=$ISSUE_NUM^source=GitHub^url=$ISSUE_URL&sysparm_fields=sys_id,number")
+
+            EXISTING_SYS_ID=$(echo "$CHECK_RESPONSE" | jq -r '.result[0].sys_id')
+            EXISTING_NUMBER=$(echo "$CHECK_RESPONSE" | jq -r '.result[0].number')
+
+            if [ -n "$EXISTING_SYS_ID" ] && [ "$EXISTING_SYS_ID" != "null" ]; then
+              echo "  ✅ Work item already exists: $EXISTING_NUMBER (sys_id: $EXISTING_SYS_ID)"
+
+              # Update existing work item if needed (state, change request link)
+              UPDATE_PAYLOAD=$(jq -n \
+                --arg state "$SN_STATE" \
+                --arg cr_sys_id "$CR_SYS_ID" \
+                '{
+                  state: $state
+                } + (if $cr_sys_id != "" then {change_request: $cr_sys_id} else {} end)')
+
+              UPDATE_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json" \
+                -X PUT \
+                -d "$UPDATE_PAYLOAD" \
+                "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_work_item/$EXISTING_SYS_ID")
+
+              if echo "$UPDATE_RESPONSE" | jq -e '.result.sys_id' > /dev/null; then
+                echo "  ✅ Updated work item $EXISTING_NUMBER"
+                WORK_ITEM_NUMBERS="$WORK_ITEM_NUMBERS,$EXISTING_NUMBER"
+                COUNT=$((COUNT + 1))
+              fi
+            else
+              # Create new work item
+              echo "  Creating new work item..."
+
+              PAYLOAD=$(jq -n \
+                --arg title "$ISSUE_TITLE" \
+                --arg type "$WI_TYPE" \
+                --arg source "GitHub" \
+                --arg external_id "$ISSUE_NUM" \
+                --arg url "$ISSUE_URL" \
+                --arg state "$SN_STATE" \
+                --arg description "$DESCRIPTION" \
+                --arg priority "$PRIORITY" \
+                --arg cr_sys_id "$CR_SYS_ID" \
+                '{
+                  title: $title,
+                  type: $type,
+                  source: $source,
+                  external_id: $external_id,
+                  url: $url,
+                  state: $state,
+                  short_description: $title,
+                  description: $description,
+                  priority: $priority
+                } + (if $cr_sys_id != "" then {change_request: $cr_sys_id} else {} end)')
+
+              RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json" \
+                -X POST \
+                -d "$PAYLOAD" \
+                "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_work_item")
+
+              WI_NUMBER=$(echo "$RESPONSE" | jq -r '.result.number')
+              WI_SYS_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id')
+
+              if [ -n "$WI_NUMBER" ] && [ "$WI_NUMBER" != "null" ]; then
+                echo "  ✅ Created work item: $WI_NUMBER (sys_id: $WI_SYS_ID)"
+                WORK_ITEM_NUMBERS="$WORK_ITEM_NUMBERS,$WI_NUMBER"
+                COUNT=$((COUNT + 1))
+              else
+                echo "  ❌ ERROR: Failed to create work item"
+                echo "$RESPONSE" | jq -r '.error.message // .error.detail // "Unknown error"'
+              fi
+            fi
+          done
+
+          # Clean up work item numbers list (remove leading comma)
+          WORK_ITEM_NUMBERS=$(echo "$WORK_ITEM_NUMBERS" | sed 's/^,//')
+
+          echo ""
+          echo "=========================================="
+          echo "Work Item Registration Summary"
+          echo "=========================================="
+          echo "GitHub Issues Processed: $(echo "$ISSUES" | tr ',' '\n' | wc -l)"
+          echo "Work Items Created/Updated: $COUNT"
+          echo "Work Item Numbers: $WORK_ITEM_NUMBERS"
+          echo "Change Request: $CHANGE_REQUEST"
+          echo ""
+          echo "View work items in ServiceNow:"
+          echo "$SERVICENOW_INSTANCE_URL/sn_devops_work_item_list.do?sysparm_query=change_request.number=$CHANGE_REQUEST"
+          echo ""
+
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "numbers=$WORK_ITEM_NUMBERS" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 📋 Work Item Registration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.extract.outputs.count }}" = "0" ]; then
+            echo "⚠️ **No GitHub issues found** in commits or PR" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To link work items, reference GitHub issues in commit messages:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "Fixes #42" >> $GITHUB_STEP_SUMMARY
+            echo "Closes #123, Resolves #456" >> $GITHUB_STEP_SUMMARY
+            echo "[#789] Add new feature" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **${{ steps.register.outputs.count }} work items** registered in ServiceNow" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **GitHub Issues**: ${{ steps.extract.outputs.issues }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Work Items**: ${{ steps.register.outputs.numbers }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Change Request**: ${{ inputs.change_request_number }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[View Work Items in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/sn_devops_work_item_list.do?sysparm_query=change_request.number=${{ inputs.change_request_number }})" >> $GITHUB_STEP_SUMMARY
+          fi

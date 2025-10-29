@@ -678,6 +678,18 @@ jobs:
   # STAGE 8: Update ServiceNow Change Request
   # ============================================================================
 
+  register-work-items:
+    name: "📋 Register Work Items"
+    needs: [pipeline-init, servicenow-change]
+    if: |
+      needs.servicenow-change.result == 'success' &&
+      needs.servicenow-change.outputs.change_number != ''
+    uses: ./.github/workflows/servicenow-register-work-items.yaml
+    secrets: inherit
+    with:
+      change_request_number: ${{ needs.servicenow-change.outputs.change_number }}
+      pr_number: ${{ github.event.pull_request.number || '' }}
+
   update-servicenow-change:
     name: "📝 Update ServiceNow Change"
     needs: [pipeline-init, servicenow-change, deploy-to-environment, smoke-tests]
@@ -710,6 +722,7 @@ jobs:
       - build-and-push
       - register-packages
       - servicenow-change
+      - register-work-items
       - deploy-to-environment
       - smoke-tests
       - update-servicenow-change
