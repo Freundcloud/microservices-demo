@@ -1,0 +1,131 @@
+---
+name: "Test ServiceNow DevOps Change Action"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (dev/qa/prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+        default: 'dev'
+
+permissions:
+  contents: read
+
+jobs:
+  # Dummy upstream job to simulate a real workflow
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab  # v3.5.2
+
+      - name: Simulate build
+        run: |
+          echo "Building application..."
+          sleep 2
+          echo "✅ Build complete"
+
+      - name: Simulate tests
+        run: |
+          echo "Running tests..."
+          sleep 2
+          echo "✅ All tests passed"
+
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ inputs.environment }}.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab  # v3.5.2
+
+      - name: ServiceNow Change Request
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        id: create
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Deploy to ${{ inputs.environment }}'
+          change-request: >-
+            {"setCloseCode":"true","autoCloseChange":true,"attributes":{
+            "short_description":"Test Deployment to ${{ inputs.environment }}",
+            "description":"Automated test deployment via GitHub Actions.",
+            "assignment_group":"a715cd759f2002002920bde8132e7018",
+            "implementation_plan":"1. Configure kubectl for EKS\n2. Deploy",
+            "backout_plan":"1. Execute kubectl rollout undo\n2. Verify",
+            "test_plan":"1. Verify deployments\n2. Check all pods Running"}}
+          interval: '100'
+          timeout: '3600'
+          changeCreationTimeOut: '3600'
+          abortOnChangeCreationFailure: true
+          abortOnChangeStepTimeout: true
+          deployment-gate: >-
+            {"environment":"${{ inputs.environment }}",
+            "jobName":"Deploy to ${{ inputs.environment }}"}
+
+      - name: Output Change Request Details
+        if: always()
+        run: |
+          echo "change-request-number = ${{ steps.create.outputs.change-request-number }}"
+
+          # Add to job summary
+          if [ -n "${{ steps.create.outputs.change-request-number }}" ]; then
+            {
+              echo "## 📝 ServiceNow Change Request Created"
+              echo ""
+              echo "**Change Number:** ${{ steps.create.outputs.change-request-number }}"
+              echo "**Environment:** ${{ inputs.environment }}"
+              echo ""
+              SN_URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"
+              CR_NUM="${{ steps.create.outputs.change-request-number }}"
+              echo "🔗 [View in ServiceNow](${SN_URL}/nav_to.do?uri=change_request.do?sysparm_query=number=${CR_NUM})"
+            } >> $GITHUB_STEP_SUMMARY
+          else
+            {
+              echo "## ❌ ServiceNow Change Request Failed"
+              echo ""
+              echo "**Environment:** ${{ inputs.environment }}"
+              echo ""
+              echo "See job logs for details."
+            } >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Simulate Deployment
+        run: |
+          echo "Deploying to ${{ inputs.environment }}..."
+          echo "Change Request: ${{ steps.create.outputs.change-request-number }}"
+          sleep 3
+          echo "✅ Deployment complete"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          {
+            echo "## 🚀 Deployment Summary"
+            echo ""
+            echo "**Environment:** ${{ inputs.environment }}"
+            CR_NUM="${{ steps.create.outputs.change-request-number }}"
+            echo "**Change Request:** ${CR_NUM:-N/A}"
+            REPO="${{ github.repository }}"
+            RUN="${{ github.run_id }}"
+            echo "**Workflow Run:** [${RUN}](https://github.com/${REPO}/actions/runs/${RUN})"
+            echo ""
+            if [ -n "${{ steps.create.outputs.change-request-number }}" ]; then
+              echo "✅ ServiceNow change request created successfully"
+            else
+              echo "⚠️  ServiceNow change request creation failed or skipped"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
