@@ -210,6 +210,9 @@ jobs:
           echo "state=$STATE" >> $GITHUB_OUTPUT
           echo "priority=$PRIORITY" >> $GITHUB_OUTPUT
 
+          # Debug logging
+          echo "DEBUG: Environment=${{ inputs.environment }}, STATE=$STATE, PRIORITY=$PRIORITY"
+
       - name: Create Change Request via REST API
         id: create-cr
         continue-on-error: true
@@ -432,6 +435,11 @@ jobs:
           )
 
           echo "Creating change request in ServiceNow..."
+          echo "DEBUG: STATE value being sent: $STATE"
+          echo "DEBUG: PAYLOAD state field:"
+          echo "$PAYLOAD" | jq '.state'
+          echo "DEBUG: Full payload (first 500 chars):"
+          echo "$PAYLOAD" | head -c 500
 
           # Make the API call
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
