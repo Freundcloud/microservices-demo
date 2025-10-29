@@ -189,65 +189,7 @@ jobs:
             fi
           } >> $GITHUB_STEP_SUMMARY
 
-  # Update Change (add work notes after deployment completes)
-  update-change:
-    name: "Update Change Request"
-    needs: [devops-change, get-change]
-    runs-on: ubuntu-latest
-    # Only run if we have a change request number (either from DevOps Change or Get Change)
-    if: |
-      always() &&
-      (needs.devops-change.outputs.change_request_number != '' ||
-       needs.get-change.outputs.change_request_number != '')
-    outputs:
-      status: ${{ steps.update-change.outputs.status }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
-
-      - name: Determine Change Request Number
-        id: determine-cr
-        run: |
-          # Prefer DevOps Change output, fallback to Get Change output
-          CR_NUM="${{ needs.devops-change.outputs.change_request_number }}"
-          if [ -z "$CR_NUM" ]; then
-            CR_NUM="${{ needs.get-change.outputs.change_request_number }}"
-          fi
-
-          echo "change_number=$CR_NUM" >> $GITHUB_OUTPUT
-          echo "Using Change Request: $CR_NUM"
-
-      - name: Update Change Request
-        id: update-change
-        continue-on-error: true
-        uses: ServiceNow/servicenow-devops-update-change@3426a193fc1d3b9e7db41b5c1eecec9bb71fef40  # v3.1.0
-        with:
-          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
-          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
-          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-          context-github: ${{ toJSON(github) }}
-          change-request-number: ${{ steps.determine-cr.outputs.change_number }}
-          change-request-details: >-
-            {
-              "work_notes": "✅ Deployment to ${{ inputs.environment }} registered successfully\n\nWorkflow: ${{ github.workflow }}\nRun ID: ${{ github.run_id }}\nActor: ${{ github.actor }}\n\nServices: ${{ inputs.services_deployed }}\nSecurity Status: ${{ inputs.security_scan_status }}"
-            }
-
-      - name: Output Update Results
-        if: always()
-        run: |
-          echo "=== Update Change Action Outputs ==="
-          echo "status: '${{ steps.update-change.outputs.status }}'"
-
-          {
-            echo "## ✏️ Update Change Request"
-            echo ""
-            echo "**Change Number:** \`${{ steps.determine-cr.outputs.change_number }}\`"
-            echo "**Update Status:** ${{ steps.update-change.outputs.status }}"
-
-            if [ "${{ steps.update-change.outputs.status }}" == "Success" ]; then
-              echo ""
-              echo "✅ Work notes added successfully"
-            fi
-          } >> $GITHUB_STEP_SUMMARY
+  # NOTE: Update Change is handled by servicenow-update-change.yaml workflow
+  # after deployment completes. This workflow only handles registration and
+  # retrieval. The Master pipeline calls servicenow-update-change.yaml with
+  # deployment status after deploy-to-environment job completes.
