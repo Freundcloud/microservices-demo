@@ -81,16 +81,12 @@ jobs:
           # Job name (required parameter)
           job-name: "Register Deployment (${{ inputs.environment }})"
 
-          # NOTE: deployment-gate parameter is COMMENTED OUT to enable traditional change requests
-          # When deployment-gate is provided: ServiceNow returns changeControl: false (deployment gate mode)
-          # When deployment-gate is OMITTED: ServiceNow returns changeControl: true (traditional CR mode)
-          #
-          # Deployment gate configuration (DISABLED for traditional CRs)
-          # deployment-gate: >-
-          #   {
-          #     "environment": "${{ inputs.environment }}",
-          #     "jobName": "Register Deployment (${{ inputs.environment }})"
-          #   }
+          # Deployment gate configuration
+          # NOTE: Adding this back because test workflow WITH deployment-gate succeeds
+          # but our workflow WITHOUT it fails during polling phase
+          # We'll investigate traditional CR mode later
+          deployment-gate: >-
+            {"environment":"${{ inputs.environment }}","jobName":"Register Deployment (${{ inputs.environment }})}"}
 
           # Change request details
           # For DEV: Uses 'standard' type for auto-approval
