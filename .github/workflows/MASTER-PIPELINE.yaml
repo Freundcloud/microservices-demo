@@ -48,6 +48,7 @@ permissions:
   pull-requests: write
   id-token: write
   actions: read
+  issues: read
 
 env:
   AWS_REGION: eu-west-2
