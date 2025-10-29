@@ -311,19 +311,20 @@ jobs:
 
           # Build the JSON payload using jq
           # Note: Detailed metadata (repository, commit, environment, etc.) is now stored in dedicated custom fields
+          # IMPORTANT: Use --argjson for numeric values (state, priority, risk, impact, urgency) to ensure they're sent as numbers not strings
           PAYLOAD=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
             --arg description "$DESCRIPTION" \
             --arg type "standard" \
-            --arg state "$STATE" \
-            --arg priority "$PRIORITY" \
+            --argjson state "$STATE" \
+            --argjson priority "$PRIORITY" \
             --arg assignment_group "$ASSIGNMENT_GROUP" \
             --arg assigned_to "$ASSIGNED_TO" \
             --arg category "DevOps" \
             --arg subcategory "Deployment" \
-            --arg risk "$RISK" \
-            --arg impact "$IMPACT" \
-            --arg urgency "3" \
+            --argjson risk "$RISK" \
+            --argjson impact "$IMPACT" \
+            --argjson urgency "3" \
             --arg justification "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow. Security scans: $SECURITY_STATUS" \
             --arg impl_plan "$IMPL_PLAN" \
             --arg backout_plan "$BACKOUT_PLAN" \
