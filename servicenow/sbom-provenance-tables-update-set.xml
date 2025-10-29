@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2025-01-29 12:00:00">
+  <sys_remote_update_set action="INSERT_OR_UPDATE">
+    <application display_value="Global">global</application>
+    <application_name>Global</application_name>
+    <application_scope>global</application_scope>
+    <application_version/>
+    <collisions/>
+    <commit_date/>
+    <deleted/>
+    <description>Custom tables for Container SBOM and Provenance tracking with GitHub Actions integration</description>
+    <inserted/>
+    <name>Container SBOM and Provenance Tables</name>
+    <origin_sys_id/>
+    <parent display_value=""/>
+    <release_date/>
+    <remote_base_update_set display_value=""/>
+    <remote_sys_id>container_sbom_provenance_v1</remote_sys_id>
+    <state>loaded</state>
+    <summary>Creates two custom tables: u_container_sbom (SBOM tracking) and u_container_provenance (build integrity tracking) for supply chain security</summary>
+    <sys_class_name>sys_remote_update_set</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_id>container_sbom_provenance_v1</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-01-29 12:00:00</sys_updated_on>
+    <update_set display_value=""/>
+    <update_source display_value=""/>
+    <updated/>
+  </sys_remote_update_set>
+
+  <!-- ============================================================ -->
+  <!-- Table 1: u_container_sbom (SBOM tracking) -->
+  <!-- ============================================================ -->
+  <sys_db_object action="INSERT_OR_UPDATE">
+    <access/>
+    <actions_access>true</actions_access>
+    <alter_access>true</alter_access>
+    <caller_access/>
+    <client_scripts_access>true</client_scripts_access>
+    <configuration_access>false</configuration_access>
+    <create_access>true</create_access>
+    <create_access_controls>false</create_access_controls>
+    <delete_access>false</delete_access>
+    <extension_model/>
+    <is_extendable>false</is_extendable>
+    <label>Container SBOM</label>
+    <live_feed_enabled>false</live_feed_enabled>
+    <name>u_container_sbom</name>
+    <number_ref/>
+    <provider_class/>
+    <read_access>true</read_access>
+    <scriptable_table>false</scriptable_table>
+    <super_class/>
+    <sys_class_code/>
+    <sys_class_name>sys_db_object</sys_class_name>
+    <sys_class_path/>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_id>u_container_sbom_table</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_name>Container SBOM</sys_name>
+    <sys_package display_value="Global" source="global">global</sys_package>
+    <sys_policy/>
+    <sys_scope display_value="Global">global</sys_scope>
+    <sys_update_name>sys_db_object_u_container_sbom</sys_update_name>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-01-29 12:00:00</sys_updated_on>
+    <update_access>true</update_access>
+    <user_role/>
+    <ws_access>true</ws_access>
+  </sys_db_object>
+
+  <!-- Field: u_service_name -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <array>false</array>
+    <attributes/>
+    <audit>false</audit>
+    <calculation/>
+    <choice>0</choice>
+    <choice_field/>
+    <choice_table/>
+    <column_label>Service Name</column_label>
+    <comments/>
+    <create_roles/>
+    <default_value/>
+    <defaultsort/>
+    <delete_roles/>
+    <dependent/>
+    <dependent_on_field/>
+    <display>false</display>
+    <dynamic_creation>false</dynamic_creation>
+    <dynamic_creation_script/>
+    <dynamic_default_value/>
+    <dynamic_ref_qual/>
+    <element>u_service_name</element>
+    <element_reference>false</element_reference>
+    <foreign_database/>
+    <formula/>
+    <function_definition/>
+    <function_field>false</function_field>
+    <internal_type display_value="String">string</internal_type>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_container_sbom</name>
+    <next_element/>
+    <primary>false</primary>
+    <read_only>false</read_only>
+    <read_roles/>
+    <reference/>
+    <reference_cascade_rule/>
+    <reference_floats>false</reference_floats>
+    <reference_key/>
+    <reference_qual/>
+    <reference_qual_condition/>
+    <reference_type/>
+    <spell_check>false</spell_check>
+    <staged>false</staged>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Service Name</sys_name>
+    <sys_package display_value="Global" source="global">global</sys_package>
+    <sys_scope display_value="Global">global</sys_scope>
+    <table_reference>false</table_reference>
+    <text_index>false</text_index>
+    <unique>false</unique>
+    <use_dependent_field>false</use_dependent_field>
+    <use_dynamic_default>false</use_dynamic_default>
+    <use_reference_qualifier>simple</use_reference_qualifier>
+    <virtual>false</virtual>
+    <write_roles/>
+    <xml_view>false</xml_view>
+  </sys_dictionary>
+
+  <!-- Field: u_image_uri -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_image_uri</element>
+    <column_label>Image URI</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>500</max_length>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Image URI</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_image_tag -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_image_tag</element>
+    <column_label>Image Tag</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Image Tag</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_sbom_format -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_sbom_format</element>
+    <column_label>SBOM Format</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>50</max_length>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>SBOM Format</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_sbom_summary -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_sbom_summary</element>
+    <column_label>SBOM Summary</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>8000</max_length>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>SBOM Summary</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_component_count -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_component_count</element>
+    <column_label>Component Count</column_label>
+    <internal_type>integer</internal_type>
+    <mandatory>false</mandatory>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Component Count</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_artifact_url -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_artifact_url</element>
+    <column_label>Artifact URL</column_label>
+    <internal_type>url</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>1024</max_length>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Artifact URL</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_github_run_id -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_github_run_id</element>
+    <column_label>GitHub Run ID</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>false</mandatory>
+    <max_length>100</max_length>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>GitHub Run ID</sys_name>
+  </sys_dictionary>
+
+  <!-- Field: u_created_date -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_created_date</element>
+    <column_label>Created Date</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <mandatory>false</mandatory>
+    <name>u_container_sbom</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Created Date</sys_name>
+  </sys_dictionary>
+
+  <!-- ============================================================ -->
+  <!-- Table 2: u_container_provenance (Provenance tracking) -->
+  <!-- ============================================================ -->
+  <sys_db_object action="INSERT_OR_UPDATE">
+    <access/>
+    <actions_access>true</actions_access>
+    <alter_access>true</alter_access>
+    <caller_access/>
+    <client_scripts_access>true</client_scripts_access>
+    <configuration_access>false</configuration_access>
+    <create_access>true</create_access>
+    <create_access_controls>false</create_access_controls>
+    <delete_access>false</delete_access>
+    <extension_model/>
+    <is_extendable>false</is_extendable>
+    <label>Container Provenance</label>
+    <live_feed_enabled>false</live_feed_enabled>
+    <name>u_container_provenance</name>
+    <number_ref/>
+    <provider_class/>
+    <read_access>true</read_access>
+    <scriptable_table>false</scriptable_table>
+    <super_class/>
+    <sys_class_code/>
+    <sys_class_name>sys_db_object</sys_class_name>
+    <sys_class_path/>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_id>u_container_provenance_table</sys_id>
+    <sys_mod_count>0</sys_mod_count>
+    <sys_name>Container Provenance</sys_name>
+    <sys_package display_value="Global" source="global">global</sys_package>
+    <sys_policy/>
+    <sys_scope display_value="Global">global</sys_scope>
+    <sys_update_name>sys_db_object_u_container_provenance</sys_update_name>
+    <sys_updated_by>admin</sys_updated_by>
+    <sys_updated_on>2025-01-29 12:00:00</sys_updated_on>
+    <update_access>true</update_access>
+    <user_role/>
+    <ws_access>true</ws_access>
+  </sys_db_object>
+
+  <!-- Provenance Table Fields -->
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_service_name</element>
+    <column_label>Service Name</column_label>
+    <internal_type>string</internal_type>
+    <mandatory>true</mandatory>
+    <max_length>100</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Service Name</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_image_uri</element>
+    <column_label>Image URI</column_label>
+    <internal_type>string</internal_type>
+    <max_length>500</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Image URI</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_image_tag</element>
+    <column_label>Image Tag</column_label>
+    <internal_type>string</internal_type>
+    <max_length>100</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Image Tag</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_signed</element>
+    <column_label>Signed</column_label>
+    <internal_type>boolean</internal_type>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Signed</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_signature_method</element>
+    <column_label>Signature Method</column_label>
+    <internal_type>string</internal_type>
+    <max_length>100</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Signature Method</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_certificate_fingerprint</element>
+    <column_label>Certificate Fingerprint</column_label>
+    <internal_type>string</internal_type>
+    <max_length>200</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Certificate Fingerprint</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_certificate_subject</element>
+    <column_label>Certificate Subject</column_label>
+    <internal_type>string</internal_type>
+    <max_length>500</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Certificate Subject</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_certificate_issuer</element>
+    <column_label>Certificate Issuer</column_label>
+    <internal_type>string</internal_type>
+    <max_length>500</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Certificate Issuer</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_signature_artifact_url</element>
+    <column_label>Signature Artifact URL</column_label>
+    <internal_type>url</internal_type>
+    <max_length>1024</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Signature Artifact URL</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_github_run_id</element>
+    <column_label>GitHub Run ID</column_label>
+    <internal_type>string</internal_type>
+    <max_length>100</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>GitHub Run ID</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_github_actor</element>
+    <column_label>GitHub Actor</column_label>
+    <internal_type>string</internal_type>
+    <max_length>100</max_length>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>GitHub Actor</sys_name>
+  </sys_dictionary>
+
+  <sys_dictionary action="INSERT_OR_UPDATE">
+    <active>true</active>
+    <element>u_created_date</element>
+    <column_label>Created Date</column_label>
+    <internal_type>glide_date_time</internal_type>
+    <name>u_container_provenance</name>
+    <sys_class_name>sys_dictionary</sys_class_name>
+    <sys_created_by>admin</sys_created_by>
+    <sys_created_on>2025-01-29 12:00:00</sys_created_on>
+    <sys_name>Created Date</sys_name>
+  </sys_dictionary>
+
+</unload>
