@@ -192,14 +192,15 @@ jobs:
         id: prepare
         run: |
           # Determine state based on environment
+          # ServiceNow state values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed, 4=Canceled
           if [ "${{ inputs.environment }}" = "dev" ]; then
-            STATE="implement"  # Auto-approved
+            STATE="-1"  # Implement (auto-approved, ready to deploy)
             PRIORITY="3"       # Low priority
           elif [ "${{ inputs.environment }}" = "qa" ]; then
-            STATE="assess"     # Awaiting approval
+            STATE="-1"  # Implement (auto-approved for QA)
             PRIORITY="3"       # Medium priority
           else
-            STATE="assess"     # Awaiting approval
+            STATE="-4"  # Assess (requires manual approval for production)
             PRIORITY="2"       # High priority (production)
           fi
 
@@ -513,8 +514,13 @@ jobs:
             # State values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed
             # Approval values: not_requested, requested, approved, rejected
 
-            # Accept Scheduled (-2), Implement (-1), or Review (0) states with approved status
-            if [ "$APPROVAL" = "approved" ] && ([ "$STATE" = "-2" ] || [ "$STATE" = "-1" ] || [ "$STATE" = "0" ]); then
+            # Accept if:
+            # 1. State is Implement (-1) - already authorized, ready to deploy
+            # 2. State is Scheduled/Review with approval=approved
+            if [ "$STATE" = "-1" ]; then
+              echo "✅ Change Request in Implement state - ready for deployment"
+              exit 0
+            elif [ "$APPROVAL" = "approved" ] && ([ "$STATE" = "-2" ] || [ "$STATE" = "0" ]); then
               echo "✅ Change Request approved (state: $STATE) and ready for deployment"
               exit 0
             elif [ "$APPROVAL" = "rejected" ]; then
