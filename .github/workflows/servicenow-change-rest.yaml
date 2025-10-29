@@ -90,73 +90,6 @@ on:
         required: false
         type: string
         default: '0'
-      # Unit test results
-      unit_test_status:
-        description: 'Overall unit test status (passed/failed/skipped)'
-        required: false
-        type: string
-        default: ''
-      unit_test_total:
-        description: 'Total number of unit tests executed'
-        required: false
-        type: string
-        default: '0'
-      unit_test_passed:
-        description: 'Number of unit tests that passed'
-        required: false
-        type: string
-        default: '0'
-      unit_test_failed:
-        description: 'Number of unit tests that failed'
-        required: false
-        type: string
-        default: '0'
-      unit_test_coverage:
-        description: 'Code coverage percentage from unit tests'
-        required: false
-        type: string
-        default: ''
-      unit_test_url:
-        description: 'Link to detailed unit test results'
-        required: false
-        type: string
-        default: ''
-      # SonarCloud scan results
-      sonarcloud_status:
-        description: 'SonarCloud quality gate status (passed/failed/warning)'
-        required: false
-        type: string
-        default: ''
-      sonarcloud_bugs:
-        description: 'Number of bugs detected by SonarCloud'
-        required: false
-        type: string
-        default: '0'
-      sonarcloud_vulnerabilities:
-        description: 'Number of vulnerabilities detected by SonarCloud'
-        required: false
-        type: string
-        default: '0'
-      sonarcloud_code_smells:
-        description: 'Number of code smells detected by SonarCloud'
-        required: false
-        type: string
-        default: '0'
-      sonarcloud_coverage:
-        description: 'Code coverage percentage from SonarCloud'
-        required: false
-        type: string
-        default: ''
-      sonarcloud_duplications:
-        description: 'Code duplication percentage from SonarCloud'
-        required: false
-        type: string
-        default: ''
-      sonarcloud_url:
-        description: 'Link to SonarCloud project dashboard'
-        required: false
-        type: string
-        default: ''
       # Deployment metadata
       deployment_method:
         description: 'Deployment method (e.g., Kustomize overlays, Helm, kubectl)'
@@ -192,26 +125,22 @@ jobs:
         id: prepare
         run: |
           # Determine state based on environment
-          # ServiceNow state values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed, 4=Canceled
-          # State flow enforced by business rules: New → Assess → Authorize → Scheduled → Implement → Review → Closed
-          # Dev: Auto-deploy (Scheduled state, no approval needed)
-          # QA/Prod: Requires manual approval (Assess state)
+          # ServiceNow accepts text state values: new, assess, authorize, scheduled, implement, review, closed
+          # Dev: Auto-approved and ready to deploy
+          # QA/Prod: Requires manual approval
           if [ "${{ inputs.environment }}" = "dev" ]; then
-            STATE="-2"  # Scheduled (auto-approved, ready to deploy)
+            STATE="scheduled"  # Auto-approved, ready to deploy (converts to state -2)
             PRIORITY="3"       # Low priority
           elif [ "${{ inputs.environment }}" = "qa" ]; then
-            STATE="-4"  # Assess (requires manual approval for QA)
+            STATE="assess"     # Requires manual approval (converts to state -4)
             PRIORITY="3"       # Medium priority
           else
-            STATE="-4"  # Assess (requires manual approval for production)
+            STATE="assess"     # Requires manual approval (converts to state -4)
             PRIORITY="2"       # High priority (production)
           fi
 
           echo "state=$STATE" >> $GITHUB_OUTPUT
           echo "priority=$PRIORITY" >> $GITHUB_OUTPUT
-
-          # Debug logging
-          echo "DEBUG: Environment=${{ inputs.environment }}, STATE=$STATE, PRIORITY=$PRIORITY"
 
       - name: Create Change Request via REST API
         id: create-cr
@@ -314,20 +243,19 @@ jobs:
 
           # Build the JSON payload using jq
           # Note: Detailed metadata (repository, commit, environment, etc.) is now stored in dedicated custom fields
-          # IMPORTANT: Use --argjson for numeric values (state, priority, risk, impact, urgency) to ensure they're sent as numbers not strings
           PAYLOAD=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
             --arg description "$DESCRIPTION" \
             --arg type "standard" \
-            --argjson state "$STATE" \
-            --argjson priority "$PRIORITY" \
+            --arg state "$STATE" \
+            --arg priority "$PRIORITY" \
             --arg assignment_group "$ASSIGNMENT_GROUP" \
             --arg assigned_to "$ASSIGNED_TO" \
             --arg category "DevOps" \
             --arg subcategory "Deployment" \
-            --argjson risk "$RISK" \
-            --argjson impact "$IMPACT" \
-            --argjson urgency "3" \
+            --arg risk "$RISK" \
+            --arg impact "$IMPACT" \
+            --arg urgency "3" \
             --arg justification "Automated deployment via CI/CD pipeline. Changes have been tested in lower environments and approved via pull request workflow. Security scans: $SECURITY_STATUS" \
             --arg impl_plan "$IMPL_PLAN" \
             --arg backout_plan "$BACKOUT_PLAN" \
@@ -360,19 +288,6 @@ jobs:
             --arg u_cluster_namespace "$CLUSTER_NAMESPACE" \
             --arg u_deployment_method "$DEPLOYMENT_METHOD" \
             --arg u_application_url "$APPLICATION_URL" \
-            --arg u_unit_test_status "${{ inputs.unit_test_status }}" \
-            --arg u_unit_test_total "${{ inputs.unit_test_total }}" \
-            --arg u_unit_test_passed "${{ inputs.unit_test_passed }}" \
-            --arg u_unit_test_failed "${{ inputs.unit_test_failed }}" \
-            --arg u_unit_test_coverage "${{ inputs.unit_test_coverage }}" \
-            --arg u_unit_test_url "${{ inputs.unit_test_url }}" \
-            --arg u_sonarcloud_status "${{ inputs.sonarcloud_status }}" \
-            --arg u_sonarcloud_bugs "${{ inputs.sonarcloud_bugs }}" \
-            --arg u_sonarcloud_vulnerabilities "${{ inputs.sonarcloud_vulnerabilities }}" \
-            --arg u_sonarcloud_code_smells "${{ inputs.sonarcloud_code_smells }}" \
-            --arg u_sonarcloud_coverage "${{ inputs.sonarcloud_coverage }}" \
-            --arg u_sonarcloud_duplications "${{ inputs.sonarcloud_duplications }}" \
-            --arg u_sonarcloud_url "${{ inputs.sonarcloud_url }}" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -417,29 +332,11 @@ jobs:
               u_security_scan_url: $u_security_scan_url,
               u_cluster_namespace: $u_cluster_namespace,
               u_deployment_method: $u_deployment_method,
-              u_application_url: $u_application_url,
-              u_unit_test_status: $u_unit_test_status,
-              u_unit_test_total: $u_unit_test_total,
-              u_unit_test_passed: $u_unit_test_passed,
-              u_unit_test_failed: $u_unit_test_failed,
-              u_unit_test_coverage: $u_unit_test_coverage,
-              u_unit_test_url: $u_unit_test_url,
-              u_sonarcloud_status: $u_sonarcloud_status,
-              u_sonarcloud_bugs: $u_sonarcloud_bugs,
-              u_sonarcloud_vulnerabilities: $u_sonarcloud_vulnerabilities,
-              u_sonarcloud_code_smells: $u_sonarcloud_code_smells,
-              u_sonarcloud_coverage: $u_sonarcloud_coverage,
-              u_sonarcloud_duplications: $u_sonarcloud_duplications,
-              u_sonarcloud_url: $u_sonarcloud_url
+              u_application_url: $u_application_url
             }'
           )
 
           echo "Creating change request in ServiceNow..."
-          echo "DEBUG: STATE value being sent: $STATE"
-          echo "DEBUG: PAYLOAD state field:"
-          echo "$PAYLOAD" | jq '.state'
-          echo "DEBUG: Full payload (first 500 chars):"
-          echo "$PAYLOAD" | head -c 500
 
           # Make the API call
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
@@ -464,40 +361,13 @@ jobs:
             echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
             echo "change_sys_id=$CHANGE_SYSID" >> $GITHUB_OUTPUT
 
-            # CRITICAL: ServiceNow business rules force new CRs to state -5 (New)
-            # We must UPDATE the state in a separate API call
-            echo "Updating state to $STATE..."
-
-            UPDATE_PAYLOAD=$(jq -n \
-              --argjson state "$STATE" \
-              '{state: $state}')
-
-            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-              -H "Content-Type: application/json" \
-              -X PATCH \
-              -d "$UPDATE_PAYLOAD" \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${CHANGE_SYSID}")
-
-            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
-            UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '/HTTP_CODE:/d')
-
-            if [ "$UPDATE_HTTP_CODE" = "200" ]; then
-              ACTUAL_STATE=$(echo "$UPDATE_BODY" | jq -r '.result.state')
-              echo "✅ State updated to: $ACTUAL_STATE"
-            else
-              echo "⚠️  State update failed (HTTP $UPDATE_HTTP_CODE) - CR will remain in default state"
-              echo "$UPDATE_BODY" | jq '.' || echo "$UPDATE_BODY"
-            fi
-
             # Add to job summary
             {
               echo "## 📝 ServiceNow Change Request Created"
               echo ""
               echo "**Change Number:** $CHANGE_NUMBER"
               echo "**Environment:** ${{ inputs.environment }}"
-              echo "**Requested State:** $STATE"
-              echo "**Actual State:** ${ACTUAL_STATE:-Unknown}"
+              echo "**State:** ${{ steps.prepare.outputs.state }}"
               echo ""
               echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
             } >> $GITHUB_STEP_SUMMARY
@@ -553,15 +423,9 @@ jobs:
             # State values: -5=New, -4=Assess, -3=Authorize, -2=Scheduled, -1=Implement, 0=Review, 3=Closed
             # Approval values: not_requested, requested, approved, rejected
 
-            # Accept if:
-            # 1. State is Scheduled (-2) or Implement (-1) - already authorized, ready to deploy
-            # 2. Approval is approved (any state except Assess/New)
-            # 3. State is Review (0) - post-deployment
-            if [ "$STATE" = "-2" ] || [ "$STATE" = "-1" ]; then
-              echo "✅ Change Request authorized (state: $STATE) - ready for deployment"
-              exit 0
-            elif [ "$APPROVAL" = "approved" ]; then
-              echo "✅ Change Request approved (approval: $APPROVAL, state: $STATE) - ready for deployment"
+            # Accept Scheduled (-2), Implement (-1), or Review (0) states with approved status
+            if [ "$APPROVAL" = "approved" ] && ([ "$STATE" = "-2" ] || [ "$STATE" = "-1" ] || [ "$STATE" = "0" ]); then
+              echo "✅ Change Request approved (state: $STATE) and ready for deployment"
               exit 0
             elif [ "$APPROVAL" = "rejected" ]; then
               echo "❌ Change Request was rejected"
