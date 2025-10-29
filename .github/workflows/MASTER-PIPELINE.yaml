@@ -435,14 +435,14 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   servicenow-change:
-    name: "📝 ServiceNow DevOps Change"
+    name: "📝 ServiceNow Change Request"
     needs: [pipeline-init, register-packages, detect-service-changes, detect-terraform-changes, security-scans, get-deployed-version]
     if: |
       always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       needs.pipeline-init.outputs.policy_ok == 'true' &&
       !inputs.skip_deploy
-    uses: ./.github/workflows/servicenow-devops-change.yaml
+    uses: ./.github/workflows/servicenow-change-rest.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
@@ -657,11 +657,11 @@ jobs:
     needs: [pipeline-init, servicenow-change]
     if: |
       needs.servicenow-change.result == 'success' &&
-      needs.servicenow-change.outputs.change_request_number != ''
+      needs.servicenow-change.outputs.change_number != ''
     uses: ./.github/workflows/servicenow-register-work-items.yaml
     secrets: inherit
     with:
-      change_request_number: ${{ needs.servicenow-change.outputs.change_request_number }}
+      change_request_number: ${{ needs.servicenow-change.outputs.change_number }}
       pr_number: ${{ github.event.pull_request.number || '' }}
 
   update-servicenow-change:
@@ -670,13 +670,13 @@ jobs:
     if: |
       always() &&
       needs.servicenow-change.result == 'success' &&
-      needs.servicenow-change.outputs.change_request_number != '' &&
+      needs.servicenow-change.outputs.change_number != '' &&
       (needs.deploy-to-environment.result == 'success' || needs.deploy-to-environment.result == 'failure' || needs.deploy-to-environment.result == 'skipped')
     uses: ./.github/workflows/servicenow-update-change.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
-      change_request_number: ${{ needs.servicenow-change.outputs.change_request_number }}
+      change_request_number: ${{ needs.servicenow-change.outputs.change_number }}
       deployment_status: ${{ needs.deploy-to-environment.result }}
       running_pods: ${{ needs.deploy-to-environment.outputs.running_pods || '0' }}
       total_pods: ${{ needs.deploy-to-environment.outputs.total_pods || '0' }}
@@ -735,7 +735,7 @@ jobs:
           echo "## 📝 ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
           echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Change Request | ${{ needs.servicenow-change.outputs.change_request_number || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Change Request | ${{ needs.servicenow-change.outputs.change_number || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
           if [ "${{ needs.pipeline-init.outputs.environment }}" == "dev" ]; then
             echo "| Approval Status | ✅ Auto-Approved (DEV) |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.servicenow-change.result }}" == "success" ]; then
