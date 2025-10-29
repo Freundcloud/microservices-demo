@@ -171,6 +171,23 @@ Official ServiceNow DevOps Change action documentation:
   - Correct payload structure
   - Testing strategy (minimal payload → incremental)
 
+- **[Test Results Integration](SERVICENOW-TEST-RESULTS-INTEGRATION.md)** - Link unit tests and SonarCloud to approvals ⭐ NEW
+  - 13 custom fields for test results and code quality
+  - Unit test status, counts, coverage
+  - SonarCloud quality gate, bugs, vulnerabilities, code smells
+  - Complete implementation guide with API examples
+  - Approval decision matrices
+
+- **[What's New: Test Results](WHATS-NEW-TEST-RESULTS.md)** - Quick overview of test integration
+  - User-friendly summary of new capability
+  - Benefits for approvers and compliance
+  - Example approval rules
+
+- **[Fields Verification Report](SERVICENOW-FIELDS-VERIFICATION.md)** - Test results field verification
+  - All 13 fields verified working
+  - API test results
+  - Production readiness confirmation
+
 ### Still Available (in _archive)
 - Detailed architecture guides
 - Development workflows
