@@ -156,7 +156,7 @@ jobs:
       - name: Get Change Details
         id: get-change
         continue-on-error: true
-        uses: ServiceNow/servicenow-devops-get-change@84f29d50658c19c591757b37e85f04d02e51df3c  # v3.1.0
+        uses: ServiceNow/servicenow-devops-get-change@38d27ed6413d88e7b7fa9a7db248a2caaaf09596  # v3.1.0
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
