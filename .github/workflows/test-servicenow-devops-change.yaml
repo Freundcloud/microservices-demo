@@ -121,9 +121,14 @@ jobs:
             {"environment":"${{ inputs.environment }}",
             "jobName":"Deploy to ${{ inputs.environment }}"}
 
+      # Get Change retrieves the change created by the DevOps Change action above
+      # It looks up the change in ServiceNow DevOps tables using build metadata
+      # Note: This will find the change registered by the DevOps Change action,
+      # not the REST API change request we created earlier for Update testing
       - name: Get Change Details
         uses: ServiceNow/servicenow-devops-get-change@v3.1.0
         id: get-change
+        continue-on-error: true
         with:
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
           devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
@@ -131,7 +136,11 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           change-details: >-
-            {"change_request_number":"${{ steps.create-rest.outputs.change_number }}"}
+            {
+              "build_number": "${{ github.run_id }}/attempts/${{ github.run_attempt }}",
+              "pipeline_name": "${{ github.repository }}/${{ github.workflow }}",
+              "stage_name": "deploy"
+            }
 
       - name: Output Change Request Details
         if: always()
