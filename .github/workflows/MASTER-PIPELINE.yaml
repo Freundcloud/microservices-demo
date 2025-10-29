@@ -49,6 +49,7 @@ permissions:
   id-token: write
   actions: read
   issues: read
+  checks: write  # Required for run-unit-tests workflow to publish test results
 
 env:
   AWS_REGION: eu-west-2
