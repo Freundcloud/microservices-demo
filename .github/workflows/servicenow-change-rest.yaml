@@ -464,13 +464,40 @@ jobs:
             echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
             echo "change_sys_id=$CHANGE_SYSID" >> $GITHUB_OUTPUT
 
+            # CRITICAL: ServiceNow business rules force new CRs to state -5 (New)
+            # We must UPDATE the state in a separate API call
+            echo "Updating state to $STATE..."
+
+            UPDATE_PAYLOAD=$(jq -n \
+              --argjson state "$STATE" \
+              '{state: $state}')
+
+            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -X PATCH \
+              -d "$UPDATE_PAYLOAD" \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${CHANGE_SYSID}")
+
+            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            UPDATE_BODY=$(echo "$UPDATE_RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$UPDATE_HTTP_CODE" = "200" ]; then
+              ACTUAL_STATE=$(echo "$UPDATE_BODY" | jq -r '.result.state')
+              echo "✅ State updated to: $ACTUAL_STATE"
+            else
+              echo "⚠️  State update failed (HTTP $UPDATE_HTTP_CODE) - CR will remain in default state"
+              echo "$UPDATE_BODY" | jq '.' || echo "$UPDATE_BODY"
+            fi
+
             # Add to job summary
             {
               echo "## 📝 ServiceNow Change Request Created"
               echo ""
               echo "**Change Number:** $CHANGE_NUMBER"
               echo "**Environment:** ${{ inputs.environment }}"
-              echo "**State:** ${{ steps.prepare.outputs.state }}"
+              echo "**Requested State:** $STATE"
+              echo "**Actual State:** ${ACTUAL_STATE:-Unknown}"
               echo ""
               echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
             } >> $GITHUB_STEP_SUMMARY
