@@ -90,6 +90,17 @@ on:
         required: false
         type: string
         default: '0'
+      # Deployment metadata
+      deployment_method:
+        description: 'Deployment method (e.g., Kustomize overlays, Helm, kubectl)'
+        required: false
+        type: string
+        default: 'Kustomize overlays'
+      application_url:
+        description: 'Load balancer URL for the deployed application'
+        required: false
+        type: string
+        default: ''
     outputs:
       change_number:
         description: "ServiceNow Change Request Number"
@@ -218,6 +229,15 @@ jobs:
           # Build security scan URL
           SECURITY_URL="https://github.com/${{ github.repository }}/security/code-scanning"
 
+          # Build cluster namespace (microservices-{environment})
+          CLUSTER_NAMESPACE="microservices-$ENVIRONMENT"
+
+          # Get deployment method
+          DEPLOYMENT_METHOD="${{ inputs.deployment_method }}"
+
+          # Get application URL (may be empty if not yet deployed)
+          APPLICATION_URL="${{ inputs.application_url }}"
+
           # Build the JSON payload using jq
           PAYLOAD=$(jq -n \
             --arg short_desc "$SHORT_DESC" \
@@ -261,6 +281,9 @@ jobs:
             --arg u_high_vulnerabilities "$HIGH" \
             --arg u_medium_vulnerabilities "$MEDIUM" \
             --arg u_security_scan_url "$SECURITY_URL" \
+            --arg u_cluster_namespace "$CLUSTER_NAMESPACE" \
+            --arg u_deployment_method "$DEPLOYMENT_METHOD" \
+            --arg u_application_url "$APPLICATION_URL" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -302,7 +325,10 @@ jobs:
               u_critical_vulnerabilities: $u_critical_vulnerabilities,
               u_high_vulnerabilities: $u_high_vulnerabilities,
               u_medium_vulnerabilities: $u_medium_vulnerabilities,
-              u_security_scan_url: $u_security_scan_url
+              u_security_scan_url: $u_security_scan_url,
+              u_cluster_namespace: $u_cluster_namespace,
+              u_deployment_method: $u_deployment_method,
+              u_application_url: $u_application_url
             }'
           )
 
