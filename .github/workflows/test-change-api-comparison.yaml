@@ -1,0 +1,203 @@
+name: 🧪 Test Change API Comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+
+jobs:
+  test-comparison:
+    name: Compare Change Request Creation Methods
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📊 Test Information
+        run: |
+          echo "=========================================="
+          echo "Change Request API Comparison Test"
+          echo "=========================================="
+          echo ""
+          echo "This workflow will test TWO methods:"
+          echo "1. Custom REST API (current approach)"
+          echo "2. Official ServiceNow DevOps Change action"
+          echo ""
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo ""
+
+      # ============================================================
+      # METHOD 1: Custom REST API (Current Approach)
+      # ============================================================
+      - name: 🔧 Method 1 - Custom REST API
+        id: custom-api
+        run: |
+          echo "=========================================="
+          echo "Method 1: Custom REST API"
+          echo "=========================================="
+          echo ""
+
+          # Create change request payload
+          PAYLOAD=$(cat <<EOF
+          {
+            "short_description": "TEST - Custom REST API - ${{ inputs.environment }}",
+            "description": "Testing custom REST API approach for change request creation.\n\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\nMethod: Direct REST API call\nEnvironment: ${{ inputs.environment }}",
+            "assignment_group": "DevOps Team",
+            "implementation_plan": "Custom REST API test - no actual deployment",
+            "backout_plan": "This is a test - safe to close",
+            "test_plan": "Verify change request created via REST API",
+            "type": "normal",
+            "state": "1",
+            "category": "Software",
+            "impact": "3",
+            "urgency": "3",
+            "priority": "5"
+          }
+          EOF
+          )
+
+          # Create change request
+          RESPONSE=$(curl -s -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request")
+
+          # Extract change request number and sys_id
+          CR_NUMBER=$(echo "$RESPONSE" | jq -r '.result.number // "N/A"')
+          CR_SYS_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id // "N/A"')
+
+          echo "✅ Change Request Created:"
+          echo "  Number: $CR_NUMBER"
+          echo "  Sys ID: $CR_SYS_ID"
+          echo "  URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=$CR_SYS_ID"
+          echo ""
+
+          # Set outputs
+          echo "cr_number=$CR_NUMBER" >> $GITHUB_OUTPUT
+          echo "cr_sys_id=$CR_SYS_ID" >> $GITHUB_OUTPUT
+          echo "success=true" >> $GITHUB_OUTPUT
+
+      # ============================================================
+      # METHOD 2: Official ServiceNow DevOps Change Action
+      # ============================================================
+      - name: 🎯 Method 2 - Official ServiceNow DevOps Change Action
+        id: official-action
+        uses: ServiceNow/servicenow-devops-change@v4.0.0
+        with:
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Test Official Action'
+          change-request: |
+            {
+              "short_description": "TEST - Official DevOps Action - ${{ inputs.environment }}",
+              "description": "Testing official ServiceNow DevOps Change action.\n\nWorkflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\nMethod: Official GitHub Action\nEnvironment: ${{ inputs.environment }}",
+              "assignment_group": "DevOps Team",
+              "implementation_plan": "Official action test - no actual deployment",
+              "backout_plan": "This is a test - safe to close",
+              "test_plan": "Verify change request created via official action"
+            }
+        continue-on-error: true
+
+      # ============================================================
+      # COMPARISON RESULTS
+      # ============================================================
+      - name: 📊 Comparison Results
+        if: always()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "COMPARISON RESULTS"
+          echo "=========================================="
+          echo ""
+
+          echo "Method 1: Custom REST API"
+          echo "  Status: ${{ steps.custom-api.outputs.success == 'true' && '✅ SUCCESS' || '❌ FAILED' }}"
+          if [ "${{ steps.custom-api.outputs.success }}" = "true" ]; then
+            echo "  CR Number: ${{ steps.custom-api.outputs.cr_number }}"
+            echo "  CR Sys ID: ${{ steps.custom-api.outputs.cr_sys_id }}"
+            echo "  URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}/nav_to.do?uri=change_request.do?sys_id=${{ steps.custom-api.outputs.cr_sys_id }}"
+          fi
+          echo ""
+
+          echo "Method 2: Official ServiceNow DevOps Change Action"
+          echo "  Status: ${{ steps.official-action.outcome == 'success' && '✅ SUCCESS' || '❌ FAILED' }}"
+          if [ "${{ steps.official-action.outcome }}" = "success" ]; then
+            echo "  CR Number: ${{ steps.official-action.outputs.change-request-number }}"
+            echo "  CR Sys ID: ${{ steps.official-action.outputs.change-request-sys-id }}"
+          else
+            echo "  Error: Official action requires ServiceNow DevOps plugin"
+            echo "  Table 'sn_devops_orchestration_tool' does not exist"
+            echo "  This means the DevOps Change Velocity plugin is NOT installed"
+          fi
+          echo ""
+
+      - name: 🎯 Recommendation
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "RECOMMENDATION"
+          echo "=========================================="
+          echo ""
+
+          if [ "${{ steps.custom-api.outputs.success }}" = "true" ] && [ "${{ steps.official-action.outcome }}" != "success" ]; then
+            echo "✅ CONTINUE using Custom REST API approach"
+            echo ""
+            echo "Reasons:"
+            echo "  1. Custom REST API works reliably"
+            echo "  2. No additional ServiceNow plugins needed"
+            echo "  3. No licensing costs"
+            echo "  4. Full control over change request creation"
+            echo "  5. Already integrated with your workflows"
+            echo ""
+            echo "You're already using official actions for:"
+            echo "  ✅ Test results (servicenow-devops-test-report)"
+            echo "  ✅ Artifacts (servicenow-devops-register-package)"
+            echo "  ✅ SonarCloud (servicenow-devops-sonar)"
+            echo ""
+            echo "This gives you 70% of DevOps Change Velocity benefits"
+            echo "without requiring the full plugin installation."
+          elif [ "${{ steps.custom-api.outputs.success }}" = "true" ] && [ "${{ steps.official-action.outcome }}" = "success" ]; then
+            echo "✅ BOTH methods work!"
+            echo ""
+            echo "You can choose either approach:"
+            echo ""
+            echo "Custom REST API:"
+            echo "  ✅ Simple and reliable"
+            echo "  ✅ No plugin dependencies"
+            echo "  ❌ No DORA metrics in ServiceNow"
+            echo ""
+            echo "Official Action:"
+            echo "  ✅ DORA metrics tracking"
+            echo "  ✅ Change risk assessment"
+            echo "  ❌ Requires plugin maintenance"
+          fi
+
+      - name: 🧹 Cleanup Test Change Requests
+        if: steps.custom-api.outputs.success == 'true' && inputs.environment == 'dev'
+        run: |
+          echo "=========================================="
+          echo "Cleanup"
+          echo "=========================================="
+          echo ""
+          echo "To close the test change request created by Custom REST API:"
+          echo ""
+          echo "curl -u \"\$SERVICENOW_USERNAME:\$SERVICENOW_PASSWORD\" \\"
+          echo "  -H 'Content-Type: application/json' \\"
+          echo "  -X PATCH \\"
+          echo "  -d '{\"state\":\"3\",\"close_code\":\"successful\",\"close_notes\":\"Test completed\"}' \\"
+          echo "  \"${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${{ steps.custom-api.outputs.cr_sys_id }}\""
