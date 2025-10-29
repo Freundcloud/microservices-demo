@@ -41,9 +41,61 @@ ServiceNow DevOps plugin supports two operational modes:
 
 ---
 
-## How to Enable changeControl
+## ✅ SOLUTION FOUND: How to Enable changeControl
 
-### Method 1: Via ServiceNow UI (Recommended)
+### Method 1: Remove deployment-gate Parameter (EASIEST - NO SERVICENOW ADMIN NEEDED!)
+
+**After analyzing the ServiceNow DevOps Change action source code, I found the root cause!**
+
+**The Problem:**
+When you provide the `deployment-gate` parameter in your GitHub Actions workflow, ServiceNow operates in "deployment gate mode" which returns `changeControl: false`.
+
+**The Solution:**
+**Simply REMOVE or COMMENT OUT the `deployment-gate` parameter!**
+
+**Source Code Evidence:**
+```javascript
+// From https://github.com/ServiceNow/servicenow-devops-change/blob/main/src/lib/create-change.js
+if (deploymentGateStr) {
+  payload.deploymentGateDetails = deploymentGateDetails;  // ← This triggers deployment gate mode!
+}
+```
+
+When `deploymentGateDetails` is included in the API payload, ServiceNow switches to deployment gate mode instead of creating traditional change requests.
+
+**How to Fix in Your Workflow:**
+
+In `.github/workflows/servicenow-devops-change.yaml`:
+
+```yaml
+# ❌ BEFORE (causes changeControl: false)
+deployment-gate: >-
+  {
+    "environment": "${{ inputs.environment }}",
+    "jobName": "Register Deployment"
+  }
+
+# ✅ AFTER (enables changeControl: true)
+# Simply comment it out or remove it entirely:
+# deployment-gate: >-
+#   {
+#     "environment": "${{ inputs.environment }}",
+#     "jobName": "Register Deployment"
+#   }
+```
+
+**That's it!** No ServiceNow admin access needed. No API calls. Just remove one parameter.
+
+**Testing:**
+```bash
+# After removing deployment-gate, trigger a workflow
+gh workflow run MASTER-PIPELINE.yaml --field environment=dev
+
+# Then check for traditional change request
+# It should now return changeControl: true and create a CR in change_request table
+```
+
+### Method 2: Via ServiceNow UI
 
 **Step 1: Navigate to DevOps Configuration**
 1. Log into ServiceNow: `https://calitiiltddemo3.service-now.com`
