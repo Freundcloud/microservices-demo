@@ -67,7 +67,7 @@ jobs:
 
       - name: ServiceNow DevOps Change
         id: create-change
-        uses: ServiceNow/servicenow-devops-change@6cabe84f2a0e07097dca3de837945ddd89a68f7d  # v6.1.0
+        uses: ServiceNow/servicenow-devops-change@5a9cae19b2869dbae3981d5e86feeef1dbd0306e  # v6.1.0
         with:
           # Authentication (Basic Auth - working method)
           devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
