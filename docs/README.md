@@ -165,6 +165,12 @@ Official ServiceNow DevOps Change action documentation:
   - Hybrid approach (fast dev, compliant qa/prod)
   - Troubleshooting approval issues
 
+- **[Change Request Payload Fix](SERVICENOW-DEVOPS-CHANGE-PAYLOAD-FIX.md)** - Fix "Internal server error" issues
+  - Why display names fail (must use sys_id)
+  - Invalid/unsupported fields (subcategory, justification)
+  - Correct payload structure
+  - Testing strategy (minimal payload → incremental)
+
 ### Still Available (in _archive)
 - Detailed architecture guides
 - Development workflows
