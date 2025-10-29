@@ -101,6 +101,73 @@ on:
         required: false
         type: string
         default: ''
+      # Unit test results
+      unit_test_status:
+        description: 'Unit test status (passed/failed)'
+        required: false
+        type: string
+        default: ''
+      unit_test_total:
+        description: 'Total number of unit tests'
+        required: false
+        type: string
+        default: '0'
+      unit_test_passed:
+        description: 'Number of unit tests passed'
+        required: false
+        type: string
+        default: '0'
+      unit_test_failed:
+        description: 'Number of unit tests failed'
+        required: false
+        type: string
+        default: '0'
+      unit_test_coverage:
+        description: 'Unit test code coverage percentage'
+        required: false
+        type: string
+        default: ''
+      unit_test_url:
+        description: 'URL to view unit test results'
+        required: false
+        type: string
+        default: ''
+      # SonarCloud results
+      sonarcloud_status:
+        description: 'SonarCloud quality gate status (passed/failed/warning)'
+        required: false
+        type: string
+        default: ''
+      sonarcloud_bugs:
+        description: 'Number of bugs detected by SonarCloud'
+        required: false
+        type: string
+        default: '0'
+      sonarcloud_vulnerabilities:
+        description: 'Number of vulnerabilities detected by SonarCloud'
+        required: false
+        type: string
+        default: '0'
+      sonarcloud_code_smells:
+        description: 'Number of code smells detected by SonarCloud'
+        required: false
+        type: string
+        default: '0'
+      sonarcloud_coverage:
+        description: 'SonarCloud code coverage percentage'
+        required: false
+        type: string
+        default: ''
+      sonarcloud_duplications:
+        description: 'SonarCloud code duplication percentage'
+        required: false
+        type: string
+        default: ''
+      sonarcloud_url:
+        description: 'URL to view SonarCloud dashboard'
+        required: false
+        type: string
+        default: ''
     outputs:
       change_number:
         description: "ServiceNow Change Request Number"
@@ -241,6 +308,23 @@ jobs:
           # Get application URL (may be empty if not yet deployed)
           APPLICATION_URL="${{ inputs.application_url }}"
 
+          # Get unit test results
+          UNIT_TEST_STATUS="${{ inputs.unit_test_status }}"
+          UNIT_TEST_TOTAL="${{ inputs.unit_test_total }}"
+          UNIT_TEST_PASSED="${{ inputs.unit_test_passed }}"
+          UNIT_TEST_FAILED="${{ inputs.unit_test_failed }}"
+          UNIT_TEST_COVERAGE="${{ inputs.unit_test_coverage }}"
+          UNIT_TEST_URL="${{ inputs.unit_test_url }}"
+
+          # Get SonarCloud results
+          SONARCLOUD_STATUS="${{ inputs.sonarcloud_status }}"
+          SONARCLOUD_BUGS="${{ inputs.sonarcloud_bugs }}"
+          SONARCLOUD_VULNS="${{ inputs.sonarcloud_vulnerabilities }}"
+          SONARCLOUD_SMELLS="${{ inputs.sonarcloud_code_smells }}"
+          SONARCLOUD_COVERAGE="${{ inputs.sonarcloud_coverage }}"
+          SONARCLOUD_DUPS="${{ inputs.sonarcloud_duplications }}"
+          SONARCLOUD_URL="${{ inputs.sonarcloud_url }}"
+
           # Build the JSON payload using jq
           # Note: Detailed metadata (repository, commit, environment, etc.) is now stored in dedicated custom fields
           PAYLOAD=$(jq -n \
@@ -288,6 +372,19 @@ jobs:
             --arg u_cluster_namespace "$CLUSTER_NAMESPACE" \
             --arg u_deployment_method "$DEPLOYMENT_METHOD" \
             --arg u_application_url "$APPLICATION_URL" \
+            --arg u_unit_test_status "$UNIT_TEST_STATUS" \
+            --arg u_unit_test_total "$UNIT_TEST_TOTAL" \
+            --arg u_unit_test_passed "$UNIT_TEST_PASSED" \
+            --arg u_unit_test_failed "$UNIT_TEST_FAILED" \
+            --arg u_unit_test_coverage "$UNIT_TEST_COVERAGE" \
+            --arg u_unit_test_url "$UNIT_TEST_URL" \
+            --arg u_sonarcloud_status "$SONARCLOUD_STATUS" \
+            --arg u_sonarcloud_bugs "$SONARCLOUD_BUGS" \
+            --arg u_sonarcloud_vulnerabilities "$SONARCLOUD_VULNS" \
+            --arg u_sonarcloud_code_smells "$SONARCLOUD_SMELLS" \
+            --arg u_sonarcloud_coverage "$SONARCLOUD_COVERAGE" \
+            --arg u_sonarcloud_duplications "$SONARCLOUD_DUPS" \
+            --arg u_sonarcloud_url "$SONARCLOUD_URL" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -332,7 +429,20 @@ jobs:
               u_security_scan_url: $u_security_scan_url,
               u_cluster_namespace: $u_cluster_namespace,
               u_deployment_method: $u_deployment_method,
-              u_application_url: $u_application_url
+              u_application_url: $u_application_url,
+              u_unit_test_status: $u_unit_test_status,
+              u_unit_test_total: $u_unit_test_total,
+              u_unit_test_passed: $u_unit_test_passed,
+              u_unit_test_failed: $u_unit_test_failed,
+              u_unit_test_coverage: $u_unit_test_coverage,
+              u_unit_test_url: $u_unit_test_url,
+              u_sonarcloud_status: $u_sonarcloud_status,
+              u_sonarcloud_bugs: $u_sonarcloud_bugs,
+              u_sonarcloud_vulnerabilities: $u_sonarcloud_vulnerabilities,
+              u_sonarcloud_code_smells: $u_sonarcloud_code_smells,
+              u_sonarcloud_coverage: $u_sonarcloud_coverage,
+              u_sonarcloud_duplications: $u_sonarcloud_duplications,
+              u_sonarcloud_url: $u_sonarcloud_url
             }'
           )
 
