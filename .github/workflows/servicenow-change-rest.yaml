@@ -90,6 +90,73 @@ on:
         required: false
         type: string
         default: '0'
+      # Unit test results
+      unit_test_status:
+        description: 'Overall unit test status (passed/failed/skipped)'
+        required: false
+        type: string
+        default: ''
+      unit_test_total:
+        description: 'Total number of unit tests executed'
+        required: false
+        type: string
+        default: '0'
+      unit_test_passed:
+        description: 'Number of unit tests that passed'
+        required: false
+        type: string
+        default: '0'
+      unit_test_failed:
+        description: 'Number of unit tests that failed'
+        required: false
+        type: string
+        default: '0'
+      unit_test_coverage:
+        description: 'Code coverage percentage from unit tests'
+        required: false
+        type: string
+        default: ''
+      unit_test_url:
+        description: 'Link to detailed unit test results'
+        required: false
+        type: string
+        default: ''
+      # SonarCloud scan results
+      sonarcloud_status:
+        description: 'SonarCloud quality gate status (passed/failed/warning)'
+        required: false
+        type: string
+        default: ''
+      sonarcloud_bugs:
+        description: 'Number of bugs detected by SonarCloud'
+        required: false
+        type: string
+        default: '0'
+      sonarcloud_vulnerabilities:
+        description: 'Number of vulnerabilities detected by SonarCloud'
+        required: false
+        type: string
+        default: '0'
+      sonarcloud_code_smells:
+        description: 'Number of code smells detected by SonarCloud'
+        required: false
+        type: string
+        default: '0'
+      sonarcloud_coverage:
+        description: 'Code coverage percentage from SonarCloud'
+        required: false
+        type: string
+        default: ''
+      sonarcloud_duplications:
+        description: 'Code duplication percentage from SonarCloud'
+        required: false
+        type: string
+        default: ''
+      sonarcloud_url:
+        description: 'Link to SonarCloud project dashboard'
+        required: false
+        type: string
+        default: ''
       # Deployment metadata
       deployment_method:
         description: 'Deployment method (e.g., Kustomize overlays, Helm, kubectl)'
@@ -285,6 +352,19 @@ jobs:
             --arg u_cluster_namespace "$CLUSTER_NAMESPACE" \
             --arg u_deployment_method "$DEPLOYMENT_METHOD" \
             --arg u_application_url "$APPLICATION_URL" \
+            --arg u_unit_test_status "${{ inputs.unit_test_status }}" \
+            --arg u_unit_test_total "${{ inputs.unit_test_total }}" \
+            --arg u_unit_test_passed "${{ inputs.unit_test_passed }}" \
+            --arg u_unit_test_failed "${{ inputs.unit_test_failed }}" \
+            --arg u_unit_test_coverage "${{ inputs.unit_test_coverage }}" \
+            --arg u_unit_test_url "${{ inputs.unit_test_url }}" \
+            --arg u_sonarcloud_status "${{ inputs.sonarcloud_status }}" \
+            --arg u_sonarcloud_bugs "${{ inputs.sonarcloud_bugs }}" \
+            --arg u_sonarcloud_vulnerabilities "${{ inputs.sonarcloud_vulnerabilities }}" \
+            --arg u_sonarcloud_code_smells "${{ inputs.sonarcloud_code_smells }}" \
+            --arg u_sonarcloud_coverage "${{ inputs.sonarcloud_coverage }}" \
+            --arg u_sonarcloud_duplications "${{ inputs.sonarcloud_duplications }}" \
+            --arg u_sonarcloud_url "${{ inputs.sonarcloud_url }}" \
             '{
               short_description: $short_desc,
               description: $description,
@@ -329,7 +409,20 @@ jobs:
               u_security_scan_url: $u_security_scan_url,
               u_cluster_namespace: $u_cluster_namespace,
               u_deployment_method: $u_deployment_method,
-              u_application_url: $u_application_url
+              u_application_url: $u_application_url,
+              u_unit_test_status: $u_unit_test_status,
+              u_unit_test_total: $u_unit_test_total,
+              u_unit_test_passed: $u_unit_test_passed,
+              u_unit_test_failed: $u_unit_test_failed,
+              u_unit_test_coverage: $u_unit_test_coverage,
+              u_unit_test_url: $u_unit_test_url,
+              u_sonarcloud_status: $u_sonarcloud_status,
+              u_sonarcloud_bugs: $u_sonarcloud_bugs,
+              u_sonarcloud_vulnerabilities: $u_sonarcloud_vulnerabilities,
+              u_sonarcloud_code_smells: $u_sonarcloud_code_smells,
+              u_sonarcloud_coverage: $u_sonarcloud_coverage,
+              u_sonarcloud_duplications: $u_sonarcloud_duplications,
+              u_sonarcloud_url: $u_sonarcloud_url
             }'
           )
 

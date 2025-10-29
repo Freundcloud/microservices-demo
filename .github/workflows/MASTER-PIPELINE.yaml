@@ -454,6 +454,23 @@ jobs:
       security_scan_status: '${{ needs.security-scans.outputs.test_result }}'
       critical_vulnerabilities: '${{ needs.security-scans.outputs.critical_count }}'
       high_vulnerabilities: '${{ needs.security-scans.outputs.high_count }}'
+      # Unit test results (fields available, workflows need enhancement to populate)
+      # TODO: Add outputs to run-unit-tests.yaml workflow and wire them here
+      unit_test_status: ''
+      unit_test_total: '0'
+      unit_test_passed: '0'
+      unit_test_failed: '0'
+      unit_test_coverage: ''
+      unit_test_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+      # SonarCloud scan results (fields available, workflows need enhancement to populate)
+      # TODO: Add outputs to sonarcloud-scan.yaml workflow and wire them here
+      sonarcloud_status: ''
+      sonarcloud_bugs: '0'
+      sonarcloud_vulnerabilities: '0'
+      sonarcloud_code_smells: '0'
+      sonarcloud_coverage: ''
+      sonarcloud_duplications: ''
+      sonarcloud_url: 'https://sonarcloud.io/dashboard?id=Freundcloud_microservices-demo'
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
