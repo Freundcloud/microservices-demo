@@ -219,13 +219,53 @@ jobs:
           PRIORITY: ${{ steps.prepare.outputs.priority }}
           ASSIGNMENT_GROUP: ${{ inputs.assignment_group }}
           ASSIGNED_TO: ${{ inputs.assigned_to }}
-          IMPL_PLAN: ${{ inputs.implementation_plan || '1. Configure kubectl access to EKS cluster\n2. Apply Kustomize overlays\n3. Monitor rollout status\n4. Verify all pods healthy\n5. Test application endpoints' }}
-          BACKOUT_PLAN: ${{ inputs.backout_plan || '1. Execute kubectl rollout undo\n2. Verify rollback completed\n3. Monitor pod status\n4. Test application functionality\n5. Notify stakeholders' }}
-          TEST_PLAN: ${{ inputs.test_plan || '1. Verify deployments rolled out\n2. Check all pods Running\n3. Verify service endpoints\n4. Test frontend accessibility\n5. Monitor application metrics' }}
           ENVIRONMENT: ${{ inputs.environment }}
           CHANGE_TYPE: ${{ inputs.change_type }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          IMPL_PLAN_INPUT: ${{ inputs.implementation_plan }}
+          BACKOUT_PLAN_INPUT: ${{ inputs.backout_plan }}
+          TEST_PLAN_INPUT: ${{ inputs.test_plan }}
         run: |
+          # Set default plans with proper newline formatting
+          if [ -z "$IMPL_PLAN_INPUT" ]; then
+            IMPL_PLAN=$(cat <<'EOF'
+          1. Configure kubectl access to EKS cluster
+          2. Apply Kustomize overlays
+          3. Monitor rollout status
+          4. Verify all pods healthy
+          5. Test application endpoints
+          EOF
+          )
+          else
+            IMPL_PLAN="$IMPL_PLAN_INPUT"
+          fi
+
+          if [ -z "$BACKOUT_PLAN_INPUT" ]; then
+            BACKOUT_PLAN=$(cat <<'EOF'
+          1. Execute kubectl rollout undo
+          2. Verify rollback completed
+          3. Monitor pod status
+          4. Test application functionality
+          5. Notify stakeholders
+          EOF
+          )
+          else
+            BACKOUT_PLAN="$BACKOUT_PLAN_INPUT"
+          fi
+
+          if [ -z "$TEST_PLAN_INPUT" ]; then
+            TEST_PLAN=$(cat <<'EOF'
+          1. Verify deployments rolled out
+          2. Check all pods Running
+          3. Verify service endpoints
+          4. Test frontend accessibility
+          5. Monitor application metrics
+          EOF
+          )
+          else
+            TEST_PLAN="$TEST_PLAN_INPUT"
+          fi
+
           # Determine risk/impact based on environment
           if [ "$ENVIRONMENT" = "prod" ]; then
             RISK="2"
