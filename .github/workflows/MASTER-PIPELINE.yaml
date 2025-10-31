@@ -558,12 +558,15 @@ jobs:
 
   servicenow-change:
     name: "📝 ServiceNow Change Request"
-    needs: [pipeline-init, register-packages, detect-service-changes, detect-terraform-changes, security-scans, sonarcloud-scan, unit-test-summary, get-deployed-version]
+    needs: [pipeline-init, detect-service-changes, detect-terraform-changes, security-scans, sonarcloud-scan, unit-test-summary, get-deployed-version]
     if: |
       always() &&
       needs.pipeline-init.outputs.should_deploy == 'true' &&
       needs.pipeline-init.outputs.policy_ok == 'true' &&
-      !inputs.skip_deploy
+      !inputs.skip_deploy &&
+      (needs.security-scans.result == 'success' || needs.security-scans.result == 'skipped') &&
+      (needs.sonarcloud-scan.result == 'success' || needs.sonarcloud-scan.result == 'skipped') &&
+      (needs.unit-test-summary.result == 'success' || needs.unit-test-summary.result == 'skipped')
     uses: ./.github/workflows/servicenow-change-rest.yaml
     secrets: inherit
     with:
