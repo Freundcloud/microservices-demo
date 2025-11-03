@@ -1,173 +1,179 @@
 ---
 name: "ServiceNow Change Request (REST API)"
 
+# IMPORTANT: This workflow uses ServiceNow Table API (/api/now/table/change_request)
+# instead of DevOps Change Control API (/api/sn_devops/v1/devops/orchestration/changeControl)
+# Reason: Table API supports custom fields (u_*) for comprehensive audit trail and compliance.
+# DevOps API does not support custom fields, which are critical for SOC 2/ISO 27001 compliance.
+# See docs/SERVICENOW-API-COMPARISON.md for detailed comparison.
+
 on:
   workflow_call:
     inputs:
       environment:
-        description: 'Target environment (dev/qa/prod)'
+        description: "Target environment (dev/qa/prod)"
         required: true
         type: string
       change_type:
-        description: 'Type of change (kubernetes/terraform/configuration)'
+        description: "Type of change (kubernetes/terraform/configuration)"
         required: false
         type: string
-        default: 'kubernetes'
+        default: "kubernetes"
       short_description:
-        description: 'Short description of the change'
+        description: "Short description of the change"
         required: true
         type: string
       description:
-        description: 'Detailed description of the change'
+        description: "Detailed description of the change"
         required: false
         type: string
       implementation_plan:
-        description: 'Implementation plan'
+        description: "Implementation plan"
         required: false
         type: string
       backout_plan:
-        description: 'Backout plan'
+        description: "Backout plan"
         required: false
         type: string
       test_plan:
-        description: 'Test plan'
+        description: "Test plan"
         required: false
         type: string
       assignment_group:
-        description: 'Assignment group for the change'
+        description: "Assignment group for the change"
         required: false
         type: string
-        default: 'GitHubARC DevOps Admin'
+        default: "GitHubARC DevOps Admin"
       assigned_to:
-        description: 'User assigned to the change'
+        description: "User assigned to the change"
         required: false
         type: string
-        default: 'Olaf Krasicki-Freund'
+        default: "Olaf Krasicki-Freund"
       # Additional deployment context
       services_deployed:
-        description: 'JSON array of services being deployed'
+        description: "JSON array of services being deployed"
         required: false
         type: string
-        default: '[]'
+        default: "[]"
       infrastructure_changes:
-        description: 'Whether infrastructure changes are included'
+        description: "Whether infrastructure changes are included"
         required: false
         type: string
-        default: 'false'
+        default: "false"
       security_scanners:
-        description: 'List of security scanners that ran'
+        description: "List of security scanners that ran"
         required: false
         type: string
-        default: ''
+        default: ""
       pr_number:
-        description: 'Pull request number if triggered by PR'
+        description: "Pull request number if triggered by PR"
         required: false
         type: string
-        default: ''
+        default: ""
       previous_version:
-        description: 'Previous version being replaced'
+        description: "Previous version being replaced"
         required: false
         type: string
-        default: ''
+        default: ""
       # Security scan results
       security_scan_status:
-        description: 'Overall security scan status (passed/failed/warning)'
+        description: "Overall security scan status (passed/failed/warning)"
         required: false
         type: string
-        default: ''
+        default: ""
       critical_vulnerabilities:
-        description: 'Count of critical severity vulnerabilities'
+        description: "Count of critical severity vulnerabilities"
         required: false
         type: string
-        default: '0'
+        default: "0"
       high_vulnerabilities:
-        description: 'Count of high severity vulnerabilities'
+        description: "Count of high severity vulnerabilities"
         required: false
         type: string
-        default: '0'
+        default: "0"
       medium_vulnerabilities:
-        description: 'Count of medium severity vulnerabilities'
+        description: "Count of medium severity vulnerabilities"
         required: false
         type: string
-        default: '0'
+        default: "0"
       # Deployment metadata
       deployment_method:
-        description: 'Deployment method (e.g., Kustomize overlays, Helm, kubectl)'
+        description: "Deployment method (e.g., Kustomize overlays, Helm, kubectl)"
         required: false
         type: string
-        default: 'Kustomize overlays'
+        default: "Kustomize overlays"
       application_url:
-        description: 'Load balancer URL for the deployed application'
+        description: "Load balancer URL for the deployed application"
         required: false
         type: string
-        default: ''
+        default: ""
       # Unit test results
       unit_test_status:
-        description: 'Unit test status (passed/failed)'
+        description: "Unit test status (passed/failed)"
         required: false
         type: string
-        default: ''
+        default: ""
       unit_test_total:
-        description: 'Total number of unit tests'
+        description: "Total number of unit tests"
         required: false
         type: string
-        default: '0'
+        default: "0"
       unit_test_passed:
-        description: 'Number of unit tests passed'
+        description: "Number of unit tests passed"
         required: false
         type: string
-        default: '0'
+        default: "0"
       unit_test_failed:
-        description: 'Number of unit tests failed'
+        description: "Number of unit tests failed"
         required: false
         type: string
-        default: '0'
+        default: "0"
       unit_test_coverage:
-        description: 'Unit test code coverage percentage'
+        description: "Unit test code coverage percentage"
         required: false
         type: string
-        default: ''
+        default: ""
       unit_test_url:
-        description: 'URL to view unit test results'
+        description: "URL to view unit test results"
         required: false
         type: string
-        default: ''
+        default: ""
       # SonarCloud results
       sonarcloud_status:
-        description: 'SonarCloud quality gate status (passed/failed/warning)'
+        description: "SonarCloud quality gate status (passed/failed/warning)"
         required: false
         type: string
-        default: ''
+        default: ""
       sonarcloud_bugs:
-        description: 'Number of bugs detected by SonarCloud'
+        description: "Number of bugs detected by SonarCloud"
         required: false
         type: string
-        default: '0'
+        default: "0"
       sonarcloud_vulnerabilities:
-        description: 'Number of vulnerabilities detected by SonarCloud'
+        description: "Number of vulnerabilities detected by SonarCloud"
         required: false
         type: string
-        default: '0'
+        default: "0"
       sonarcloud_code_smells:
-        description: 'Number of code smells detected by SonarCloud'
+        description: "Number of code smells detected by SonarCloud"
         required: false
         type: string
-        default: '0'
+        default: "0"
       sonarcloud_coverage:
-        description: 'SonarCloud code coverage percentage'
+        description: "SonarCloud code coverage percentage"
         required: false
         type: string
-        default: ''
+        default: ""
       sonarcloud_duplications:
-        description: 'SonarCloud code duplication percentage'
+        description: "SonarCloud code duplication percentage"
         required: false
         type: string
-        default: ''
+        default: ""
       sonarcloud_url:
-        description: 'URL to view SonarCloud dashboard'
+        description: "URL to view SonarCloud dashboard"
         required: false
         type: string
-        default: ''
+        default: ""
     outputs:
       change_number:
         description: "ServiceNow Change Request Number"
