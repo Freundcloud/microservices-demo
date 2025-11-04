@@ -188,6 +188,23 @@ Official ServiceNow DevOps Change action documentation:
   - API test results
   - Production readiness confirmation
 
+### API Comparison and Testing
+
+- **[ServiceNow API Comparison](SERVICENOW-API-COMPARISON.md)** - Table API vs DevOps Change Control API
+  - Detailed endpoint comparison
+  - Request/response format differences
+  - Feature trade-offs and limitations
+  - **Key Finding**: DevOps API does NOT support custom fields (u_*)
+  - Recommendation: Keep Table API for compliance
+
+- **[DevOps API Testing Guide](SERVICENOW-DEVOPS-API-TESTING.md)** - Test experimental DevOps API workflow ⭐ NEW
+  - Prerequisites and ServiceNow DevOps plugin setup
+  - Step-by-step testing procedure
+  - Side-by-side comparison checklist
+  - Decision matrix for choosing between APIs
+  - Integration instructions for both approaches
+  - Complete troubleshooting guide
+
 ### Still Available (in _archive)
 - Detailed architecture guides
 - Development workflows

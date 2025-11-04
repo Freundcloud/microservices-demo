@@ -1,0 +1,300 @@
+---
+name: "ServiceNow Change Request (DevOps API)"
+
+# EXPERIMENTAL: This workflow uses ServiceNow DevOps Change Control API
+# Endpoint: /api/sn_devops/v1/devops/orchestration/changeControl
+# Purpose: Test DevOps API approach for comparison with Table API
+# Limitations: Does NOT support custom fields (u_*)
+# See docs/SERVICENOW-DEVOPS-API-TESTING.md for setup and testing guide
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target environment (dev/qa/prod)"
+        required: true
+        type: string
+      short_description:
+        description: "Short description of the change"
+        required: true
+        type: string
+      description:
+        description: "Detailed description of the change"
+        required: false
+        type: string
+      implementation_plan:
+        description: "Implementation plan"
+        required: false
+        type: string
+      backout_plan:
+        description: "Backout plan"
+        required: false
+        type: string
+      test_plan:
+        description: "Test plan"
+        required: false
+        type: string
+      assignment_group:
+        description: "Assignment group for the change"
+        required: false
+        type: string
+        default: "GitHubARC DevOps Admin"
+      assigned_to:
+        description: "User assigned to the change"
+        required: false
+        type: string
+        default: "Olaf Krasicki-Freund"
+    outputs:
+      change_number:
+        description: "ServiceNow Change Request Number"
+        value: ${{ jobs.create-change.outputs.change_number }}
+      change_sys_id:
+        description: "ServiceNow Change Request Sys ID"
+        value: ${{ jobs.create-change.outputs.change_sys_id }}
+
+permissions:
+  contents: read
+
+jobs:
+  create-change:
+    name: "Create Change via DevOps API (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    outputs:
+      change_number: ${{ steps.create-cr.outputs.change_number }}
+      change_sys_id: ${{ steps.create-cr.outputs.change_sys_id }}
+
+    steps:
+      - name: Prepare Change Request Data
+        id: prepare
+        run: |
+          # Determine state and auto-close behavior
+          if [ "${{ inputs.environment }}" = "dev" ]; then
+            # Dev: Auto-approved and auto-close on completion
+            AUTO_CLOSE="true"
+            SET_CLOSE_CODE="true"
+          else
+            # QA/Prod: Require manual approval, auto-close on success
+            AUTO_CLOSE="true"
+            SET_CLOSE_CODE="true"
+          fi
+
+          echo "auto_close=$AUTO_CLOSE" >> $GITHUB_OUTPUT
+          echo "set_close_code=$SET_CLOSE_CODE" >> $GITHUB_OUTPUT
+
+      - name: Set Default Plans
+        id: plans
+        env:
+          IMPL_PLAN_INPUT: ${{ inputs.implementation_plan }}
+          BACKOUT_PLAN_INPUT: ${{ inputs.backout_plan }}
+          TEST_PLAN_INPUT: ${{ inputs.test_plan }}
+        run: |
+          # Set default implementation plan
+          if [ -z "$IMPL_PLAN_INPUT" ]; then
+            IMPL_PLAN=$(cat <<'EOF'
+          1. Configure kubectl access to EKS cluster
+          2. Apply Kustomize overlays to target namespace
+          3. Monitor rollout status for all deployments
+          4. Verify all pods reach healthy state
+          5. Test application endpoints and connectivity
+          EOF
+          )
+          else
+            IMPL_PLAN="$IMPL_PLAN_INPUT"
+          fi
+
+          # Set default backout plan
+          if [ -z "$BACKOUT_PLAN_INPUT" ]; then
+            BACKOUT_PLAN=$(cat <<'EOF'
+          1. Execute kubectl rollout undo for affected deployments
+          2. Verify rollback completed successfully
+          3. Monitor pod status until stable
+          4. Test application functionality post-rollback
+          5. Notify stakeholders of rollback completion
+          EOF
+          )
+          else
+            BACKOUT_PLAN="$BACKOUT_PLAN_INPUT"
+          fi
+
+          # Set default test plan
+          if [ -z "$TEST_PLAN_INPUT" ]; then
+            TEST_PLAN=$(cat <<'EOF'
+          1. Verify all deployments rolled out successfully
+          2. Check all pods are in Running state
+          3. Verify service endpoints are accessible
+          4. Test frontend application accessibility
+          5. Monitor application metrics and logs
+          EOF
+          )
+          else
+            TEST_PLAN="$TEST_PLAN_INPUT"
+          fi
+
+          # Export as outputs (escape newlines for GitHub Actions)
+          echo "impl_plan<<EOF" >> $GITHUB_OUTPUT
+          echo "$IMPL_PLAN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "backout_plan<<EOF" >> $GITHUB_OUTPUT
+          echo "$BACKOUT_PLAN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "test_plan<<EOF" >> $GITHUB_OUTPUT
+          echo "$TEST_PLAN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Change Request via DevOps API
+        id: create-cr
+        continue-on-error: true
+        env:
+          SHORT_DESC: ${{ inputs.short_description }} [${{ inputs.environment }}]
+          DESCRIPTION: ${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions using DevOps Change Control API', inputs.environment) }}
+          ASSIGNMENT_GROUP: ${{ inputs.assignment_group }}
+          ASSIGNED_TO: ${{ inputs.assigned_to }}
+          AUTO_CLOSE: ${{ steps.prepare.outputs.auto_close }}
+          SET_CLOSE_CODE: ${{ steps.prepare.outputs.set_close_code }}
+          IMPL_PLAN: ${{ steps.plans.outputs.impl_plan }}
+          BACKOUT_PLAN: ${{ steps.plans.outputs.backout_plan }}
+          TEST_PLAN: ${{ steps.plans.outputs.test_plan }}
+        run: |
+          echo "Creating change request via ServiceNow DevOps Change Control API..."
+
+          # Build the DevOps API payload
+          PAYLOAD=$(jq -n \
+            --argjson auto_close "$AUTO_CLOSE" \
+            --argjson set_close_code "$SET_CLOSE_CODE" \
+            --arg short_desc "$SHORT_DESC" \
+            --arg description "$DESCRIPTION" \
+            --arg assignment_group "$ASSIGNMENT_GROUP" \
+            --arg assigned_to "$ASSIGNED_TO" \
+            --arg impl_plan "$IMPL_PLAN" \
+            --arg backout_plan "$BACKOUT_PLAN" \
+            --arg test_plan "$TEST_PLAN" \
+            '{
+              "autoCloseChange": $auto_close,
+              "setCloseCode": $set_close_code,
+              "attributes": {
+                "short_description": $short_desc,
+                "description": $description,
+                "assignment_group": $assignment_group,
+                "assigned_to": $assigned_to,
+                "implementation_plan": $impl_plan,
+                "backout_plan": $backout_plan,
+                "test_plan": $test_plan,
+                "category": "DevOps",
+                "subcategory": "Deployment",
+                "justification": "Automated deployment via CI/CD pipeline. Changes have been tested and approved via pull request workflow."
+              }
+            }'
+          )
+
+          echo "Payload structure:"
+          echo "$PAYLOAD" | jq '.'
+
+          # Make the API call to DevOps Change Control endpoint
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -H "sn_devops_orchestration_tool_id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}" \
+            -X POST \
+            -d "$PAYLOAD" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/sn_devops/v1/devops/orchestration/changeControl")
+
+          # Extract HTTP code and body
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response body:"
+          echo "$BODY" | jq '.' || echo "$BODY"
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            # DevOps API returns different structure than Table API
+            CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.changeRequestNumber // .result.number // empty')
+            CHANGE_SYSID=$(echo "$BODY" | jq -r '.result.changeRequestSysId // .result.sys_id // empty')
+
+            if [ -n "$CHANGE_NUMBER" ] && [ "$CHANGE_NUMBER" != "null" ]; then
+              echo "✅ Change Request Created: $CHANGE_NUMBER"
+              echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+              echo "change_sys_id=$CHANGE_SYSID" >> $GITHUB_OUTPUT
+
+              # Add to job summary
+              {
+                echo "## 📝 ServiceNow Change Request Created (DevOps API)"
+                echo ""
+                echo "**Change Number:** $CHANGE_NUMBER"
+                echo "**Environment:** ${{ inputs.environment }}"
+                echo "**API Used:** DevOps Change Control API"
+                echo "**Auto-Close:** ${{ steps.prepare.outputs.auto_close }}"
+                echo ""
+                echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
+                echo ""
+                echo "**Note:** This change request is created via DevOps API and will appear in:"
+                echo "- Standard change_request table"
+                echo "- sn_devops_change_reference table"
+                echo "- ServiceNow DevOps workspace"
+              } >> $GITHUB_STEP_SUMMARY
+
+              exit 0
+            else
+              echo "⚠️ Change request created but number not found in response"
+              echo "Response: $BODY"
+              exit 1
+            fi
+          else
+            echo "❌ Change Request Creation Failed (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+
+            # Add to job summary
+            {
+              echo "## ❌ ServiceNow Change Request Failed (DevOps API)"
+              echo ""
+              echo "**Environment:** ${{ inputs.environment }}"
+              echo "**HTTP Status:** $HTTP_CODE"
+              echo ""
+              echo "**Response:**"
+              echo '```json'
+              echo "$BODY" | jq '.' || echo "$BODY"
+              echo '```'
+              echo ""
+              echo "**Possible causes:**"
+              echo "1. ServiceNow DevOps plugin not installed"
+              echo "2. SN_ORCHESTRATION_TOOL_ID secret not configured or invalid"
+              echo "3. User permissions insufficient for DevOps API"
+              echo "4. DevOps Change Velocity plugin not activated"
+              echo ""
+              echo "See docs/SERVICENOW-DEVOPS-API-TESTING.md for setup instructions"
+            } >> $GITHUB_STEP_SUMMARY
+
+            # Don't fail for dev environment
+            if [ "${{ inputs.environment }}" = "dev" ]; then
+              echo "⚠️ Continuing despite failure (dev environment)"
+              exit 0
+            else
+              exit 1
+            fi
+          fi
+
+      - name: Log API Comparison Data
+        if: always()
+        run: |
+          echo "## 🔬 DevOps API Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow uses the **ServiceNow DevOps Change Control API**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Comparison with Table API:**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Feature | DevOps API (This) | Table API (Production) |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------------------|----------------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Custom Fields | ❌ Not supported | ✅ 40+ fields |" >> $GITHUB_STEP_SUMMARY
+          echo "| Auto-Close | ✅ Built-in | ⚠️ Manual |" >> $GITHUB_STEP_SUMMARY
+          echo "| DevOps Workspace | ✅ Visible | ❌ Not visible |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compliance Data | ❌ Limited | ✅ Complete |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check if change request appears in ServiceNow DevOps workspace" >> $GITHUB_STEP_SUMMARY
+          echo "2. Compare change record with Table API version" >> $GITHUB_STEP_SUMMARY
+          echo "3. Evaluate trade-offs (auto-close vs custom fields)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📖 See [docs/SERVICENOW-DEVOPS-API-TESTING.md](../docs/SERVICENOW-DEVOPS-API-TESTING.md) for analysis" >> $GITHUB_STEP_SUMMARY

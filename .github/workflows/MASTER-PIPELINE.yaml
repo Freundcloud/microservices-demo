@@ -557,7 +557,7 @@ jobs:
           echo "View results: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_test_summary_list.do" >> $GITHUB_STEP_SUMMARY
 
   servicenow-change:
-    name: "📝 ServiceNow Change Request"
+    name: "📝 ServiceNow Change Request (TESTING DevOps API)"
     needs: [pipeline-init, detect-service-changes, detect-terraform-changes, security-scans, sonarcloud-scan, unit-test-summary, get-deployed-version]
     if: |
       always() &&
@@ -567,33 +567,20 @@ jobs:
       (needs.security-scans.result == 'success' || needs.security-scans.result == 'skipped') &&
       (needs.sonarcloud-scan.result == 'success' || needs.sonarcloud-scan.result == 'skipped') &&
       (needs.unit-test-summary.result == 'success' || needs.unit-test-summary.result == 'skipped')
-    uses: ./.github/workflows/servicenow-change-rest.yaml
+    # TEMPORARY: Testing DevOps Change Control API
+    # TO REVERT: Change back to ./.github/workflows/servicenow-change-rest.yaml
+    uses: ./.github/workflows/servicenow-change-devops-api.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
       short_description: 'Deploy microservices to ${{ needs.pipeline-init.outputs.environment }}'
-      # Additional context fields for ServiceNow traceability
-      services_deployed: ${{ needs.detect-service-changes.outputs.services_changed }}
-      infrastructure_changes: ${{ needs.detect-terraform-changes.outputs.terraform_changed }}
-      # Security scan results
-      security_scan_status: '${{ needs.security-scans.outputs.test_result }}'
-      critical_vulnerabilities: '${{ needs.security-scans.outputs.critical_count }}'
-      high_vulnerabilities: '${{ needs.security-scans.outputs.high_count }}'
-      # Unit test results (ACTUAL DATA from unit-test-summary job)
-      unit_test_status: '${{ needs.unit-test-summary.outputs.test_status }}'
-      unit_test_total: '${{ needs.unit-test-summary.outputs.total_tests }}'
-      unit_test_passed: '${{ needs.unit-test-summary.outputs.passed_tests }}'
-      unit_test_failed: '${{ needs.unit-test-summary.outputs.failed_tests }}'
-      unit_test_coverage: '${{ needs.unit-test-summary.outputs.coverage }}'
-      unit_test_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      # SonarCloud scan results (ACTUAL DATA from sonarcloud-scan workflow)
-      sonarcloud_status: '${{ needs.sonarcloud-scan.outputs.quality_gate }}'
-      sonarcloud_bugs: '${{ needs.sonarcloud-scan.outputs.bugs }}'
-      sonarcloud_vulnerabilities: '${{ needs.sonarcloud-scan.outputs.vulnerabilities }}'
-      sonarcloud_code_smells: '${{ needs.sonarcloud-scan.outputs.code_smells }}'
-      sonarcloud_coverage: '${{ needs.sonarcloud-scan.outputs.coverage }}'
-      sonarcloud_duplications: '${{ needs.sonarcloud-scan.outputs.duplications }}'
-      sonarcloud_url: 'https://sonarcloud.io/dashboard?id=Freundcloud_microservices-demo'
+      # Note: DevOps API does NOT support custom fields
+      # The following fields will be ignored by DevOps API:
+      # - services_deployed, infrastructure_changes
+      # - security_scan_status, vulnerabilities
+      # - unit_test_* fields
+      # - sonarcloud_* fields
+      # See docs/SERVICENOW-API-COMPARISON.md for details
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
