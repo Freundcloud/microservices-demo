@@ -552,9 +552,7 @@ jobs:
           echo "| Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
           echo "| Coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Test results uploaded to ServiceNow DevOps Test Summary**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View results: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_test_summary_list.do" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Test results will be uploaded to ServiceNow DevOps tables**" >> $GITHUB_STEP_SUMMARY
 
   servicenow-change:
     name: "📝 ServiceNow Change Request + DevOps Integration"
@@ -597,6 +595,53 @@ jobs:
       # - Test results (sn_devops_test_result + sn_devops_test_summary)
       # - Work items (sn_devops_work_item)
       # - Artifacts (sn_devops_artifact)
+
+  upload-unit-test-results:
+    name: "📊 Upload Unit Test Results to ServiceNow"
+    needs: [pipeline-init, servicenow-change, unit-test-summary]
+    if: |
+      always() &&
+      needs.servicenow-change.result == 'success' &&
+      needs.unit-test-summary.outputs.test_status != 'skipped'
+    uses: ./.github/workflows/upload-test-results-servicenow.yaml
+    with:
+      change_request_sys_id: ${{ needs.servicenow-change.outputs.change_sys_id }}
+      change_request_number: ${{ needs.servicenow-change.outputs.change_number }}
+      test_suite_name: "Unit Tests"
+      test_result: ${{ needs.unit-test-summary.outputs.test_status }}
+      test_duration: "60"
+      test_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets: inherit
+
+  upload-security-scan-results:
+    name: "🔒 Upload Security Scan Results to ServiceNow"
+    needs: [pipeline-init, servicenow-change, security-scans]
+    if: |
+      always() &&
+      needs.servicenow-change.result == 'success' &&
+      needs.security-scans.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Upload Security Results to sn_devops_security_result
+        run: |
+          chmod +x scripts/upload-security-results-servicenow.sh
+          ./scripts/upload-security-results-servicenow.sh
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          CHANGE_REQUEST_SYS_ID: ${{ needs.servicenow-change.outputs.change_sys_id }}
+          CHANGE_REQUEST_NUMBER: ${{ needs.servicenow-change.outputs.change_number }}
+          CRITICAL_COUNT: ${{ needs.security-scans.outputs.critical_count }}
+          HIGH_COUNT: ${{ needs.security-scans.outputs.high_count }}
+          MEDIUM_COUNT: ${{ needs.security-scans.outputs.medium_count }}
+          LOW_COUNT: ${{ needs.security-scans.outputs.low_count }}
+          TOTAL_COUNT: ${{ needs.security-scans.outputs.total_count }}
+          SCAN_RESULT: ${{ needs.security-scans.outputs.test_result }}
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
@@ -858,6 +903,8 @@ jobs:
       - build-and-push
       - register-packages
       - servicenow-change
+      - upload-unit-test-results
+      - upload-security-scan-results
       - register-work-items
       - deploy-to-environment
       - smoke-tests
@@ -888,12 +935,15 @@ jobs:
           echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Register Packages | ${{ needs.register-packages.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ServiceNow Change | ${{ needs.servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Upload Test Results | ${{ needs.upload-unit-test-results.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Upload Security Results | ${{ needs.upload-security-scan-results.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Register Work Items | ${{ needs.register-work-items.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           # echo "| Update Change | ${{ needs.update-servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY  # Disabled
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "## 📝 ServiceNow Integration" >> $GITHUB_STEP_SUMMARY
+          echo "## 📝 ServiceNow DevOps Integration" >> $GITHUB_STEP_SUMMARY
           echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Change Request | ${{ needs.servicenow-change.outputs.change_number || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY

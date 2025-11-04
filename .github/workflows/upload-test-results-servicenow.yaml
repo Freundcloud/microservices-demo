@@ -1,0 +1,184 @@
+---
+name: "📊 Upload Test Results to ServiceNow"
+
+on:
+  workflow_call:
+    inputs:
+      change_request_sys_id:
+        description: 'ServiceNow Change Request Sys ID'
+        required: true
+        type: string
+      change_request_number:
+        description: 'ServiceNow Change Request Number'
+        required: true
+        type: string
+      test_suite_name:
+        description: 'Name of the test suite'
+        required: true
+        type: string
+      test_result:
+        description: 'Overall test result (passed/failed)'
+        required: true
+        type: string
+      test_duration:
+        description: 'Test duration in seconds'
+        required: false
+        type: string
+        default: '0'
+      test_url:
+        description: 'URL to test results'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  upload-test-results:
+    name: "Upload Test Results"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve ServiceNow Inputs
+        id: resolve
+        run: |
+          URL="${{ secrets.SN_INSTANCE_URL }}"
+          if [ -z "$URL" ]; then URL="${{ secrets.SERVICENOW_INSTANCE_URL }}"; fi
+          USER="${{ secrets.SN_DEVOPS_USER }}"
+          if [ -z "$USER" ]; then USER="${{ secrets.SERVICENOW_USERNAME }}"; fi
+          PASS="${{ secrets.SN_DEVOPS_PASSWORD }}"
+          if [ -z "$PASS" ]; then PASS="${{ secrets.SERVICENOW_PASSWORD }}"; fi
+          TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "user=$USER" >> $GITHUB_OUTPUT
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+          echo "tool=$TOOL" >> $GITHUB_OUTPUT
+      - name: Create Test Execution Record
+        id: create-test-exec
+        run: |
+          echo "📊 Creating Test Execution Record in ServiceNow"
+          echo "Change Request: ${{ inputs.change_request_number }}"
+          echo "Test Suite: ${{ inputs.test_suite_name }}"
+          echo "Result: ${{ inputs.test_result }}"
+          echo ""
+
+          # Create test execution payload
+          TEST_URL="${{ inputs.test_url }}"
+          if [ -z "$TEST_URL" ]; then
+            TEST_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg tool_id "${{ steps.resolve.outputs.tool }}" \
+            --arg test_url "$TEST_URL" \
+            --arg duration "${{ inputs.test_duration }}" \
+            --arg state "imported" \
+            '{
+              tool: $tool_id,
+              test_url: $test_url,
+              test_execution_duration: ($duration | tonumber),
+              results_import_state: $state
+            }')
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}" \
+            -d "$PAYLOAD" \
+            "${{ steps.resolve.outputs.url }}/api/now/table/sn_devops_test_execution")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" == "201" ]; then
+            TEST_EXEC_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+            TEST_EXEC_NUMBER=$(echo "$BODY" | jq -r '.result.number')
+            echo "✅ Test Execution created: $TEST_EXEC_NUMBER"
+            echo "test_exec_sys_id=$TEST_EXEC_SYS_ID" >> $GITHUB_OUTPUT
+            echo "test_exec_number=$TEST_EXEC_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Failed to create test execution (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+            echo "test_exec_sys_id=" >> $GITHUB_OUTPUT
+            echo "test_exec_number=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Test Result Records
+        if: steps.create-test-exec.outputs.test_exec_sys_id != ''
+        run: |
+          echo "📝 Creating Test Result Records"
+          TEST_EXEC_SYS_ID="${{ steps.create-test-exec.outputs.test_exec_sys_id }}"
+
+          # Create overall test result
+          RESULT_PAYLOAD=$(jq -n \
+            --arg test_exec "$TEST_EXEC_SYS_ID" \
+            --arg label "${{ inputs.test_suite_name }}" \
+            --arg result "${{ inputs.test_result }}" \
+            --arg value "${{ inputs.test_duration }}" \
+            --arg units "seconds" \
+            '{
+              test_execution: $test_exec,
+              label: $label,
+              result: $result,
+              value: ($value | tonumber),
+              units: $units
+            }')
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}" \
+            -d "$RESULT_PAYLOAD" \
+            "${{ steps.resolve.outputs.url }}/api/now/table/sn_devops_test_result")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" == "201" ]; then
+            RESULT_NUMBER=$(echo "$BODY" | jq -r '.result.number')
+            echo "✅ Test Result created: $RESULT_NUMBER"
+          else
+            echo "⚠️  Failed to create test result (HTTP $HTTP_CODE)"
+          fi
+
+      - name: Add Test Results to Change Request Work Notes
+        run: |
+          echo "📋 Adding Test Results to Change Request"
+
+          # Determine status icon
+          if [ "${{ inputs.test_result }}" == "passed" ]; then
+            STATUS_ICON="✅"
+            STATUS_MSG="ALL TESTS PASSED"
+          else
+            STATUS_ICON="❌"
+            STATUS_MSG="TESTS FAILED - REVIEW REQUIRED"
+          fi
+
+          # Create work note - build incrementally to avoid line length issues
+          WORK_NOTE="🧪 TEST EXECUTION RESULTS"
+          WORK_NOTE="${WORK_NOTE}\n\nTest Suite: ${{ inputs.test_suite_name }}"
+          WORK_NOTE="${WORK_NOTE}\nStatus: $STATUS_ICON $STATUS_MSG"
+          WORK_NOTE="${WORK_NOTE}\nDuration: ${{ inputs.test_duration }} seconds"
+          WORK_NOTE="${WORK_NOTE}\nTest URL: ${{ inputs.test_url }}"
+          WORK_NOTE="${WORK_NOTE}\n\nTest execution record created in ServiceNow:"
+          WORK_NOTE="${WORK_NOTE}\n- Test Execution: ${{ steps.create-test-exec.outputs.test_exec_number }}"
+          WORK_NOTE="${WORK_NOTE}\n- Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          PAYLOAD=$(jq -n --arg note "$WORK_NOTE" '{work_notes: $note}')
+
+          curl -s -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -u "${{ steps.resolve.outputs.user }}:${{ steps.resolve.outputs.pass }}" \
+            -d "$PAYLOAD" \
+            "${{ steps.resolve.outputs.url }}/api/now/table/change_request/${{ inputs.change_request_sys_id }}" > /dev/null
+
+          echo "✅ Test results added to change request ${{ inputs.change_request_number }}"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ TEST RESULTS UPLOADED TO SERVICENOW"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Change Request: ${{ inputs.change_request_number }}"
+          echo "Test Execution: ${{ steps.create-test-exec.outputs.test_exec_number }}"
+          echo "Status: ${{ inputs.test_result }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

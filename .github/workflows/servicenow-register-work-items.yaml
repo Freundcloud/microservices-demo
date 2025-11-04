@@ -132,13 +132,23 @@ jobs:
           SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
         run: |
           echo "Registering work items in ServiceNow..."
 
           ISSUES="${{ steps.extract.outputs.issues }}"
           CHANGE_REQUEST="${{ inputs.change_request_number }}"
+          TOOL_ID="$SN_ORCHESTRATION_TOOL_ID"
           WORK_ITEM_NUMBERS=""
           COUNT=0
+
+          # Validate tool ID
+          if [ -z "$TOOL_ID" ]; then
+            echo "⚠️  WARNING: SN_ORCHESTRATION_TOOL_ID not set"
+            echo "Work items will be created but may not be linked to GitHub tool"
+          else
+            echo "✅ Using tool ID: $TOOL_ID"
+          fi
 
           # Get change request sys_id
           echo "Looking up change request sys_id for $CHANGE_REQUEST..."
@@ -262,6 +272,7 @@ jobs:
                 --arg description "$DESCRIPTION" \
                 --arg priority "$PRIORITY" \
                 --arg cr_sys_id "$CR_SYS_ID" \
+                --arg tool_id "$TOOL_ID" \
                 '{
                   title: $title,
                   type: $type,
@@ -272,7 +283,8 @@ jobs:
                   short_description: $title,
                   description: $description,
                   priority: $priority
-                } + (if $cr_sys_id != "" then {change_request: $cr_sys_id} else {} end)')
+                } + (if $cr_sys_id != "" then {change_request: $cr_sys_id} else {} end)
+                  + (if $tool_id != "" then {tool: $tool_id} else {} end)')
 
               RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
                 -H "Content-Type: application/json" \
