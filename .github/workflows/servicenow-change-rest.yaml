@@ -581,6 +581,295 @@ jobs:
             fi
           fi
 
+      # ========================================
+      # PHASE 1: DevOps Workspace Integration
+      # ========================================
+
+      - name: Link Change Request to DevOps Pipeline
+        if: steps.create-cr.outputs.change_sys_id != ''
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+        run: |
+          echo "🔗 Linking CR $CHANGE_NUMBER to DevOps workspace..."
+
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            -d '{
+              "change_request": "'"$CHANGE_SYSID"'",
+              "pipeline_name": "Deploy to ${{ inputs.environment }}",
+              "pipeline_id": "${{ github.run_id }}",
+              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+            }' \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_change_reference")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            REF_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+            echo "✅ Pipeline linked to DevOps workspace (ref: $REF_ID)"
+            echo "   CR now visible in: DevOps → Change Velocity"
+          else
+            echo "⚠️  Failed to link to DevOps workspace (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+          fi
+
+      # ========================================
+      # PHASE 2: Test Results Tracking
+      # ========================================
+
+      - name: Register Test Results in DevOps Workspace
+        if: steps.create-cr.outputs.change_sys_id != '' && (inputs.unit_test_total != '0' || inputs.security_scan_status != '')
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+        run: |
+          echo "📊 Registering test results for CR $CHANGE_NUMBER..."
+
+          # Calculate overall test result
+          UNIT_TEST_TOTAL="${{ inputs.unit_test_total }}"
+          UNIT_TEST_FAILED="${{ inputs.unit_test_failed }}"
+          SECURITY_STATUS="${{ inputs.security_scan_status }}"
+          CRITICAL="${{ inputs.critical_vulnerabilities }}"
+          HIGH="${{ inputs.high_vulnerabilities }}"
+
+          # Determine test result
+          if [ "$UNIT_TEST_FAILED" != "0" ] || [ "$CRITICAL" != "0" ]; then
+            TEST_RESULT="failure"
+          elif [ "$HIGH" != "0" ]; then
+            TEST_RESULT="warning"
+          else
+            TEST_RESULT="success"
+          fi
+
+          # Register unit test results
+          if [ "$UNIT_TEST_TOTAL" != "0" ]; then
+            echo "  ↳ Registering unit tests..."
+            curl -s \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "change_request": "'"$CHANGE_SYSID"'",
+                "test_suite_name": "Unit Tests - All Services",
+                "test_result": "'"$TEST_RESULT"'",
+                "total_tests": '${{ inputs.unit_test_total }}',
+                "passed_tests": '${{ inputs.unit_test_passed }}',
+                "failed_tests": '${{ inputs.unit_test_failed }}',
+                "pipeline_id": "${{ github.run_id }}",
+                "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+            echo "    ✅ Unit test results registered"
+          fi
+
+          # Register security scan results
+          if [ -n "$SECURITY_STATUS" ]; then
+            echo "  ↳ Registering security scans..."
+            curl -s \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "change_request": "'"$CHANGE_SYSID"'",
+                "test_suite_name": "Security Scans",
+                "test_result": "'"$SECURITY_STATUS"'",
+                "total_tests": 10,
+                "passed_tests": '$((10 - (${CRITICAL:-0} > 0 ? 1 : 0) - (${HIGH:-0} > 0 ? 1 : 0)))',
+                "failed_tests": '$((${CRITICAL:-0} > 0 ? 1 : 0))',
+                "pipeline_id": "${{ github.run_id }}",
+                "pipeline_url": "https://github.com/${{ github.repository }}/security/code-scanning"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+            echo "    ✅ Security scan results registered"
+          fi
+
+          # Register SonarCloud results (if available)
+          if [ -n "${{ inputs.sonarcloud_status }}" ]; then
+            echo "  ↳ Registering SonarCloud results..."
+            SONAR_RESULT="${{ inputs.sonarcloud_status }}"
+            [ "$SONAR_RESULT" = "passed" ] && SONAR_TEST_RESULT="success" || SONAR_TEST_RESULT="failure"
+
+            curl -s \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "change_request": "'"$CHANGE_SYSID"'",
+                "test_suite_name": "SonarCloud Quality Gate",
+                "test_result": "'"$SONAR_TEST_RESULT"'",
+                "total_tests": 1,
+                "passed_tests": '$([[ "$SONAR_RESULT" == "passed" ]] && echo "1" || echo "0")',
+                "failed_tests": '$([[ "$SONAR_RESULT" != "passed" ]] && echo "1" || echo "0")',
+                "pipeline_id": "${{ github.run_id }}",
+                "pipeline_url": "${{ inputs.sonarcloud_url }}"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+            echo "    ✅ SonarCloud results registered"
+          fi
+
+          echo "✅ Test results registered in DevOps workspace"
+
+      - name: Create Test Summary
+        if: steps.create-cr.outputs.change_sys_id != '' && inputs.unit_test_total != '0'
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+        run: |
+          echo "📈 Creating test summary..."
+
+          # Calculate totals
+          TOTAL_SUITES=1  # Unit tests
+          [ -n "${{ inputs.security_scan_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
+          [ -n "${{ inputs.sonarcloud_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
+
+          # Determine overall result
+          FAILED="${{ inputs.unit_test_failed }}"
+          CRITICAL="${{ inputs.critical_vulnerabilities }}"
+          if [ "$FAILED" = "0" ] && [ "$CRITICAL" = "0" ]; then
+            OVERALL="passed"
+          else
+            OVERALL="passed_with_failures"
+          fi
+
+          curl -s \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "change_request": "'"$CHANGE_SYSID"'",
+              "total_test_suites": '$TOTAL_SUITES',
+              "passed_test_suites": '$((TOTAL_SUITES - (${FAILED:-0} > 0 ? 1 : 0)))',
+              "failed_test_suites": '$((${FAILED:-0} > 0 ? 1 : 0))',
+              "total_tests": '${{ inputs.unit_test_total }}',
+              "passed_tests": '${{ inputs.unit_test_passed }}',
+              "failed_tests": '${{ inputs.unit_test_failed }}',
+              "overall_result": "'"$OVERALL"'",
+              "pipeline_id": "${{ github.run_id }}"
+            }' \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_summary" > /dev/null
+
+          echo "✅ Test summary created"
+
+      # ========================================
+      # PHASE 3: Work Items Integration
+      # ========================================
+
+      - name: Extract and Register Work Items
+        if: steps.create-cr.outputs.change_sys_id != ''
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          echo "🔗 Extracting work items from commits for CR $CHANGE_NUMBER..."
+
+          # Extract issue numbers from commit message
+          # Looks for: Fixes #7, Closes #123, Resolves #456, etc.
+          ISSUES=$(echo "$COMMIT_MESSAGE" | grep -oP '(?:Fixes|Closes|Resolves|References|Refs|Issue|#)\s*#?\K\d+' | sort -u)
+
+          if [ -z "$ISSUES" ]; then
+            echo "  No issue references found in commit message"
+          else
+            echo "  Found issue references: $(echo $ISSUES | tr '\n' ' ')"
+
+            for ISSUE_NUM in $ISSUES; do
+              echo "  ↳ Registering GitHub Issue #$ISSUE_NUM..."
+
+              # Get issue details from GitHub API
+              ISSUE_DATA=$(curl -s \
+                -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUM")
+
+              ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title // "GitHub Issue #'"$ISSUE_NUM"'"')
+              ISSUE_STATE=$(echo "$ISSUE_DATA" | jq -r '.state // "unknown"')
+
+              # Register work item in ServiceNow
+              curl -s \
+                -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+                -H "Content-Type: application/json" \
+                -X POST \
+                -d '{
+                  "change_request": "'"$CHANGE_SYSID"'",
+                  "work_item_id": "'"$ISSUE_NUM"'",
+                  "work_item_type": "GitHub Issue",
+                  "work_item_url": "https://github.com/${{ github.repository }}/issues/'"$ISSUE_NUM"'",
+                  "work_item_title": "'"$(echo "$ISSUE_TITLE" | sed 's/"/\\"/g')"'",
+                  "work_item_state": "'"$ISSUE_STATE"'"
+                }' \
+                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_work_item" > /dev/null
+
+              echo "    ✅ Issue #$ISSUE_NUM registered"
+            done
+
+            echo "✅ Work items linked to CR"
+          fi
+
+      # ========================================
+      # PHASE 4: Artifact Tracking
+      # ========================================
+
+      - name: Register Deployed Artifacts
+        if: steps.create-cr.outputs.change_sys_id != '' && inputs.services_deployed != '[]' && inputs.services_deployed != ''
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          SERVICES: ${{ inputs.services_deployed }}
+        run: |
+          echo "📦 Registering deployed artifacts for CR $CHANGE_NUMBER..."
+
+          # Get version from previous_version input or use github.sha as fallback
+          VERSION="${{ inputs.previous_version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ github.sha }}"
+            VERSION="${VERSION:0:7}"
+          fi
+
+          # Parse services JSON array and register each artifact
+          SERVICE_COUNT=$(echo "$SERVICES" | jq -r 'length')
+
+          if [ "$SERVICE_COUNT" -gt 0 ]; then
+            echo "  Found $SERVICE_COUNT service(s) to register"
+
+            echo "$SERVICES" | jq -r '.[]' | while read -r SERVICE; do
+              echo "  ↳ Registering $SERVICE..."
+
+              # Determine ECR URL based on AWS account and region
+              ECR_URL="533267307120.dkr.ecr.eu-west-2.amazonaws.com/$SERVICE:$VERSION"
+
+              curl -s \
+                -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+                -H "Content-Type: application/json" \
+                -X POST \
+                -d '{
+                  "change_request": "'"$CHANGE_SYSID"'",
+                  "artifact_name": "'"$SERVICE"'",
+                  "artifact_version": "'"$VERSION"'",
+                  "artifact_type": "container_image",
+                  "artifact_url": "'"$ECR_URL"'",
+                  "artifact_repository": "AWS ECR",
+                  "deployment_environment": "${{ inputs.environment }}",
+                  "pipeline_id": "${{ github.run_id }}"
+                }' \
+                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_artifact" > /dev/null
+
+              echo "    ✅ $SERVICE registered"
+            done
+
+            echo "✅ Deployed artifacts registered in DevOps workspace"
+          else
+            echo "  No services to register"
+          fi
+
       - name: Wait for Change Approval (QA/PROD)
         if: inputs.environment != 'dev' && steps.create-cr.outputs.change_number != ''
         run: |

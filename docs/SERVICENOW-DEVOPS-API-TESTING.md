@@ -548,6 +548,53 @@ PAYLOAD=$(jq -n \
 - Track the orchestration task (workflow run)
 - Link change request to the GitHub Actions execution
 
+### DevOps API Returns changeControl: false (Deployment Gate)
+
+**Response**:
+```json
+{
+  "result": {
+    "changeControl": false,
+    "status": "Success"
+  }
+}
+```
+
+**What This Means**: ServiceNow created a **Deployment Gate** (automated approval) instead of a traditional change request.
+
+**Why This Happens**:
+- ServiceNow DevOps Change Velocity is configured for "fast deployment mode"
+- No change request number is returned because no CR was created
+- The deployment is automatically approved via a deployment gate
+
+**This is NOT an Error**: Deployment gates are a valid DevOps API feature that allows:
+- ✅ Automated approval for low-risk deployments
+- ✅ Faster deployment without manual change requests
+- ✅ Policy-based gating (security scans, tests must pass)
+
+**To Get Traditional Change Requests (changeControl=true)**:
+
+You need to configure ServiceNow DevOps Change Velocity:
+
+1. Log into ServiceNow as admin
+2. Navigate to: **DevOps → Change Velocity → Configuration**
+3. Find your tool configuration (GitHub Actions)
+4. Enable "Create Change Requests" option
+5. Configure change creation policy:
+   - Always create change requests
+   - Create based on environment (dev=gate, prod=CR)
+   - Create based on risk assessment
+
+**Current Behavior is Acceptable If:**
+- You want fast deployments without manual CRs
+- You're using deployment gates for policy enforcement
+- You don't need traditional change tracking
+
+**Use Table API If:**
+- You need traditional change requests with custom fields
+- You require complete audit trail for compliance
+- You need change numbers for reporting
+
 ### DevOps API Returns 404
 
 **Error**:

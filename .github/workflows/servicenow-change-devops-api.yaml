@@ -218,35 +218,76 @@ jobs:
           echo "$BODY" | jq '.' || echo "$BODY"
 
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-            # DevOps API returns different structure than Table API
-            CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.changeRequestNumber // .result.number // empty')
-            CHANGE_SYSID=$(echo "$BODY" | jq -r '.result.changeRequestSysId // .result.sys_id // empty')
+            # Check if this is a deployment gate (changeControl=false) or traditional CR (changeControl=true)
+            CHANGE_CONTROL=$(echo "$BODY" | jq -r '.result.changeControl // "unknown"')
+            STATUS=$(echo "$BODY" | jq -r '.result.status // "unknown"')
 
-            if [ -n "$CHANGE_NUMBER" ] && [ "$CHANGE_NUMBER" != "null" ]; then
-              echo "✅ Change Request Created: $CHANGE_NUMBER"
-              echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
-              echo "change_sys_id=$CHANGE_SYSID" >> $GITHUB_OUTPUT
+            if [ "$STATUS" = "Success" ]; then
+              if [ "$CHANGE_CONTROL" = "false" ]; then
+                # Deployment Gate (automated approval - no traditional change request)
+                echo "✅ Deployment Gate Created (No Traditional Change Request)"
+                echo "change_number=DEPLOYMENT_GATE" >> $GITHUB_OUTPUT
+                echo "change_sys_id=N/A" >> $GITHUB_OUTPUT
 
-              # Add to job summary
-              {
-                echo "## 📝 ServiceNow Change Request Created (DevOps API)"
-                echo ""
-                echo "**Change Number:** $CHANGE_NUMBER"
-                echo "**Environment:** ${{ inputs.environment }}"
-                echo "**API Used:** DevOps Change Control API"
-                echo "**Auto-Close:** ${{ steps.prepare.outputs.auto_close }}"
-                echo ""
-                echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
-                echo ""
-                echo "**Note:** This change request is created via DevOps API and will appear in:"
-                echo "- Standard change_request table"
-                echo "- sn_devops_change_reference table"
-                echo "- ServiceNow DevOps workspace"
-              } >> $GITHUB_STEP_SUMMARY
+                # Add to job summary
+                {
+                  echo "## 🚀 ServiceNow Deployment Gate Approved (DevOps API)"
+                  echo ""
+                  echo "**Type:** Deployment Gate (Automated Approval)"
+                  echo "**Change Control:** Disabled (Fast Deployment Mode)"
+                  echo "**Environment:** ${{ inputs.environment }}"
+                  echo "**Status:** Approved - Deployment can proceed"
+                  echo ""
+                  echo "**What This Means:**"
+                  echo "- ✅ ServiceNow approved the deployment automatically"
+                  echo "- ⚠️ No traditional change request was created (changeControl=false)"
+                  echo "- ✅ Deployment can proceed without manual approval"
+                  echo "- ℹ️ This is the DevOps API's fast deployment mode"
+                  echo ""
+                  echo "**Note:** To create traditional change requests with changeControl=true,"
+                  echo "you need to configure ServiceNow DevOps Change Velocity settings."
+                  echo ""
+                  echo "📖 See: docs/SERVICENOW-DEVOPS-API-TESTING.md for configuration options"
+                } >> $GITHUB_STEP_SUMMARY
 
-              exit 0
+                exit 0
+              else
+                # Traditional Change Request
+                CHANGE_NUMBER=$(echo "$BODY" | jq -r '.result.changeRequestNumber // .result.number // empty')
+                CHANGE_SYSID=$(echo "$BODY" | jq -r '.result.changeRequestSysId // .result.sys_id // empty')
+
+                if [ -n "$CHANGE_NUMBER" ] && [ "$CHANGE_NUMBER" != "null" ]; then
+                  echo "✅ Change Request Created: $CHANGE_NUMBER"
+                  echo "change_number=$CHANGE_NUMBER" >> $GITHUB_OUTPUT
+                  echo "change_sys_id=$CHANGE_SYSID" >> $GITHUB_OUTPUT
+
+                  # Add to job summary
+                  {
+                    echo "## 📝 ServiceNow Change Request Created (DevOps API)"
+                    echo ""
+                    echo "**Change Number:** $CHANGE_NUMBER"
+                    echo "**Environment:** ${{ inputs.environment }}"
+                    echo "**API Used:** DevOps Change Control API"
+                    echo "**Auto-Close:** ${{ steps.prepare.outputs.auto_close }}"
+                    echo ""
+                    echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
+                    echo ""
+                    echo "**Note:** This change request is created via DevOps API and will appear in:"
+                    echo "- Standard change_request table"
+                    echo "- sn_devops_change_reference table"
+                    echo "- ServiceNow DevOps workspace"
+                  } >> $GITHUB_STEP_SUMMARY
+
+                  exit 0
+                else
+                  echo "⚠️ Change request expected but number not found in response"
+                  echo "Response: $BODY"
+                  exit 1
+                fi
+              fi
             else
-              echo "⚠️ Change request created but number not found in response"
+              echo "❌ API call succeeded but status is not Success"
+              echo "Status: $STATUS"
               echo "Response: $BODY"
               exit 1
             fi

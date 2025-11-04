@@ -557,7 +557,7 @@ jobs:
           echo "View results: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/sn_devops_test_summary_list.do" >> $GITHUB_STEP_SUMMARY
 
   servicenow-change:
-    name: "📝 ServiceNow Change Request (TESTING DevOps API)"
+    name: "📝 ServiceNow Change Request + DevOps Integration"
     needs: [pipeline-init, detect-service-changes, detect-terraform-changes, security-scans, sonarcloud-scan, unit-test-summary, get-deployed-version]
     if: |
       always() &&
@@ -567,20 +567,36 @@ jobs:
       (needs.security-scans.result == 'success' || needs.security-scans.result == 'skipped') &&
       (needs.sonarcloud-scan.result == 'success' || needs.sonarcloud-scan.result == 'skipped') &&
       (needs.unit-test-summary.result == 'success' || needs.unit-test-summary.result == 'skipped')
-    # TEMPORARY: Testing DevOps Change Control API
-    # TO REVERT: Change back to ./.github/workflows/servicenow-change-rest.yaml
-    uses: ./.github/workflows/servicenow-change-devops-api.yaml
+    # Uses Table API for compliance (40+ custom fields) + DevOps tables for visibility
+    # See docs/SERVICENOW-HYBRID-APPROACH.md for complete details
+    uses: ./.github/workflows/servicenow-change-rest.yaml
     secrets: inherit
     with:
       environment: ${{ needs.pipeline-init.outputs.environment }}
       short_description: 'Deploy microservices to ${{ needs.pipeline-init.outputs.environment }}'
-      # Note: DevOps API does NOT support custom fields
-      # The following fields will be ignored by DevOps API:
-      # - services_deployed, infrastructure_changes
-      # - security_scan_status, vulnerabilities
-      # - unit_test_* fields
-      # - sonarcloud_* fields
-      # See docs/SERVICENOW-API-COMPARISON.md for details
+      # Complete audit trail via custom fields (Table API)
+      services_deployed: ${{ needs.detect-service-changes.outputs.changed_services_json }}
+      infrastructure_changes: ${{ needs.detect-terraform-changes.outputs.has_changes }}
+      security_scan_status: ${{ needs.security-scans.outputs.overall_status }}
+      critical_vulnerabilities: ${{ needs.security-scans.outputs.critical_count }}
+      high_vulnerabilities: ${{ needs.security-scans.outputs.high_count }}
+      medium_vulnerabilities: ${{ needs.security-scans.outputs.medium_count }}
+      unit_test_status: ${{ needs.unit-test-summary.outputs.status }}
+      unit_test_total: ${{ needs.unit-test-summary.outputs.total }}
+      unit_test_passed: ${{ needs.unit-test-summary.outputs.passed }}
+      unit_test_failed: ${{ needs.unit-test-summary.outputs.failed }}
+      unit_test_coverage: ${{ needs.unit-test-summary.outputs.coverage }}
+      sonarcloud_status: ${{ needs.sonarcloud-scan.outputs.quality_gate }}
+      sonarcloud_bugs: ${{ needs.sonarcloud-scan.outputs.bugs }}
+      sonarcloud_vulnerabilities: ${{ needs.sonarcloud-scan.outputs.vulnerabilities }}
+      sonarcloud_code_smells: ${{ needs.sonarcloud-scan.outputs.code_smells }}
+      sonarcloud_coverage: ${{ needs.sonarcloud-scan.outputs.coverage }}
+      previous_version: ${{ needs.get-deployed-version.outputs.version }}
+      # DevOps integration now happens automatically within servicenow-change-rest.yaml:
+      # - Pipeline linking (sn_devops_change_reference)
+      # - Test results (sn_devops_test_result + sn_devops_test_summary)
+      # - Work items (sn_devops_work_item)
+      # - Artifacts (sn_devops_artifact)
 
   deploy-to-environment:
     name: "🚀 Deploy Application"

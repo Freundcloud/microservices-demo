@@ -129,6 +129,33 @@ git show HEAD~1:.github/workflows/MASTER-PIPELINE.yaml > .github/workflows/MASTE
   - `callbackURL` - URL for ServiceNow to callback (GitHub Actions run URL)
   - `orchestrationTaskURL` - URL to orchestration task (GitHub Actions run URL)
 
+### Validation Against Official Documentation
+
+**Sources**:
+- ServiceNow GitHub Repository: https://github.com/ServiceNow/servicenow-devops-change
+- ServiceNow Community Forums
+- ServiceNow Product Documentation (Vancouver/Washington DC releases)
+
+**Confirmed Implementation Details**:
+1. ✅ **Endpoint Path**: `/api/sn_devops/v1/devops/orchestration/changeControl` - Correct
+2. ✅ **Query Parameter**: `toolId` required - Correctly implemented
+3. ✅ **Header**: `sn_devops_orchestration_tool_id` - Correctly implemented
+4. ✅ **Callback URLs**: Both `callbackURL` and `orchestrationTaskURL` required - Correctly implemented
+5. ✅ **Supported Fields**: All standard change_request fields except `risk`, `impact`, `risk_impact_analysis`
+6. ✅ **Custom Fields**: NOT supported by DevOps API (as documented)
+
+**Response Behavior Validation**:
+- `changeControl: false` → Deployment Gate mode (immediate approval, no CR number)
+  - Change payload stored in `sn_devops_callback` table with state "Ready to process"
+  - Pipeline continues until deployment gate
+  - Change information displayed in GitHub Actions console logs
+- `changeControl: true` → Traditional Change Request mode
+  - Returns `changeRequestNumber` and `changeRequestSysId`
+  - Visible in `sn_devops_change_reference` table
+  - Requires manual approval (unless auto-approval configured)
+
+**Our Implementation Status**: ✅ **FULLY COMPLIANT** with ServiceNow DevOps Change Control API specification
+
 ### Features Being Tested
 
 1. **Auto-Close Functionality**

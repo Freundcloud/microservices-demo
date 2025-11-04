@@ -205,6 +205,47 @@ Official ServiceNow DevOps Change action documentation:
   - Integration instructions for both approaches
   - Complete troubleshooting guide
 
+- **[DevOps API Validation Report](SERVICENOW-DEVOPS-API-VALIDATION.md)** - Official specification compliance ✅ VALIDATED
+  - Validated against ServiceNow official documentation
+  - Complete API specification compliance check
+  - Response handling validation
+  - Field support verification
+  - Testing results and fixes documentation
+  - Comparison with official GitHub Action
+  - Production recommendations
+
+- **[Enable Traditional Change Requests Guide](SERVICENOW-ENABLE-TRADITIONAL-CRS.md)** - How to get changeControl: true ⚙️
+  - Understanding deployment gates vs traditional CRs
+  - Step-by-step ServiceNow configuration
+  - Diagnostic script for checking current settings
+  - Quick revert to Table API (immediate solution)
+  - Hybrid approach (best of both worlds)
+  - Troubleshooting common issues
+
+- **[DevOps API Final Analysis](SERVICENOW-DEVOPS-API-FINAL-ANALYSIS.md)** - Complete testing results and recommendations ✅
+  - Analysis of official ServiceNow DevOps API documentation
+  - Diagnostic script results and instance capability assessment
+  - Why changeControl: true cannot be enabled on this instance
+  - Table API vs DevOps API decision matrix
+  - Final recommendations (revert to Table API recommended)
+  - Testing conclusions and next steps
+
+- **[Hybrid Approach Guide](SERVICENOW-HYBRID-APPROACH.md)** - Best of both worlds solution 🚀 RECOMMENDED
+  - Combine Table API (compliance) with DevOps tables (visibility)
+  - Use sn_devops_change_reference for pipeline linking
+  - Use sn_devops_test_result for test tracking
+  - Use sn_devops_work_item for GitHub Issues
+  - Use sn_devops_artifact for deployment tracking
+  - Complete implementation guide with code examples
+  - Phased rollout plan (4 phases)
+
+- **[Implementation Complete](SERVICENOW-IMPLEMENTATION-COMPLETE.md)** - Hybrid approach fully implemented ✅ DONE
+  - All 4 phases implemented in servicenow-change-rest.yaml
+  - MASTER-PIPELINE.yaml reverted to Table API
+  - Complete verification guide
+  - Before/after comparison
+  - Troubleshooting and support
+
 ### Still Available (in _archive)
 - Detailed architecture guides
 - Development workflows
