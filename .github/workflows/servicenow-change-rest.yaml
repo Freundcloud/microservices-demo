@@ -731,33 +731,44 @@ jobs:
             echo "    ✅ SonarCloud results registered"
           fi
 
-          # Register smoke test / performance test results (if available)
+          # Register smoke test / performance test summary (if available)
           if [ -n "${{ inputs.smoke_test_status }}" ]; then
-            echo "  ↳ Registering smoke/performance tests..."
+            echo "  ↳ Registering smoke/performance test summary..."
             SMOKE_STATUS="${{ inputs.smoke_test_status }}"
-            [ "$SMOKE_STATUS" = "passed" ] && SMOKE_RESULT="success" || SMOKE_RESULT="failure"
 
             DURATION="${{ inputs.smoke_test_duration }}"
             [ -z "$DURATION" ] && DURATION="0"
+
+            # Calculate times (convert duration to milliseconds for glide_time fields)
+            DURATION_MS=$((DURATION * 1000))
+            START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
 
             curl -s \
               -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
               -H "Content-Type: application/json" \
               -X POST \
               -d '{
-                "change_request": "'"$CHANGE_SYSID"'",
-                "test_suite_name": "Smoke Tests - Post-Deployment",
-                "test_result": "'"$SMOKE_RESULT"'",
-                "test_type": "performance",
+                "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
+                "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}",
+                "url": "${{ inputs.smoke_test_url }}",
+                "start_time": "'"$START_TIME"'",
+                "duration": '$DURATION',
                 "total_tests": 1,
                 "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
                 "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
-                "duration_seconds": '$DURATION',
-                "pipeline_id": "${{ github.run_id }}",
-                "pipeline_url": "${{ inputs.smoke_test_url }}"
+                "skipped_tests": 0,
+                "blocked_tests": 0,
+                "passing_percent": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "100" || echo "0")',
+                "avg_time": '$DURATION_MS',
+                "min_time": '$DURATION_MS',
+                "max_time": '$DURATION_MS',
+                "ninety_percent": '$DURATION_MS',
+                "standard_deviation": 0.0,
+                "throughput": "1",
+                "maximum_virtual_users": 1
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
-            echo "    ✅ Smoke test results registered (duration: ${DURATION}s)"
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_performance_test_summary" > /dev/null
+            echo "    ✅ Smoke test performance summary registered (duration: ${DURATION}s)"
           fi
 
           echo "✅ Test results registered in DevOps workspace"
