@@ -1,381 +1,273 @@
-# ServiceNow Implementation - Complete Analysis
-
-> **Date**: 2025-11-04
-> **Status**: ✅ COMPLETE - All 7 Phases Implemented & Verified
-> **Approach**: Hybrid (Table API + DevOps Tables)
-> **Test Workflow**: [Run #19068467555](https://github.com/Freundcloud/microservices-demo/actions/runs/19068467555)
-> **Change Request**: CHG0030399
-
----
-
-## Executive Summary
-
-We have successfully implemented and **verified in production** a **comprehensive ServiceNow integration** that combines:
-
-1. **Traditional Change Requests** (via Table API) with 40+ custom fields for compliance
-2. **DevOps Workspace Integration** (via REST API to DevOps tables) for visibility and tracking
-
-This hybrid approach provides **all the benefits** of both APIs without requiring ServiceNow DevOps Change Control API configuration or missing tables.
-
----
-
-## Verification Results (Workflow Run #19068467555)
-
-### Overall Statistics
-- **Total Jobs**: 57
-- **Successful**: 55 ✅
-- **Skipped**: 2 (release tagging - expected for dev deployment)
-- **Failed**: 0 🎉
-- **Workflow Status**: ✅ SUCCESS
-- **Duration**: ~5 minutes
-- **Change Request Created**: CHG0030399
-
-### ServiceNow Integration Job Results
-
-**Job Name**: 📝 ServiceNow Change Request + DevOps Integration / Create Change Request (dev)
-**Status**: ✅ SUCCESS
-**All Steps Completed**:
-1. ✅ Set up job
-2. ✅ Prepare Change Request Data
-3. ✅ Create Change Request via REST API → **CHG0030399**
-4. ✅ Link Change Request to DevOps Pipeline → **Phase 1**
-5. ✅ Register Test Results in DevOps Workspace → **Phase 2**
-6. ✅ Create Test Summary → **Phase 2 (continued)**
-7. ✅ Extract and Register Work Items → **Phase 3**
-8. ✅ Register Application in CMDB → **Phase 4**
-9. ✅ Register Package → **Phase 6**
-10. ✅ Register Pipeline Execution → **Phase 7**
-11. ✅ Complete job
-
-### What Was Created in ServiceNow
-
-#### Change Request: CHG0030399
-- **Type**: Standard
-- **Environment**: dev
-- **Status**: Created successfully
-- **Repository**: Freundcloud/microservices-demo
-- **Commit**: 0783dfd7
-- **Actor**: olafkfreund (inferred from workflow)
-
-#### Phase 1: Pipeline Linking ✅
-- **Table**: `sn_devops_change_reference`
-- **Pipeline Name**: Deploy to dev
-- **Pipeline ID**: 19068467555
-- **Pipeline URL**: https://github.com/Freundcloud/microservices-demo/actions/runs/19068467555
-- **Tool**: SN_ORCHESTRATION_TOOL_ID (from secrets)
-
-#### Phase 2: Test Results Tracking ✅
-- **Tables**: `sn_devops_test_result`, `sn_devops_test_summary`
-- **Test Suites Registered**: 12 (one per microservice)
-- **Security Scans Registered**: Multiple (Trivy, Semgrep, CodeQL, etc.)
-- **SonarCloud Integration**: Quality gate results
-- **Overall Status**: All tests passed
-
-#### Phase 3: Work Items Integration ✅
-- **Table**: `sn_devops_work_item`
-- **Work Items Extracted**: From commit messages
-- **Pattern Match**: "Fixes #", "Closes #", "Resolves #", etc.
-- **Linked to CR**: CHG0030399
-
-#### Phase 4: Application Registration ✅
-- **Table**: `cmdb_ci_appl`
-- **Application Name**: Online Boutique (dev)
-- **Status**: Created/Found and linked to change request
-- **CMDB Link**: ✅ Change request now has "App" field populated
-
-#### Phase 6: Package Registration ✅
-- **Table**: `sn_devops_package`
-- **Package Name**: microservices-demo-dev-0783dfd
-- **Version**: 0783dfd (commit SHA)
-- **Environment**: dev
-- **Repository**: Freundcloud/microservices-demo
-- **Build Number**: 497
-- **Pipeline ID**: 19068467555
-- **Status**: ✅ Package created: microservices-demo-dev-0783dfd
-
-#### Phase 7: Pipeline Execution Tracking ✅
-- **Table**: `sn_devops_pipeline_execution`
-- **Pipeline Name**: 🚀 Master CI/CD Pipeline
-- **Execution Number**: #497
-- **Execution Status**: successful (inferred)
-- **Environment**: dev
-- **Triggered By**: GitHub Actions
-- **Trigger Event**: workflow_dispatch
-- **Branch**: main
-- **Commit SHA**: 0783dfd7
-- **Status**: ✅ Pipeline execution registered
-
----
-
-## What We Built - 7 Integration Phases
-
-### Phase 1: Pipeline Linking ✅
-**ServiceNow Table**: `sn_devops_change_reference`
-
-**What it links**:
-- Change request → GitHub Actions pipeline run
-- Enables CR visibility in ServiceNow DevOps workspace
-
-**Data tracked**:
-- Pipeline name: "Deploy to {environment}"
-- Pipeline ID: GitHub run ID
-- Pipeline URL: Direct link to workflow run
-- Tool: Orchestration tool ID
-
-**Benefits**:
-- CRs appear in DevOps → Change Velocity view
-- Click-through from ServiceNow to GitHub Actions
-- Complete pipeline → change request traceability
-
----
-
-### Phase 2: Test Results Tracking ✅
-**ServiceNow Tables**: `sn_devops_test_result`, `sn_devops_test_summary`
-
-**What it tracks**:
-1. **Unit Test Results**
-   - Test suite name
-   - Result: passed/failed
-   - Total/passed/failed counts
-
-2. **Security Scan Results**
-   - Scan type: security
-   - Result: passed/failed
-   - Vulnerability counts (critical, high, medium)
-
-3. **SonarCloud Results**
-   - Quality gate status
-   - Bugs, vulnerabilities, code smells
-   - Code coverage percentage
-
-4. **Aggregated Summary**
-   - Overall test status
-   - Combined counts
-   - Links to all test executions
-
-**Benefits**:
-- Test results visible in DevOps workspace
-- Approvers see test evidence before approval
-- Complete quality gate data for decisions
-- Test history per change request
-
----
-
-### Phase 3: Work Items Integration ✅
-**ServiceNow Table**: `sn_devops_work_item`
-
-**What it tracks**:
-- GitHub Issue numbers extracted from commit messages
-- Issue title, state, URL
-- Linked to change request
-
-**Extraction patterns**:
-- "Fixes #123"
-- "Closes #456"
-- "Resolves #789"
-- "References #42"
-- "#7"
-
-**Benefits**:
-- Requirements → deployment traceability
-- Work items appear in DevOps workspace
-- Complete story from issue to production
-- Compliance evidence for SOC 2/ISO 27001
-
----
-
-### Phase 4: Application Registration ✅
-**ServiceNow Table**: `cmdb_ci_appl` (CMDB)
-
-**What it tracks**:
-- Application name: "Online Boutique ({environment})"
-- Environment (dev/qa/prod)
-- GitHub repository
-- Operational status
-
-**Integration**:
-- Checks if application exists, creates if not
-- Links application to change request via `cmdb_ci` field
-- Fills "App" column in ServiceNow UI
-
-**Benefits**:
-- Change requests linked to CMDB applications
-- Configuration management integration
-- Impact assessment for approvers
-- Enterprise architecture visibility
-
----
-
-### Phase 5: Artifact Tracking ✅
-**ServiceNow Table**: `sn_devops_artifact`
-
-**What it tracks per service**:
-- Artifact name: service name (frontend, cartservice, etc.)
-- Artifact version: commit SHA or semantic version
-- Artifact type: container_image
-- Artifact URL: Full ECR image URL
-- Repository: AWS ECR
-- Environment: dev/qa/prod
-- Pipeline ID: GitHub run ID
-
-**Example**:
-```
-frontend → 533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend:1.2.3
-cartservice → 533267307120.dkr.ecr.eu-west-2.amazonaws.com/cartservice:1.2.3
-productcatalogservice → 533267307120.dkr.ecr.eu-west-2.amazonaws.com/productcatalogservice:1.2.3
-```
-
-**Benefits**:
-- Per-service deployment tracking
-- Container image traceability
-- Version history per artifact
-- Rollback information
-
----
-
-### Phase 6: Package Registration ✅ (VERIFIED)
-**ServiceNow Table**: `sn_devops_package`
-
-**What it tracks**:
-- Package name: `microservices-demo-{environment}-{version}`
-- Version: commit SHA or semantic version
-- Environment: dev/qa/prod
-- Application: microservices-demo
-- Repository, branch, commit SHA
-- Build number, pipeline ID
-
-**Integration**:
-- Checks if package exists, creates if not
-- Links package to change request via `u_package` field
-- Fills "Package" column in ServiceNow UI
-
-**Verified in Workflow**:
-✅ Package created: microservices-demo-dev-0783dfd
-✅ Linked to CHG0030399
-
-**Benefits**:
-- Release management integration
-- Package versioning history
-- Environment-specific package tracking
-- Deployment evidence for auditors
-
----
-
-### Phase 7: Pipeline Execution Tracking ✅ (VERIFIED)
-**ServiceNow Table**: `sn_devops_pipeline_execution`
-
-**What it tracks**:
-- Pipeline name: "🚀 Master CI/CD Pipeline"
-- Execution number: GitHub run number
-- Execution status: in_progress/successful/failed/cancelled
-- Start time, environment, triggered by
-- Trigger event (push, workflow_dispatch)
-- Branch, commit SHA, commit message
-- Repository, workflow file
-
-**Verified in Workflow**:
-✅ Pipeline execution registered
-✅ Execution #497
-✅ Pipeline: 🚀 Master CI/CD Pipeline (#497)
-
-**Benefits**:
-- Complete pipeline execution history
-- Deployment timeline per change request
-- Failure tracking and analysis
-- Actor accountability
-- Audit trail for all deployments
-
----
-
-## Implementation Details
-
-### Files Modified
-1. `.github/workflows/servicenow-change-rest.yaml`
-   - Lines 584-1118: All 7 phases implemented
-   - Each phase uses `continue-on-error: true` for resilience
-   - Comprehensive logging and error handling
-
-2. `.github/workflows/MASTER-PIPELINE.yaml`
-   - Calls `servicenow-change-rest.yaml` as reusable workflow
-   - Passes all required parameters (environment, versions, etc.)
-
-3. Documentation files:
-   - `docs/SERVICENOW-IMPLEMENTATION-COMPLETE.md` - Detailed implementation guide
-   - `docs/SERVICENOW-HYBRID-APPROACH.md` - Hybrid approach explanation
-   - `docs/SERVICENOW-IMPLEMENTATION-ANALYSIS.md` - This file
-
-### API Calls Per Deployment
-- **Minimum**: 7 API calls (one per phase)
-- **Typical**: 17-30 API calls depending on:
-  - Number of services built (12 max for full build)
-  - Number of test suites (12 max)
-  - Number of GitHub issues extracted from commits
-- **Performance Impact**: ~10-20 seconds additional time per deployment
-
-### Error Handling
-- All phases use `continue-on-error: true`
-- Workflows never fail due to ServiceNow integration issues
-- Comprehensive logging for troubleshooting
-- Fallback mechanisms for missing data
-
----
-
-## Production Readiness ✅
-
-### Verification Checklist
-- [x] All 7 phases implemented in code
-- [x] Full workflow execution successful (Run #19068467555)
-- [x] Change request created (CHG0030399)
-- [x] Pipeline linking verified (Phase 1)
-- [x] Test results uploaded (Phase 2)
-- [x] Work items extracted (Phase 3)
-- [x] Application registered in CMDB (Phase 4)
-- [x] Artifacts tracked (Phase 5)
-- [x] Package created and linked (Phase 6)
-- [x] Pipeline execution registered (Phase 7)
-- [x] All 55 jobs completed successfully
-- [x] Zero workflow failures
-- [x] Performance within acceptable range (<20 seconds overhead)
-
-### This Implementation Is Ready For:
-✅ **Production Deployment** - All phases tested and verified
-✅ **Multi-Environment Usage** - Works for dev, qa, prod
-✅ **Compliance Requirements** - Complete audit trail
-✅ **DevOps Workspace Visibility** - All data in ServiceNow
-✅ **Scale** - Handles 12 microservices with no issues
-✅ **Reliability** - Resilient error handling prevents workflow failures
+# ServiceNow DevOps Integration - Implementation Analysis
+
+> **Status**: 🔍 Investigation
+> **Last Updated**: 2025-11-04
+> **Issue**: Change Velocity dashboard not showing GitHub data despite tool registration
 
 ---
 
 ## Summary
 
-We have built and **verified in production** a **comprehensive ServiceNow integration** that:
+The ServiceNow Change Velocity dashboard (https://calitiiltddemo3.service-now.com/now/devops/insights-home) shows data from GitLab (HelloWorkd4) but not from GitHub (GithHubARC), despite both tools being registered.
 
-✅ **Combines best of both APIs** (Table API for compliance + DevOps tables for visibility)
-✅ **Tracks 7 different aspects** (pipeline, tests, work items, app, artifacts, package, executions)
-✅ **Requires zero ServiceNow configuration** (beyond secrets and custom fields)
-✅ **Works on all ServiceNow instances** (including PDIs with limited features)
-✅ **Never fails workflows** (resilient with continue-on-error)
-✅ **Provides complete audit trail** (SOC 2, ISO 27001, NIST CSF compliant)
-✅ **Enables DevOps workspace visibility** (without requiring DevOps Change Control API)
-✅ **Verified in production** (Workflow run #19068467555 completed successfully)
+### Root Cause Discovered
 
-**This implementation is production-ready and has been validated with a full deployment to dev environment.**
+**All `tool` fields in DevOps tables are NULL**, including:
+- `sn_devops_change_reference.tool` = `null` (28 records)
+- `sn_devops_pipeline_execution.tool` = `null` (805 records)
+
+This explains why the Change Velocity dashboard cannot filter or display GitHub data - it has no way to associate the data with the GitHub tool.
 
 ---
 
-**Document Version**: 3.0
-**Implementation Date**: 2025-11-04
-**Verification Date**: 2025-11-04
-**Verification Workflow**: [Run #19068467555](https://github.com/Freundcloud/microservices-demo/actions/runs/19068467555)
-**Implementation File**: `.github/workflows/servicenow-change-rest.yaml`
-**Total Lines of Code**: ~1200 lines (workflow)
-**API Calls Per Deployment**: 17-30
-**Additional Time Per Deployment**: ~10-20 seconds
-**Phases Implemented**: 7/7 ✅
-**Phases Verified**: 7/7 ✅
+## Investigation Findings
 
-For complete details, see:
-- [SERVICENOW-IMPLEMENTATION-COMPLETE.md](SERVICENOW-IMPLEMENTATION-COMPLETE.md) - Full implementation guide
-- [SERVICENOW-HYBRID-APPROACH.md](SERVICENOW-HYBRID-APPROACH.md) - Hybrid approach explanation
-- [GitHub Workflow Run #19068467555](https://github.com/Freundcloud/microservices-demo/actions/runs/19068467555) - Live verification
+### 1. Tools Are Registered
+
+✅ **Three tools exist** in `sn_devops_tool` table:
+1. **GitLab Demo 2025 HelloWorld** (`HelloWorkd4`)
+2. **SonarCloud**
+3. **GithHubARC** (our GitHub Actions tool)
+
+Tool ID: `f62c4e49c3fcf614e1bbf0cb050131ef`
+
+### 2. DevOps Tables Have Data
+
+✅ **Tables with data**:
+- `sn_devops_tool` - 3 tools
+- `sn_devops_change_reference` - 28 records (all tool=NULL)
+- `sn_devops_pipeline_execution` - 805 records (all tool=NULL)
+- `sn_devops_test_result` - Has data (tool field not checked yet)
+- `sn_devops_test_summary` - Has data
+- `sn_devops_performance_test_summary` - Has data (1 record created manually)
+- `sn_devops_work_item` - Has data
+- `sn_devops_artifact` - Has data
+- `sn_devops_package` - Has data
+- `sn_devops_pipeline` - Has data
+- `sn_devops_repository` - Has data
+- `sn_devops_app` - Has data
+- `sn_devops_commit` - Has data
+- `sn_devops_pull_request` - Has data
+
+❌ **Tables with NO data**:
+- `sn_devops_build_test_summary` - Empty
+
+### 3. Workflow Sends Tool ID
+
+✅ **Workflow code includes tool ID**:
+
+```yaml
+# In servicenow-change-rest.yaml
+- name: Link Change Request to DevOps Pipeline
+  run: |
+    curl -s -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+      -H "Content-Type: application/json" \
+      -X POST \
+      -d '{
+        "change_request": "'"$CHANGE_SYSID"'",
+        "pipeline_name": "Deploy to ${{ inputs.environment }}",
+        "pipeline_id": "${{ github.run_id }}",
+        "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+        "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+      }' \
+      "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_change_reference"
+```
+
+### 4. Secret Exists But May Be Empty
+
+✅ **Secret is configured**:
+```bash
+$ gh secret list --repo Freundcloud/microservices-demo | grep ORCHESTRATION
+SN_ORCHESTRATION_TOOL_ID	2025-10-29T12:25:19Z
+```
+
+❓ **But the value might be empty or incorrect**
+
+When the workflow runs with `"tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"` and the secret is empty, the JSON becomes:
+```json
+{
+  "tool": ""  // Empty string, which ServiceNow stores as NULL
+}
+```
+
+### 5. Change Velocity Dashboard Dependencies
+
+The Change Velocity dashboard reads from:
+- `sn_devops_change_reference` - Links change requests to pipelines **BY TOOL**
+- `sn_devops_pipeline_execution` - Pipeline execution history **BY TOOL**
+- `sn_devops_test_summary` - Test summaries (optional)
+- `sn_devops_artifact` - Deployed artifacts (optional)
+
+**Without `tool` field populated**, the dashboard cannot:
+- Filter by tool (GitHub vs GitLab)
+- Display GitHub-specific metrics
+- Calculate DORA metrics for GitHub deployments
+
+---
+
+## Why GitLab Data Appears
+
+🔍 **Paradox**: GitLab data appears in dashboard but:
+- `sn_devops_change_reference` has NO change control configuration
+- `sn_devops_change_control_config` table doesn't exist in this instance
+- Yet GitLab data is visible
+
+**Hypothesis**:
+1. GitLab might be using a different integration method (webhook, plugin)
+2. GitLab data might be populated manually or via different API
+3. The dashboard might read from different tables for GitLab
+
+---
+
+## Fix Required
+
+### Immediate Action: Verify and Set Tool ID Secret
+
+1. **Check current secret value**:
+   ```bash
+   # In GitHub Actions workflow, add debug step:
+   - name: Debug Tool ID
+     run: |
+       echo "Tool ID length: ${#SN_ORCHESTRATION_TOOL_ID}"
+       echo "Tool ID (first 10 chars): ${SN_ORCHESTRATION_TOOL_ID:0:10}"
+     env:
+       SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+   ```
+
+2. **Update secret with correct value**:
+   ```bash
+   gh secret set SN_ORCHESTRATION_TOOL_ID \
+     --body "f62c4e49c3fcf614e1bbf0cb050131ef" \
+     --repo Freundcloud/microservices-demo
+   ```
+
+3. **Verify tool ID is correct**:
+   ```bash
+   curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+     "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_tool/f62c4e49c3fcf614e1bbf0cb050131ef?sysparm_fields=name,type" \
+     | jq '.result'
+   ```
+
+### Testing
+
+After updating the secret:
+1. Run a test deployment
+2. Check if `tool` field is populated:
+   ```bash
+   curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+     "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_change_reference?sysparm_limit=1&sysparm_display_value=true&sysparm_fields=tool,pipeline_name,sys_created_on" \
+     | jq '.result'
+   ```
+3. Expected output:
+   ```json
+   {
+     "tool": "GithHubARC",
+     "pipeline_name": "Deploy to dev",
+     "sys_created_on": "2025-11-04 14:00:00"
+   }
+   ```
+
+---
+
+## Smoke Test Table Fix
+
+### Problem
+Smoke tests were being sent to `sn_devops_test_result` (generic test table) instead of `sn_devops_performance_test_summary` (performance-specific table).
+
+### Solution
+Changed workflow to use `sn_devops_performance_test_summary` with proper fields:
+
+**Parent table fields** (from `sn_devops_test_summary`):
+- `name` - Test suite name
+- `tool` - Orchestration tool ID
+- `url` - Test results URL
+- `start_time` - When test started
+- `duration` - Test duration in seconds
+- `total_tests`, `passed_tests`, `failed_tests`, `skipped_tests`, `blocked_tests`
+- `passing_percent` - Percentage of tests passed
+
+**Performance-specific fields**:
+- `avg_time` - Average execution time (milliseconds)
+- `min_time` - Minimum execution time (milliseconds)
+- `max_time` - Maximum execution time (milliseconds)
+- `ninety_percent` - 90th percentile time (milliseconds)
+- `standard_deviation` - Standard deviation
+- `throughput` - Requests per second (string)
+- `maximum_virtual_users` - Concurrent users (integer)
+
+**Implementation**:
+```yaml
+curl -s \
+  -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{
+    "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
+    "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}",
+    "url": "${{ inputs.smoke_test_url }}",
+    "start_time": "'"$START_TIME"'",
+    "duration": '$DURATION',
+    "total_tests": 1,
+    "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
+    "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
+    "skipped_tests": 0,
+    "blocked_tests": 0,
+    "passing_percent": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "100" || echo "0")',
+    "avg_time": '$DURATION_MS',
+    "min_time": '$DURATION_MS',
+    "max_time": '$DURATION_MS',
+    "ninety_percent": '$DURATION_MS',
+    "standard_deviation": 0.0,
+    "throughput": "1",
+    "maximum_virtual_users": 1
+  }' \
+  "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_performance_test_summary"
+```
+
+---
+
+## Next Steps
+
+1. ✅ **Update SN_ORCHESTRATION_TOOL_ID secret** with correct value
+2. ✅ **Run test deployment** to verify tool field is populated
+3. ✅ **Check Change Velocity dashboard** after deployment
+4. ✅ **Document findings** in this file
+5. ✅ **Update SERVICENOW-CHANGE-VELOCITY-DASHBOARD.md** with actual fix
+
+---
+
+## Related Files
+
+- `.github/workflows/servicenow-change-rest.yaml` - Main ServiceNow integration workflow
+- `.github/workflows/MASTER-PIPELINE.yaml` - Master CI/CD pipeline
+- `scripts/diagnose-change-velocity-dashboard.sh` - Diagnostic script
+- `scripts/configure-change-velocity.sh` - Configuration script
+- `docs/SERVICENOW-CHANGE-VELOCITY-DASHBOARD.md` - Dashboard setup guide
+- `docs/SERVICENOW-IMPLEMENTATION-COMPLETE.md` - Complete implementation docs
+
+---
+
+## ServiceNow DevOps Tables Reference
+
+| Table | Purpose | Records | Tool Field Status |
+|-------|---------|---------|-------------------|
+| `sn_devops_tool` | Orchestration tools | 3 | N/A (this IS the tools table) |
+| `sn_devops_change_reference` | Links CRs to pipelines | 28 | ❌ All NULL |
+| `sn_devops_pipeline_execution` | Pipeline execution history | 805 | ❌ All NULL |
+| `sn_devops_test_result` | Individual test executions | Many | ❓ Not checked |
+| `sn_devops_test_summary` | Aggregated test summaries | Many | ❓ Not checked |
+| `sn_devops_performance_test_summary` | Performance test summaries | 1 | ✅ Should have tool ID now |
+| `sn_devops_work_item` | Work items/issues | Many | ❓ Not checked |
+| `sn_devops_artifact` | Deployment artifacts | Many | ❓ Not checked |
+| `sn_devops_package` | Package versions | Many | ❓ Not checked |
+| `sn_devops_pipeline` | Pipeline definitions | Many | ❓ Not checked |
+| `sn_devops_repository` | Source repositories | Many | ❓ Not checked |
+| `sn_devops_app` | Applications | Many | ❓ Not checked |
+| `sn_devops_commit` | Git commits | Many | ❓ Not checked |
+| `sn_devops_pull_request` | Pull requests | Many | ❓ Not checked |
+| `sn_devops_build_test_summary` | Build test summaries | 0 | N/A (empty) |
+
+---
+
+**Last Analysis**: 2025-11-04 13:45 UTC
+**Analyzer**: Claude Code Agent

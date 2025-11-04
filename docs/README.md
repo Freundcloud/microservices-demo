@@ -240,11 +240,20 @@ Official ServiceNow DevOps Change action documentation:
   - Phased rollout plan (4 phases)
 
 - **[Implementation Complete](SERVICENOW-IMPLEMENTATION-COMPLETE.md)** - Hybrid approach fully implemented ✅ DONE
-  - All 4 phases implemented in servicenow-change-rest.yaml
+  - All 7 phases implemented in servicenow-change-rest.yaml
   - MASTER-PIPELINE.yaml reverted to Table API
   - Complete verification guide
   - Before/after comparison
   - Troubleshooting and support
+
+- **[Change Velocity Dashboard Setup](SERVICENOW-CHANGE-VELOCITY-DASHBOARD.md)** - Populate DORA metrics dashboard 📊
+  - Why the dashboard is empty
+  - Plugin installation and configuration
+  - Change control setup for Change Velocity
+  - Generating historical data for trends
+  - Understanding DORA metrics (deployment frequency, lead time, failure rate, MTTR)
+  - Troubleshooting empty or partial data
+  - Alternative approaches if plugin not available
 
 ### Still Available (in _archive)
 - Detailed architecture guides
