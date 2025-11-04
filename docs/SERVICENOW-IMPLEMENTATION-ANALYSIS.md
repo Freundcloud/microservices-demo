@@ -112,6 +112,8 @@ git show HEAD~1:.github/workflows/MASTER-PIPELINE.yaml > .github/workflows/MASTE
   {
     "autoCloseChange": true,
     "setCloseCode": true,
+    "callbackURL": "https://github.com/{repo}/actions/runs/{run_id}",
+    "orchestrationTaskURL": "https://github.com/{repo}/actions/runs/{run_id}",
     "attributes": {
       "short_description": "...",
       "description": "...",
@@ -123,6 +125,9 @@ git show HEAD~1:.github/workflows/MASTER-PIPELINE.yaml > .github/workflows/MASTE
     }
   }
   ```
+  **Required Fields**:
+  - `callbackURL` - URL for ServiceNow to callback (GitHub Actions run URL)
+  - `orchestrationTaskURL` - URL to orchestration task (GitHub Actions run URL)
 
 ### Features Being Tested
 

@@ -159,6 +159,10 @@ jobs:
         run: |
           echo "Creating change request via ServiceNow DevOps Change Control API..."
 
+          # Build callback and orchestration URLs
+          CALLBACK_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ORCHESTRATION_TASK_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
           # Build the DevOps API payload
           PAYLOAD=$(jq -n \
             --argjson auto_close "$AUTO_CLOSE" \
@@ -170,9 +174,13 @@ jobs:
             --arg impl_plan "$IMPL_PLAN" \
             --arg backout_plan "$BACKOUT_PLAN" \
             --arg test_plan "$TEST_PLAN" \
+            --arg callback_url "$CALLBACK_URL" \
+            --arg orch_task_url "$ORCHESTRATION_TASK_URL" \
             '{
               "autoCloseChange": $auto_close,
               "setCloseCode": $set_close_code,
+              "callbackURL": $callback_url,
+              "orchestrationTaskURL": $orch_task_url,
               "attributes": {
                 "short_description": $short_desc,
                 "description": $description,

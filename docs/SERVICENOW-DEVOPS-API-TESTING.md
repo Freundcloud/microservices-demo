@@ -492,6 +492,62 @@ This gives you auto-close functionality with Table API.
 
 **Note**: The DevOps API requires toolId BOTH as query parameter AND as header (`sn_devops_orchestration_tool_id`).
 
+### DevOps API Returns 400: Missing callbackURL or orchestrationTaskURL
+
+**Error**:
+```json
+{
+  "result": {
+    "status": "Error",
+    "details": {
+      "errors": [
+        {
+          "message": "Missing required property: callbackURL"
+        },
+        {
+          "message": "Missing required property: orchestrationTaskURL"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Cause**: The DevOps API requires callback URLs for orchestration
+
+**Fix**: Add both URLs to the payload:
+```json
+{
+  "autoCloseChange": true,
+  "setCloseCode": true,
+  "callbackURL": "https://github.com/{repo}/actions/runs/{run_id}",
+  "orchestrationTaskURL": "https://github.com/{repo}/actions/runs/{run_id}",
+  "attributes": {
+    ...
+  }
+}
+```
+
+**In workflow**:
+```bash
+CALLBACK_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+ORCHESTRATION_TASK_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+PAYLOAD=$(jq -n \
+  --arg callback_url "$CALLBACK_URL" \
+  --arg orch_task_url "$ORCHESTRATION_TASK_URL" \
+  '{
+    "callbackURL": $callback_url,
+    "orchestrationTaskURL": $orch_task_url,
+    ...
+  }')
+```
+
+**Purpose**: These URLs allow ServiceNow to:
+- Callback to GitHub Actions with status updates
+- Track the orchestration task (workflow run)
+- Link change request to the GitHub Actions execution
+
 ### DevOps API Returns 404
 
 **Error**:
