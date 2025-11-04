@@ -75,8 +75,25 @@ This gives you **all the benefits** without requiring ServiceNow DevOps Change C
 ✅ Work items linked to CR
 ```
 
-### Phase 4: Artifact Tracking ✅
-**File**: `.github/workflows/servicenow-change-rest.yaml` (Lines 816-871)
+### Phase 4: Application Registration ✅
+**File**: `.github/workflows/servicenow-change-rest.yaml` (Lines 816-897)
+
+**What it does**:
+- Checks if application exists in `cmdb_ci_appl` table
+- Creates application if not found
+- Links application to change request via `cmdb_ci` field
+
+**Example output**:
+```
+🏢 Registering application in CMDB for CR CHG0030123...
+  ↳ Found existing application: Online Boutique (dev)
+  ↳ Linking application to change request...
+    ✅ Application linked to change request
+✅ App: Online Boutique (dev)
+```
+
+### Phase 5: Artifact Tracking ✅
+**File**: `.github/workflows/servicenow-change-rest.yaml` (Lines 899-955)
 
 **What it does**:
 - Parses `services_deployed` JSON array
@@ -94,6 +111,44 @@ This gives you **all the benefits** without requiring ServiceNow DevOps Change C
   ↳ Registering productcatalogservice...
     ✅ productcatalogservice registered
 ✅ Deployed artifacts registered in DevOps workspace
+```
+
+### Phase 6: Package Registration ✅
+**File**: `.github/workflows/servicenow-change-rest.yaml` (Lines 956-1048)
+
+**What it does**:
+- Creates or finds package in `sn_devops_package` table
+- Package naming: `microservices-demo-{environment}-{version}`
+- Links package to change request via `u_package` field
+- Tracks version, repository, branch, commit details
+
+**Example output**:
+```
+📦 Registering package for CR CHG0030123...
+  ↳ Creating new package: microservices-demo-dev-1.2.3...
+    ✅ Package created: microservices-demo-dev-1.2.3
+  ↳ Linking package to change request...
+    ✅ Package linked to change request
+✅ Package: microservices-demo-dev-1.2.3
+```
+
+### Phase 7: Pipeline Execution Tracking ✅
+**File**: `.github/workflows/servicenow-change-rest.yaml` (Lines 1050-1118)
+
+**What it does**:
+- Registers pipeline execution in `sn_devops_pipeline_execution` table
+- Tracks execution status (in_progress, successful, failed, cancelled)
+- Records start time, trigger, commit details, actor
+- Links to change request and tool
+
+**Example output**:
+```
+🚀 Registering pipeline execution for CR CHG0030123...
+  ✅ Pipeline execution registered
+     Execution ID: def456...
+     Status: in_progress
+     Run: 123
+✅ Pipeline: 🚀 Master CI/CD Pipeline (#123)
 ```
 
 ### Master Pipeline Updated ✅
@@ -222,6 +277,21 @@ curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
   "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_artifact?sysparm_query=change_request=$CHANGE_SYS_ID" \
   | jq '.result'
+
+# Check package
+curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+  "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYS_ID?sysparm_fields=u_package" \
+  | jq '.result.u_package'
+
+# Check package details
+curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+  "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package?sysparm_query=name=microservices-demo-dev-*" \
+  | jq '.result'
+
+# Check pipeline executions
+curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+  "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_pipeline_execution?sysparm_query=change_request=$CHANGE_SYS_ID" \
+  | jq '.result'
 ```
 
 ---
@@ -233,31 +303,39 @@ curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 - ✅ Traditional change requests (no deployment gates)
 - ✅ SOC 2 / ISO 27001 / NIST CSF compliance data
 - ✅ Full traceability from requirements to deployment
+- ✅ Application linkage in CMDB for configuration management
+- ✅ Package tracking for release management
 
 ### For DevOps Teams
 - ✅ Changes visible in DevOps workspace
 - ✅ Pipeline runs linked to change requests
 - ✅ Automated tracking (no manual work)
 - ✅ End-to-end traceability
+- ✅ Pipeline execution history per change request
+- ✅ Package versioning and deployment tracking
 
 ### For Security Teams
 - ✅ Security scan results tracked in dedicated table
 - ✅ Vulnerability counts linked to each CR
 - ✅ SBOM and SARIF results available
 - ✅ Test evidence for approval decisions
+- ✅ Application context for security assessments
 
 ### For Approvers
 - ✅ All context in one place (traditional CR)
 - ✅ Test results visible in DevOps workspace
 - ✅ Work items show requirements traceability
 - ✅ Artifact tracking shows what's being deployed
+- ✅ Application association for impact assessment
+- ✅ Package details for release verification
+- ✅ Pipeline execution status for deployment confidence
 
 ---
 
 ## Files Modified
 
 ### Workflows
-1. `.github/workflows/servicenow-change-rest.yaml` - Enhanced with 4 phases
+1. `.github/workflows/servicenow-change-rest.yaml` - Enhanced with 7 phases
 2. `.github/workflows/MASTER-PIPELINE.yaml` - Reverted to Table API
 
 ### Documentation
@@ -274,14 +352,19 @@ curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
 **Traditional Table API (1 call)**:
 - POST `/api/now/table/change_request` - Create CR with 40+ custom fields
 
-**DevOps Integration (4-6 calls)** - All via REST API:
-- POST `/api/now/table/sn_devops_change_reference` - Link pipeline
-- POST `/api/now/table/sn_devops_test_result` (3x) - Unit tests, security, SonarCloud
-- POST `/api/now/table/sn_devops_test_summary` - Aggregated summary
-- POST `/api/now/table/sn_devops_work_item` (n) - GitHub Issues
-- POST `/api/now/table/sn_devops_artifact` (n) - Container images
+**DevOps Integration (7-9+ calls)** - All via REST API:
+1. POST `/api/now/table/sn_devops_change_reference` - Link pipeline
+2. POST `/api/now/table/sn_devops_test_result` (3x) - Unit tests, security, SonarCloud
+3. POST `/api/now/table/sn_devops_test_summary` - Aggregated summary
+4. POST `/api/now/table/sn_devops_work_item` (n) - GitHub Issues
+5. GET/POST `/api/now/table/cmdb_ci_appl` - Application registration
+6. PATCH `/api/now/table/change_request/{sys_id}` - Link application to CR
+7. POST `/api/now/table/sn_devops_artifact` (n) - Container images per service
+8. GET/POST `/api/now/table/sn_devops_package` - Package registration
+9. PATCH `/api/now/table/change_request/{sys_id}` - Link package to CR
+10. POST `/api/now/table/sn_devops_pipeline_execution` - Pipeline execution tracking
 
-**Total**: 5-15 API calls depending on number of services and issues
+**Total**: 10-25 API calls depending on number of services, issues, and whether app/package exist
 
 ### Error Handling
 All DevOps integration steps use `continue-on-error: true`:
@@ -291,9 +374,9 @@ All DevOps integration steps use `continue-on-error: true`:
 - Failures logged but don't block deployment
 
 ### Performance Impact
-- **Additional time**: ~5-15 seconds per deployment
-- **Network overhead**: Minimal (parallel API calls possible)
-- **ServiceNow load**: Low (simple POST requests)
+- **Additional time**: ~10-20 seconds per deployment
+- **Network overhead**: Minimal (sequential API calls with error handling)
+- **ServiceNow load**: Low to moderate (simple POST/PATCH requests)
 
 ---
 
@@ -308,9 +391,12 @@ All DevOps integration steps use `continue-on-error: true`:
 | **Work Items** | ⚠️ Separate workflow | ✅ Integrated automatically |
 | **Artifacts** | ❌ Not tracked | ✅ Per-service tracking |
 | **Pipeline Linking** | ⚠️ URL in custom field | ✅ Proper reference table |
+| **Application CMDB** | ❌ Not linked | ✅ Linked to cmdb_ci_appl |
+| **Package Tracking** | ❌ Not tracked | ✅ sn_devops_package with versioning |
+| **Pipeline Executions** | ❌ Not tracked | ✅ Full execution history |
 | **Compliance Data** | ✅ Complete | ✅ Complete |
 | **Configuration** | ✅ None needed | ✅ None needed |
-| **API Calls** | 1 | 5-15 |
+| **API Calls** | 1 | 10-25 |
 
 ---
 

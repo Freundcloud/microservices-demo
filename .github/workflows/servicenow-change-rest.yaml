@@ -814,7 +814,90 @@ jobs:
           fi
 
       # ========================================
-      # PHASE 4: Artifact Tracking
+      # PHASE 4: Application Registration
+      # ========================================
+
+      - name: Register Application in CMDB
+        if: steps.create-cr.outputs.change_sys_id != ''
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+        run: |
+          echo "📱 Registering application in CMDB for CR $CHANGE_NUMBER..."
+
+          # Check if application already exists
+          APP_NAME="Online Boutique (${{ inputs.environment }})"
+          APP_QUERY="name=$APP_NAME"
+
+          echo "  ↳ Checking if application exists: $APP_NAME"
+          APP_RESPONSE=$(curl -s \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Accept: application/json" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/cmdb_ci_appl?sysparm_query=$APP_QUERY&sysparm_fields=sys_id,name")
+
+          APP_COUNT=$(echo "$APP_RESPONSE" | jq -r '.result | length')
+
+          if [ "$APP_COUNT" -gt 0 ]; then
+            # Application exists - get sys_id
+            APP_SYS_ID=$(echo "$APP_RESPONSE" | jq -r '.result[0].sys_id')
+            echo "    ✅ Application already exists (sys_id: $APP_SYS_ID)"
+          else
+            # Create new application
+            echo "    ↳ Creating new application in CMDB..."
+            CREATE_RESPONSE=$(curl -s \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X POST \
+              -d '{
+                "name": "'"$APP_NAME"'",
+                "short_description": "Microservices demo application (${{ inputs.environment }} environment)",
+                "u_environment": "${{ inputs.environment }}",
+                "u_github_repo": "${{ github.repository }}",
+                "operational_status": "1",
+                "install_status": "1"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/cmdb_ci_appl")
+
+            APP_SYS_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.sys_id // empty')
+
+            if [ -n "$APP_SYS_ID" ]; then
+              echo "    ✅ Application created (sys_id: $APP_SYS_ID)"
+            else
+              echo "    ⚠️  Failed to create application"
+              echo "$CREATE_RESPONSE" | jq '.'
+              exit 0
+            fi
+          fi
+
+          # Link application to change request
+          if [ -n "$APP_SYS_ID" ]; then
+            echo "  ↳ Linking application to change request..."
+
+            # Update change request with application reference
+            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X PATCH \
+              -d '{
+                "cmdb_ci": "'"$APP_SYS_ID"'"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYSID")
+
+            HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "    ✅ Application linked to change request"
+              echo "✅ App: $APP_NAME"
+            else
+              echo "    ⚠️  Failed to link application (HTTP $HTTP_CODE)"
+            fi
+          fi
+
+      # ========================================
+      # PHASE 5: Artifact Tracking
       # ========================================
 
       - name: Register Deployed Artifacts
@@ -868,6 +951,170 @@ jobs:
             echo "✅ Deployed artifacts registered in DevOps workspace"
           else
             echo "  No services to register"
+          fi
+
+      # ========================================
+      # PHASE 6: Package Registration
+      # ========================================
+
+      - name: Register Package
+        if: steps.create-cr.outputs.change_sys_id != ''
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+        run: |
+          echo "📦 Registering package for CR $CHANGE_NUMBER..."
+
+          # Package naming: microservices-demo-{environment}-{version}
+          VERSION="${{ inputs.previous_version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ github.sha }}"
+            VERSION="${VERSION:0:7}"
+          fi
+
+          PACKAGE_NAME="microservices-demo-${{ inputs.environment }}-$VERSION"
+
+          # Check if package already exists in ServiceNow
+          PACKAGE_RESPONSE=$(curl -s \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_package?sysparm_query=name=$PACKAGE_NAME&sysparm_limit=1")
+
+          PACKAGE_COUNT=$(echo "$PACKAGE_RESPONSE" | jq -r '.result | length')
+
+          if [ "$PACKAGE_COUNT" -gt 0 ]; then
+            # Package exists - get sys_id
+            PACKAGE_SYS_ID=$(echo "$PACKAGE_RESPONSE" | jq -r '.result[0].sys_id')
+            echo "  ↳ Found existing package: $PACKAGE_NAME"
+          else
+            # Create new package
+            echo "  ↳ Creating new package: $PACKAGE_NAME..."
+
+            CREATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X POST \
+              -d '{
+                "name": "'"$PACKAGE_NAME"'",
+                "version": "'"$VERSION"'",
+                "environment": "${{ inputs.environment }}",
+                "application": "microservices-demo",
+                "repository": "${{ github.repository }}",
+                "branch": "${{ github.ref_name }}",
+                "commit_sha": "${{ github.sha }}",
+                "build_number": "${{ github.run_number }}",
+                "pipeline_id": "${{ github.run_id }}",
+                "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_package")
+
+            HTTP_CODE=$(echo "$CREATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+            BODY=$(echo "$CREATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              PACKAGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ Package created: $PACKAGE_NAME"
+            else
+              echo "    ⚠️  Failed to create package (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.'
+            fi
+          fi
+
+          # Link package to change request via PATCH
+          if [ -n "$PACKAGE_SYS_ID" ]; then
+            echo "  ↳ Linking package to change request..."
+
+            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X PATCH \
+              -d '{
+                "u_package": "'"$PACKAGE_SYS_ID"'"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYSID")
+
+            HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "    ✅ Package linked to change request"
+              echo "✅ Package: $PACKAGE_NAME"
+            else
+              echo "    ⚠️  Failed to link package (HTTP $HTTP_CODE)"
+            fi
+          fi
+
+      # ========================================
+      # PHASE 7: Pipeline Execution Tracking
+      # ========================================
+
+      - name: Register Pipeline Execution
+        if: steps.create-cr.outputs.change_sys_id != ''
+        continue-on-error: true
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+        run: |
+          echo "🚀 Registering pipeline execution for CR $CHANGE_NUMBER..."
+
+          # Calculate execution metadata
+          START_TIME="${{ github.event.repository.pushed_at }}"
+          if [ -z "$START_TIME" ]; then
+            START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
+          fi
+
+          # Determine execution status based on workflow state
+          EXECUTION_STATUS="in_progress"
+          if [ "${{ job.status }}" = "success" ]; then
+            EXECUTION_STATUS="successful"
+          elif [ "${{ job.status }}" = "failure" ]; then
+            EXECUTION_STATUS="failed"
+          elif [ "${{ job.status }}" = "cancelled" ]; then
+            EXECUTION_STATUS="cancelled"
+          fi
+
+          # Register pipeline execution in sn_devops_pipeline_execution
+          EXEC_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X POST \
+            -d '{
+              "change_request": "'"$CHANGE_SYSID"'",
+              "pipeline_name": "🚀 Master CI/CD Pipeline",
+              "pipeline_id": "${{ github.run_id }}",
+              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "execution_number": "${{ github.run_number }}",
+              "execution_status": "'"$EXECUTION_STATUS"'",
+              "start_time": "'"$START_TIME"'",
+              "environment": "${{ inputs.environment }}",
+              "triggered_by": "${{ github.actor }}",
+              "trigger_event": "${{ github.event_name }}",
+              "branch": "${{ github.ref_name }}",
+              "commit_sha": "${{ github.sha }}",
+              "commit_message": "${{ github.event.head_commit.message }}",
+              "repository": "${{ github.repository }}",
+              "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}",
+              "workflow_file": "${{ github.workflow }}"
+            }' \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_pipeline_execution")
+
+          HTTP_CODE=$(echo "$EXEC_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+          BODY=$(echo "$EXEC_RESPONSE" | sed 's/HTTP_CODE:.*//')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            EXECUTION_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+            echo "  ✅ Pipeline execution registered"
+            echo "     Execution ID: $EXECUTION_SYS_ID"
+            echo "     Status: $EXECUTION_STATUS"
+            echo "     Run: ${{ github.run_number }}"
+            echo "✅ Pipeline: 🚀 Master CI/CD Pipeline (#${{ github.run_number }})"
+          else
+            echo "  ⚠️  Failed to register pipeline execution (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.'
           fi
 
       - name: Wait for Change Approval (QA/PROD)
