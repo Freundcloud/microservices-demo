@@ -625,8 +625,16 @@ jobs:
     needs: [pipeline-init, deploy-to-environment]
     if: needs.deploy-to-environment.result == 'success'
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.test-frontend.outputs.status }}
+      url: ${{ steps.test-frontend.outputs.url }}
+      duration: ${{ steps.calculate-duration.outputs.duration }}
 
     steps:
+      - name: Record Start Time
+        id: start-time
+        run: echo "time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -676,8 +684,18 @@ jobs:
             fi
           fi
 
+      - name: Calculate Duration
+        id: calculate-duration
+        run: |
+          END_TIME=$(date +%s)
+          START_TIME=${{ steps.start-time.outputs.time }}
+          DURATION=$((END_TIME - START_TIME))
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+          echo "Smoke tests duration: ${DURATION}s"
+
       - name: Smoke Test Summary
         run: |
+          DURATION=${{ steps.calculate-duration.outputs.duration }}
           echo "## ✅ Smoke Tests Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
@@ -687,6 +705,7 @@ jobs:
           if [ "${{ steps.test-frontend.outputs.status }}" == "success" ]; then
             echo "| URL | ${{ steps.test-frontend.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "| Duration | ${DURATION}s |" >> $GITHUB_STEP_SUMMARY
 
     # ============================================================================
     # STAGE 7: Release Tagging (Production Only)
@@ -825,6 +844,83 @@ jobs:
       total_pods: ${{ needs.deploy-to-environment.outputs.total_pods || '0' }}
       frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url || '' }}
 
+  upload-smoke-test-results:
+    name: "🧪 Upload Smoke Test Results to ServiceNow"
+    needs: [pipeline-init, servicenow-change, smoke-tests]
+    if: |
+      needs.servicenow-change.result == 'success' &&
+      needs.servicenow-change.outputs.change_number != '' &&
+      needs.smoke-tests.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Change Request sys_id
+        id: get-sysid
+        run: |
+          # Query ServiceNow to get the sys_id of the change request
+          RESPONSE=$(curl -s \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Accept: application/json" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request?sysparm_query=number=${{ needs.servicenow-change.outputs.change_number }}&sysparm_fields=sys_id")
+
+          SYS_ID=$(echo "$RESPONSE" | jq -r '.result[0].sys_id')
+          echo "Change request ${{ needs.servicenow-change.outputs.change_number }} sys_id: $SYS_ID"
+          echo "sys_id=$SYS_ID" >> $GITHUB_OUTPUT
+
+      - name: Register Smoke Test Results
+        run: |
+          echo "Uploading smoke test results to ServiceNow..."
+          SMOKE_STATUS="${{ needs.smoke-tests.outputs.status }}"
+          [ "$SMOKE_STATUS" = "passed" ] && SMOKE_RESULT="success" || SMOKE_RESULT="failure"
+
+          DURATION="${{ needs.smoke-tests.outputs.duration }}"
+          [ -z "$DURATION" ] && DURATION="0"
+
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "change_request": "${{ steps.get-sysid.outputs.sys_id }}",
+              "test_suite_name": "Smoke Tests - Post-Deployment",
+              "test_result": "'"$SMOKE_RESULT"'",
+              "test_type": "performance",
+              "total_tests": 1,
+              "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
+              "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
+              "duration_seconds": '$DURATION',
+              "pipeline_id": "${{ github.run_id }}",
+              "pipeline_url": "${{ needs.smoke-tests.outputs.url }}"
+            }' \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            echo "✅ Smoke test results uploaded successfully (duration: ${DURATION}s)"
+          else
+            echo "❌ Failed to upload smoke test results (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+            exit 1
+          fi
+
+      - name: Update Summary
+        if: always()
+        run: |
+          echo "## 🧪 Smoke Test Results Uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Smoke Tests - Post-Deployment |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ needs.smoke-tests.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Duration | ${{ needs.smoke-tests.outputs.duration }}s |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | performance |" >> $GITHUB_STEP_SUMMARY
+          echo "| Change Request | **${{ needs.servicenow-change.outputs.change_number }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View in ServiceNow:**" >> $GITHUB_STEP_SUMMARY
+          echo "${{ secrets.SERVICENOW_INSTANCE_URL }}/sn_devops_test_result_list.do?sysparm_query=change_request=${{ steps.get-sysid.outputs.sys_id }}" >> $GITHUB_STEP_SUMMARY
+
   # ============================================================================
   # STAGE 9: Pipeline Summary
   # ============================================================================
@@ -843,6 +939,7 @@ jobs:
       - deploy-to-environment
       - smoke-tests
       - update-servicenow-change
+      - upload-smoke-test-results
     if: always()
     runs-on: ubuntu-latest
 
@@ -872,6 +969,7 @@ jobs:
           echo "| ServiceNow Change | ${{ needs.servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Upload Smoke Test Results | ${{ needs.upload-smoke-test-results.result }} |" >> $GITHUB_STEP_SUMMARY
           # echo "| Update Change | ${{ needs.update-servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY  # Disabled
           echo "" >> $GITHUB_STEP_SUMMARY
 

@@ -174,6 +174,22 @@ on:
         required: false
         type: string
         default: ""
+      # Smoke test / Performance test results
+      smoke_test_status:
+        description: "Smoke test status (passed/failed)"
+        required: false
+        type: string
+        default: ""
+      smoke_test_duration:
+        description: "Smoke test duration in seconds"
+        required: false
+        type: string
+        default: ""
+      smoke_test_url:
+        description: "URL to view smoke test results"
+        required: false
+        type: string
+        default: ""
     outputs:
       change_number:
         description: "ServiceNow Change Request Number"
@@ -715,6 +731,35 @@ jobs:
             echo "    ✅ SonarCloud results registered"
           fi
 
+          # Register smoke test / performance test results (if available)
+          if [ -n "${{ inputs.smoke_test_status }}" ]; then
+            echo "  ↳ Registering smoke/performance tests..."
+            SMOKE_STATUS="${{ inputs.smoke_test_status }}"
+            [ "$SMOKE_STATUS" = "passed" ] && SMOKE_RESULT="success" || SMOKE_RESULT="failure"
+
+            DURATION="${{ inputs.smoke_test_duration }}"
+            [ -z "$DURATION" ] && DURATION="0"
+
+            curl -s \
+              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "change_request": "'"$CHANGE_SYSID"'",
+                "test_suite_name": "Smoke Tests - Post-Deployment",
+                "test_result": "'"$SMOKE_RESULT"'",
+                "test_type": "performance",
+                "total_tests": 1,
+                "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
+                "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
+                "duration_seconds": '$DURATION',
+                "pipeline_id": "${{ github.run_id }}",
+                "pipeline_url": "${{ inputs.smoke_test_url }}"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+            echo "    ✅ Smoke test results registered (duration: ${DURATION}s)"
+          fi
+
           echo "✅ Test results registered in DevOps workspace"
 
       - name: Create Test Summary
@@ -729,6 +774,7 @@ jobs:
           TOTAL_SUITES=1  # Unit tests
           [ -n "${{ inputs.security_scan_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
           [ -n "${{ inputs.sonarcloud_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
+          [ -n "${{ inputs.smoke_test_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
 
           # Determine overall result
           FAILED="${{ inputs.unit_test_failed }}"
