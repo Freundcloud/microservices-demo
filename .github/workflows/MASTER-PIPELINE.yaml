@@ -643,6 +643,31 @@ jobs:
           TOTAL_COUNT: ${{ needs.security-scans.outputs.total_count }}
           SCAN_RESULT: ${{ needs.security-scans.outputs.test_result }}
 
+  link-packages-to-change-request:
+    name: "🔗 Link Packages to Change Request"
+    needs: [pipeline-init, servicenow-change, register-packages]
+    if: |
+      always() &&
+      needs.servicenow-change.result == 'success' &&
+      needs.register-packages.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Link Packages to Change Request
+        run: |
+          chmod +x scripts/link-packages-to-change-request.sh
+          ./scripts/link-packages-to-change-request.sh
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          CHANGE_REQUEST_SYS_ID: ${{ needs.servicenow-change.outputs.change_sys_id }}
+          CHANGE_REQUEST_NUMBER: ${{ needs.servicenow-change.outputs.change_number }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
   deploy-to-environment:
     name: "🚀 Deploy Application"
     needs: [pipeline-init, servicenow-change]
@@ -905,6 +930,7 @@ jobs:
       - servicenow-change
       - upload-unit-test-results
       - upload-security-scan-results
+      - link-packages-to-change-request
       - register-work-items
       - deploy-to-environment
       - smoke-tests
@@ -937,6 +963,7 @@ jobs:
           echo "| ServiceNow Change | ${{ needs.servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Upload Test Results | ${{ needs.upload-unit-test-results.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Upload Security Results | ${{ needs.upload-security-scan-results.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Link Packages to CR | ${{ needs.link-packages-to-change-request.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Register Work Items | ${{ needs.register-work-items.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY

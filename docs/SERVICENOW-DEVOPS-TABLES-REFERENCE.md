@@ -2,12 +2,12 @@
 
 > **Instance**: calitiiltddemo3.service-now.com
 > **Plugin Version**: ServiceNow DevOps (activated)
-> **Last Verified**: 2025-01-04
-> **Tables Available**: 10 of 18 checked
+> **Last Verified**: 2025-11-04
+> **Tables Available**: 11 of 19 checked
 
 ## Summary
 
-**✅ Available Tables (10)**:
+**✅ Available Tables (11)**:
 1. `sn_devops_tool` - Tool registry (GitHub, Jenkins, etc.)
 2. `sn_devops_package` - Artifact/package tracking
 3. `sn_devops_test_result` - Test results
@@ -18,9 +18,10 @@
 8. `sn_devops_change_reference` - Change request linkages
 9. `sn_devops_commit` - Git commit tracking
 10. `sn_devops_pull_request` - Pull request tracking
+11. `sn_devops_pipeline_execution` - Pipeline execution tracking ⭐ NEW
 
 **❌ Not Available Tables (8)**:
-1. `sn_devops_pipeline_info` - Pipeline execution tracking
+1. `sn_devops_pipeline_info` - Legacy pipeline table (replaced by pipeline_execution)
 2. `sn_devops_security_result` - Security scan results
 3. `sn_devops_change` - DevOps change records
 4. `sn_devops_deployment` - Deployment tracking
@@ -281,6 +282,40 @@ https://calitiiltddemo3.service-now.com/sn_devops_pull_request_list.do
 
 ---
 
+### 11. sn_devops_pipeline_execution
+
+**Purpose**: Track pipeline/workflow executions with detailed metadata
+
+**Status**: ✅ Available (1 record)
+
+**Key Fields**:
+- `tool` (reference) - Links to sn_devops_tool
+- `change_request` (reference) - Links to change request
+- `pipeline_name` (string) - Name of pipeline/workflow
+- `pipeline_id` (string) - Unique pipeline run ID
+- `pipeline_url` (string) - Link to pipeline run
+- `execution_number` (string) - Build/run number
+- `execution_status` (string) - "success", "failed", "cancelled"
+- `start_time` (datetime) - Execution start time
+- `environment` (string) - Target environment
+- `triggered_by` (string) - User who triggered execution
+- `branch` (string) - Git branch
+- `commit_sha` (string) - Git commit SHA
+
+**Our Usage**:
+- Workflow: `.github/workflows/servicenow-change-rest.yaml` (register-pipeline-execution step)
+- Created automatically when change request is created
+- Links pipeline run to change request with complete execution context
+
+**View**:
+```
+https://calitiiltddemo3.service-now.com/sn_devops_pipeline_execution_list.do
+```
+
+**Note**: This replaces the legacy `sn_devops_pipeline_info` table
+
+---
+
 ## Not Available Tables
 
 The following tables are **NOT available** in this ServiceNow instance. Attempts to use them will result in "Invalid table" errors.
@@ -333,7 +368,7 @@ The following tables are **NOT available** in this ServiceNow instance. Attempts
 | Purpose | Table | Integration Method |
 |---------|-------|-------------------|
 | Tool registry | `sn_devops_tool` | Manual/script creation |
-| Packages/Images | `sn_devops_package` | GitHub Action |
+| Packages/Images | `sn_devops_package` | GitHub Action + link script |
 | Test results | `sn_devops_test_result` | Reusable workflow |
 | Test executions | `sn_devops_test_execution` | Auto-created with test results |
 | Smoke tests | `sn_devops_performance_test_summary` | Custom script |
@@ -341,12 +376,13 @@ The following tables are **NOT available** in this ServiceNow instance. Attempts
 | Change linking | `sn_devops_change_reference` | Auto-created |
 | Commits | `sn_devops_commit` | Auto-created |
 | Pull requests | `sn_devops_pull_request` | Auto-created |
+| Pipeline tracking | `sn_devops_pipeline_execution` | Auto-created with change request |
 
 ### ⚠️ What Doesn't Work (Use Workarounds)
 
 | Purpose | Missing Table | Workaround |
 |---------|---------------|------------|
-| Pipeline tracking | `sn_devops_pipeline_info` | Use change_reference |
+| Legacy pipeline info | `sn_devops_pipeline_info` | Use sn_devops_pipeline_execution |
 | Security results | `sn_devops_security_result` | Change request work notes |
 | Code quality | `sn_devops_sonar_result` | Custom fields on change request |
 | Deployments | `sn_devops_deployment` | Track via packages + change request |
@@ -396,6 +432,7 @@ sn_devops_artifact:                 https://calitiiltddemo3.service-now.com/sn_d
 sn_devops_change_reference:         https://calitiiltddemo3.service-now.com/sn_devops_change_reference_list.do
 sn_devops_commit:                   https://calitiiltddemo3.service-now.com/sn_devops_commit_list.do
 sn_devops_pull_request:             https://calitiiltddemo3.service-now.com/sn_devops_pull_request_list.do
+sn_devops_pipeline_execution:       https://calitiiltddemo3.service-now.com/sn_devops_pipeline_execution_list.do
 ```
 
 ---
@@ -408,6 +445,6 @@ sn_devops_pull_request:             https://calitiiltddemo3.service-now.com/sn_d
 
 ---
 
-**Last Updated**: 2025-01-04
+**Last Updated**: 2025-11-04
 **Verification**: Tested against calitiiltddemo3.service-now.com
-**Status**: ✅ 10 tables available and working
+**Status**: ✅ 11 tables available and working
