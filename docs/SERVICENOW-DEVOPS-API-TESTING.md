@@ -19,7 +19,8 @@ This guide explains how to test the experimental DevOps Change Control API workf
 - Full audit trail and compliance data
 
 **Experimental** (`.github/workflows/servicenow-change-devops-api.yaml`):
-- Uses ServiceNow DevOps Change Control API: `/api/sn_devops/v1/devops/orchestration/changeControl`
+- Uses ServiceNow DevOps Change Control API: `/api/sn_devops/v1/devops/orchestration/changeControl?toolId={tool_id}`
+- Requires `toolId` query parameter AND `sn_devops_orchestration_tool_id` header
 - No custom field support
 - Creates records in `change_request` AND `sn_devops_change_reference` tables
 - Auto-close functionality built-in
@@ -459,6 +460,37 @@ This gives you auto-close functionality with Table API.
 ---
 
 ## Troubleshooting
+
+### DevOps API Returns 400: Missing toolId
+
+**Error**:
+```json
+{
+  "result": {
+    "status": "Error",
+    "details": {
+      "errors": [
+        {
+          "message": "Missing query parameters: toolId"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Cause**: The `toolId` query parameter is missing from the API call
+
+**Fix**: Ensure the API endpoint includes `?toolId={tool_id}`:
+```bash
+# Correct URL format
+/api/sn_devops/v1/devops/orchestration/changeControl?toolId=$SN_ORCHESTRATION_TOOL_ID
+
+# In workflow:
+"${{ secrets.SERVICENOW_INSTANCE_URL }}/api/sn_devops/v1/devops/orchestration/changeControl?toolId=${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+```
+
+**Note**: The DevOps API requires toolId BOTH as query parameter AND as header (`sn_devops_orchestration_tool_id`).
 
 ### DevOps API Returns 404
 

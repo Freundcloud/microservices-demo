@@ -102,9 +102,11 @@ git show HEAD~1:.github/workflows/MASTER-PIPELINE.yaml > .github/workflows/MASTE
 ### API Endpoint Being Tested
 
 **DevOps Change Control API**:
-- Endpoint: `/api/sn_devops/v1/devops/orchestration/changeControl`
+- Endpoint: `/api/sn_devops/v1/devops/orchestration/changeControl?toolId={tool_id}`
 - Method: POST
-- Authentication: Basic Auth + `sn_devops_orchestration_tool_id` header
+- Authentication: Basic Auth
+- Required Headers: `sn_devops_orchestration_tool_id: {tool_id}`
+- Required Query Parameter: `toolId={tool_id}` (CRITICAL - API returns 400 without this)
 - Payload Structure:
   ```json
   {

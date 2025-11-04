@@ -199,7 +199,7 @@ jobs:
             -H "sn_devops_orchestration_tool_id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}" \
             -X POST \
             -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/sn_devops/v1/devops/orchestration/changeControl")
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/sn_devops/v1/devops/orchestration/changeControl?toolId=${{ secrets.SN_ORCHESTRATION_TOOL_ID }}")
 
           # Extract HTTP code and body
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
