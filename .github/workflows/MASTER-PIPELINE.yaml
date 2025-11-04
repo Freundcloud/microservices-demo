@@ -862,7 +862,6 @@ jobs:
       - deploy-to-environment
       - smoke-tests
       - update-servicenow-change
-      - upload-smoke-test-results
     if: always()
     runs-on: ubuntu-latest
 
@@ -887,12 +886,10 @@ jobs:
           echo "| Terraform Changes | ${{ needs.detect-terraform-changes.outputs.terraform_changed == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Service Changes | ${{ needs.detect-service-changes.outputs.has_changes == 'true' && '✅ Detected' || '⏭️ None' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Images | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Upload Test Results | ${{ needs.upload-test-results.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Register Packages | ${{ needs.register-packages.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ServiceNow Change | ${{ needs.servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | ${{ needs.deploy-to-environment.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | ${{ needs.smoke-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Upload Smoke Test Results | ${{ needs.upload-smoke-test-results.result }} |" >> $GITHUB_STEP_SUMMARY
           # echo "| Update Change | ${{ needs.update-servicenow-change.result }} |" >> $GITHUB_STEP_SUMMARY  # Disabled
           echo "" >> $GITHUB_STEP_SUMMARY
 
