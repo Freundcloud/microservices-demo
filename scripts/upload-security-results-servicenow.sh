@@ -105,7 +105,36 @@ if [ "$HTTP_CODE" == "201" ]; then
 else
   echo "❌ Failed to upload security result (HTTP $HTTP_CODE)"
   echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
-  exit 1
+
+  # Check if table doesn't exist
+  if echo "$BODY" | grep -qi "Invalid table\|does not exist"; then
+    echo ""
+    echo "⚠️  The sn_devops_security_result table does not exist in your ServiceNow instance."
+    echo ""
+    echo "This table is part of the ServiceNow DevOps plugin."
+    echo ""
+    echo "To fix this, you have two options:"
+    echo ""
+    echo "1. Activate the ServiceNow DevOps plugin:"
+    echo "   - Log into ServiceNow as admin"
+    echo "   - Go to: System Applications > All Available Applications > All"
+    echo "   - Search for 'DevOps'"
+    echo "   - Click 'Activate/Upgrade' on 'DevOps' plugin"
+    echo "   - Wait for activation to complete (~5-10 minutes)"
+    echo ""
+    echo "2. Disable security results upload (temporary workaround):"
+    echo "   - Edit .github/workflows/MASTER-PIPELINE.yaml"
+    echo "   - Comment out the 'upload-security-scan-results' job"
+    echo ""
+    echo "Continuing with work note only (security results not uploaded to DevOps table)..."
+
+    # Don't exit with error - just skip the table upload
+    # We'll still add work notes below
+    RESULT_SYS_ID=""
+    RESULT_NUMBER="N/A (table not available)"
+  else
+    exit 1
+  fi
 fi
 
 # Add work note to change request
@@ -132,7 +161,13 @@ WORK_NOTE="${WORK_NOTE}- Medium: $MEDIUM_COUNT\\n"
 WORK_NOTE="${WORK_NOTE}- Low: $LOW_COUNT\\n"
 WORK_NOTE="${WORK_NOTE}- Total: $TOTAL_COUNT\\n"
 WORK_NOTE="${WORK_NOTE}\\n"
-WORK_NOTE="${WORK_NOTE}Security result record: $RESULT_NUMBER\\n"
+
+if [ -n "$RESULT_SYS_ID" ]; then
+  WORK_NOTE="${WORK_NOTE}Security result record: $RESULT_NUMBER\\n"
+else
+  WORK_NOTE="${WORK_NOTE}Note: sn_devops_security_result table not available in this ServiceNow instance\\n"
+fi
+
 WORK_NOTE="${WORK_NOTE}Scan details: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/security/code-scanning"
 
 WORK_NOTE_PAYLOAD=$(jq -n --arg note "$WORK_NOTE" '{work_notes: $note}')
@@ -147,9 +182,17 @@ curl -s -X PATCH \
 echo "✅ Work note added to change request $CHANGE_REQUEST_NUMBER"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ SECURITY RESULTS UPLOADED TO SERVICENOW"
+if [ -n "$RESULT_SYS_ID" ]; then
+  echo "✅ SECURITY RESULTS UPLOADED TO SERVICENOW"
+else
+  echo "✅ SECURITY RESULTS ADDED TO CHANGE REQUEST"
+fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Change Request: $CHANGE_REQUEST_NUMBER"
-echo "Security Result: $RESULT_NUMBER"
+if [ -n "$RESULT_SYS_ID" ]; then
+  echo "Security Result: $RESULT_NUMBER"
+else
+  echo "Security Result: Added as work note (DevOps table not available)"
+fi
 echo "Status: $SCAN_RESULT"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
