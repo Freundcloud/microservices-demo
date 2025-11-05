@@ -229,6 +229,17 @@ jobs:
             echo "✅ Test results found: $TEST_FILE"
             echo "found=true" >> $GITHUB_OUTPUT
             echo "path=$TEST_FILE" >> $GITHUB_OUTPUT
+
+            # Detect if path is file or directory and set appropriate pattern
+            if [ -f "$TEST_FILE" ]; then
+              # File: Use the file path directly
+              echo "pattern=$TEST_FILE" >> $GITHUB_OUTPUT
+              echo "📄 Type: File - using path: $TEST_FILE"
+            else
+              # Directory: Append glob pattern to find XML files
+              echo "pattern=$TEST_FILE/**/*.xml" >> $GITHUB_OUTPUT
+              echo "📁 Type: Directory - using pattern: $TEST_FILE/**/*.xml"
+            fi
           fi
 
       # =====================================================================
@@ -254,7 +265,7 @@ jobs:
         if: always() && steps.find-results.outputs.found == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          files: ${{ steps.find-results.outputs.path }}/**/*.xml
+          files: ${{ steps.find-results.outputs.pattern }}
           check_name: "${{ inputs.service }} Test Results"
         continue-on-error: true
 
