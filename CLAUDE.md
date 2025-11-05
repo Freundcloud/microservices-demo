@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Online Boutique** is a cloud-native microservices demo application migrated from Google Cloud (GKE) to AWS (EKS). It consists of 12 microservices written in different languages (Go, Python, Java, Node.js, C#) communicating via gRPC, demonstrating modern cloud-native practices on AWS with Istio service mesh.
+**Online Boutique** is a cloud-native microservices demo application migrated from Google Cloud (GKE) to AWS (EKS). It consists of 12 microservices written in different languages (Go, Python, Java, Node.js, C#) communicating via gRPC, demonstrating modern cloud-native practices on AWS with ALB Ingress Controller.
 
 **Purpose**: Cloud-native microservices demo on AWS
-**Infrastructure**: Terraform-managed AWS EKS with Istio service mesh
+**Infrastructure**: Terraform-managed AWS EKS with AWS ALB Ingress Controller
 **CI/CD**: GitHub Actions with comprehensive security scanning
 
 ## Essential Commands
@@ -43,9 +43,9 @@ just tf-check                 # Run all quality checks
 just k8s-config           # or qa, or prod
 
 # Deploy application (traditional)
-just k8s-deploy               # Applies release/ and istio-manifests/
+just k8s-deploy               # Applies release/ manifests
 
-# Deploy with Kustomize (multi-environment)
+# Deploy with Kustomize (multi-environment - RECOMMENDED)
 kubectl apply -k kustomize/overlays/dev    # Deploy to dev namespace
 kubectl apply -k kustomize/overlays/qa     # Deploy to qa namespace
 kubectl apply -k kustomize/overlays/prod   # Deploy to prod namespace
@@ -67,15 +67,13 @@ just nodes-info              # Detailed node information
 just nodes-usage             # Node resource utilization
 just pods-usage [NAMESPACE]  # Pod resource usage
 
-# Istio Service Mesh
-just istio-health            # Istio control plane status
-just istio-ingress-info      # Gateway URL and configuration
-just istio-kiali             # Open Kiali dashboard (port 20001)
-just istio-grafana           # Open Grafana dashboard (port 3000)
+# Ingress & LoadBalancer
+kubectl get ingress --all-namespaces           # View ALB Ingress resources
+kubectl get ingress -n microservices-dev       # Dev environment ingress
+kubectl describe ingress frontend-ingress -n microservices-dev  # Ingress details
 
 # Logs & Events
 just logs-tail DEPLOYMENT [NS]    # Stream deployment logs
-just logs-proxy POD [NS]          # Istio sidecar logs
 just events-watch [NAMESPACE]     # Watch events in real-time
 just events-recent [NAMESPACE]    # Show recent events
 
@@ -131,14 +129,15 @@ just ecr-login                # Login to AWS ECR
 just ecr-push frontend dev    # Push to dev environment
 ```
 
-### Istio Service Mesh Dashboards
+### ALB Ingress & Frontend Access
 ```bash
-just istio-kiali              # Service mesh visualization (port 20001)
-just istio-grafana            # Metrics dashboards (port 3000)
-just istio-jaeger             # Distributed tracing (port 16686)
-just istio-prometheus         # Metrics database (port 9090)
-just istio-analyze            # Analyze Istio configuration
-just istio-status             # Check proxy status
+# Get frontend URLs for each environment
+kubectl get ingress frontend-ingress -n microservices-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get ingress frontend-ingress -n microservices-qa -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get ingress frontend-ingress -n microservices-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# Test frontend accessibility
+curl -f http://$(kubectl get ingress frontend-ingress -n microservices-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ```
 
 ### Security & Validation
@@ -191,20 +190,20 @@ just clean-all                # Clean Docker and Terraform artifacts
 - `microservices-qa` → 1 replica per service (10 pods)
 - `microservices-prod` → 1 replica per service (10 pods)
 
-### Istio Configuration
-**Minimal Istio** (saves ~2GB RAM):
-- ✅ **Enabled**: istiod (control plane) + ingress gateway
-- ✅ **Enabled**: mTLS, traffic routing, service mesh core features
-- ❌ **Disabled**: Observability addons (Grafana, Prometheus, Jaeger, Kiali)
-- **Reason**: RAM conservation on single small node
+### Ingress Configuration
+**AWS ALB Ingress Controller**:
+- ✅ **Enabled**: ALB Ingress Controller for external traffic routing
+- ✅ **Enabled**: Health checks, SSL termination, path-based routing
+- ✅ **Features**: Automatic ALB provisioning per environment via Kubernetes Ingress resources
+- **Ingress Resources**: `frontend-ingress` in each namespace (microservices-dev, microservices-qa, microservices-prod)
 
-To enable observability dashboards:
+View ingress status:
 ```bash
-# Edit terraform-aws/variables.tf
-enable_istio_addons = true
+# Check ingress resources
+kubectl get ingress --all-namespaces
 
-# Apply changes
-just tf-apply
+# Get ALB hostname for environment
+kubectl get ingress frontend-ingress -n microservices-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
 ### Limitations (Demo Only)
@@ -258,33 +257,32 @@ microservices-demo/
 ├── kubernetes-manifests/         # Individual K8s manifests per service
 ├── kustomize/                   # Kustomize-based multi-environment deployment
 │   ├── base/                   # Base Kubernetes manifests (shared)
-│   ├── components/             # Reusable components (Istio, load generator)
+│   │   └── frontend-ingress.yaml  # ALB Ingress for frontend
+│   ├── components/             # Reusable components (load generator)
 │   └── overlays/               # Environment-specific configs
 │       ├── dev/               # Development (1 replica, minimal resources)
+│       │   └── ingress-patch.yaml  # Dev ALB tags and annotations
 │       ├── qa/                # QA/Testing (1 replica, cost-optimized)
+│       │   └── ingress-patch.yaml  # QA ALB tags
 │       └── prod/              # Production (1 replica, cost-optimized)
-├── istio-manifests/             # Istio Gateway and VirtualService configs
-│   ├── frontend-gateway.yaml   # External traffic entry point
-│   └── frontend.yaml            # Internal routing
+│           └── ingress-patch.yaml  # Prod ALB tags
 ├── release/                     # Combined manifests (autogenerated)
 │   └── kubernetes-manifests.yaml
 ├── terraform-aws/               # AWS infrastructure as code
 │   ├── versions.tf             # Provider versions
 │   ├── vpc.tf                  # VPC with 3 AZs, NAT, VPC endpoints
-│   ├── eks.tf                  # EKS cluster, node groups, addons
+│   ├── eks.tf                  # EKS cluster, node groups, addons (ALB controller)
 │   ├── elasticache.tf          # Redis for cartservice
 │   ├── ecr.tf                  # 12 ECR repositories
-│   ├── iam.tf                  # IRSA roles
-│   ├── istio.tf                # Istio via Helm (istiod, ingress, observability)
+│   ├── iam.tf                  # IRSA roles (ALB controller, cluster autoscaler, EBS CSI)
 │   ├── environments/           # Environment-specific configs
-│   │   ├── dev.tfvars         # Dev: 2-3 nodes, t3.medium
-│   │   ├── qa.tfvars          # QA: 3-5 nodes, t3.medium
-│   │   └── prod.tfvars        # Prod: 5-10 nodes, t3.large/xlarge
+│   │   ├── dev.tfvars         # Dev: minimal node configuration
+│   │   ├── qa.tfvars          # QA: cost-optimized
+│   │   └── prod.tfvars        # Prod: production-grade
 │   └── tests/                  # Terraform tests
 │       ├── vpc_test.tftest.hcl
 │       ├── eks_test.tftest.hcl
-│       ├── redis_test.tftest.hcl
-│       └── istio_test.tftest.hcl
+│       └── redis_test.tftest.hcl
 ├── .github/workflows/           # CI/CD automation
 │   ├── terraform-validate.yaml  # Multi-env validation, tests, security
 │   ├── terraform-plan.yaml      # PR previews
@@ -297,7 +295,7 @@ microservices-demo/
 │   ├── ONBOARDING.md           # New developer setup
 │   ├── README-AWS.md           # Complete AWS deployment guide
 │   ├── setup/                  # AWS, GitHub Actions, Security setup
-│   ├── architecture/           # Repository structure, Istio, requirements
+│   ├── architecture/           # Repository structure, networking, requirements
 │   └── development/            # Dev guide, adding services
 ├── justfile                     # Task automation (50+ commands)
 └── MIGRATION-SUMMARY.md        # GCP→AWS migration details
@@ -310,14 +308,14 @@ microservices-demo/
 - **EKS**: Managed node groups, cluster autoscaler, metrics server, ALB controller, EBS CSI driver
 - **ElastiCache Redis**: Replaces Google Memorystore, used by cartservice
 - **ECR**: 12 repositories (one per service), vulnerability scanning, lifecycle policies
-- **Istio**: Helm-installed (base, istiod, ingress gateway with NLB, Kiali, Prometheus, Jaeger, Grafana)
+- **ALB Ingress**: AWS Application Load Balancer provisioned automatically per environment via Ingress resources
 - **IAM**: IRSA (IAM Roles for Service Accounts) for secure AWS access, no long-lived credentials
-- **Security**: Strict mTLS via PeerAuthentication, Security Groups, private subnets
+- **Security**: TLS termination at ALB, Security Groups, private subnets, network policies
 
 **Multi-Environment Support**:
-- **Dev** (dev.tfvars): 2-3 nodes, cache.t3.micro Redis, no Istio addons (~$185/month)
-- **QA** (qa.tfvars): 3-5 nodes, cache.t3.small Redis, full observability (~$235/month)
-- **Prod** (prod.tfvars): 5-10 nodes, cache.t3.medium Redis (multi-node), full stack (~$442/month)
+- **Dev** (dev.tfvars): Minimal node configuration, cache.t3.micro Redis (~$134/month - ultra-minimal)
+- **QA** (qa.tfvars): Cost-optimized, cache.t3.small Redis
+- **Prod** (prod.tfvars): Production-grade, cache.t3.medium Redis (multi-node)
 
 ## Critical Patterns
 
@@ -340,7 +338,7 @@ microservices-demo/
 ### Kustomize Multi-Environment Pattern
 - **Base manifests**: `kustomize/base/` contains shared configuration for all environments
 - **Environment overlays**: `kustomize/overlays/{dev,qa,prod}/` contain environment-specific customizations
-- **Components**: `kustomize/components/` contain reusable features (Istio, load generator)
+- **Components**: `kustomize/components/` contain reusable features (load generator)
 - **Namespace isolation**: Each environment deploys to separate namespace:
   - Dev: `microservices-dev` (1 replica, no load generator, minimal resources)
   - QA: `microservices-qa` (2 replicas, with load generator for testing, moderate resources)
@@ -350,17 +348,18 @@ microservices-demo/
   - Dev uses `dev` tag for latest development builds
   - QA uses `qa` tag for tested builds
   - Prod uses `prod` tag or semantic versions (v1.2.3) for stable releases
-- **Istio injection**: All namespaces have `istio-injection=enabled` label for automatic sidecar injection
+- **Ingress per environment**: Each overlay customizes ALB Ingress with environment-specific tags and annotations
 - **When to use**: Use Kustomize overlays for multi-environment deployments on the same cluster or different clusters
 - **Complete documentation**: See `kustomize/overlays/README.md` for comprehensive deployment guide
 
-### Istio Service Mesh
-- **Deployed by Terraform** in `terraform-aws/istio.tf` (Helm-based)
-- **Application routing** in `istio-manifests/`
-- **Strict mTLS enforced globally** via PeerAuthentication in istio-system namespace
-- All pods get Istio sidecar (istio-proxy) automatically via namespace label `istio-injection=enabled`
-- Ingress via Istio Gateway with AWS NLB (not ALB)
-- Observability stack: Kiali (topology), Prometheus (metrics), Jaeger (tracing), Grafana (viz)
+### AWS ALB Ingress Controller
+- **Deployed by Terraform** as EKS addon (ALB controller via IRSA)
+- **Ingress resources** in `kustomize/base/frontend-ingress.yaml` with environment-specific patches
+- **Automatic ALB provisioning**: Each environment gets dedicated ALB via Kubernetes Ingress annotations
+- **Health checks**: Configured at `/` endpoint with 15s interval, 2 healthy/unhealthy thresholds
+- **TLS termination**: Supports SSL certificates at ALB level (not currently configured)
+- **Access**: External traffic → ALB → frontend Service → frontend Pods
+- **View ingress**: `kubectl get ingress --all-namespaces` or `kubectl describe ingress frontend-ingress -n microservices-dev`
 
 ### Terraform Structure
 - **Environment-specific configs**: Use `terraform-aws/environments/{dev,qa,prod}.tfvars`
@@ -465,7 +464,7 @@ run "test_name" {
 - `docs/ONBOARDING.md` - Complete new developer guide
 - `docs/README.md` - Documentation index
 - `docs/architecture/REPOSITORY-STRUCTURE.md` - Detailed codebase explanation
-- `docs/architecture/ISTIO-DEPLOYMENT.md` - Istio usage and troubleshooting
+- `kustomize/overlays/README.md` - Multi-environment deployment guide
 - `MIGRATION-SUMMARY.md` - GCP to AWS migration details
 
 ## Testing
@@ -501,37 +500,51 @@ cd src/cartservice && dotnet test         # C# services
 
 ### Test gRPC Services
 ```bash
-# Using grpcurl
+# Using grpcurl locally
 grpcurl -plaintext localhost:3550 hipstershop.ProductCatalogService/ListProducts
 
-# Via Istio (with mTLS)
+# From within cluster
 kubectl run -it --rm grpcurl --image=fullstorydev/grpcurl --restart=Never -- \
-  -insecure productcatalogservice:3550 hipstershop.ProductCatalogService/ListProducts
+  -plaintext productcatalogservice:3550 hipstershop.ProductCatalogService/ListProducts
 ```
 
 ## Troubleshooting
 
 ### Pods Not Starting
 ```bash
-kubectl get pods -n default
-kubectl describe pod <pod-name> -n default
-kubectl logs <pod-name> -c server -n default
-kubectl logs <pod-name> -c istio-proxy -n default  # Check sidecar
+kubectl get pods -n microservices-dev
+kubectl describe pod <pod-name> -n microservices-dev
+kubectl logs <pod-name> -n microservices-dev
+kubectl logs <pod-name> -c <container-name> -n microservices-dev  # Multi-container pods
 ```
 
 **Common causes**:
 - Image pull errors: Check ECR permissions, verify image exists
-- Resource limits: Increase in deployment manifest
+- Resource limits: Increase in deployment manifest or check ResourceQuota
 - Missing ConfigMap/Secret: Check Redis config created by Terraform
+- Namespace quota exceeded: `kubectl describe resourcequota -n microservices-dev`
 
-### Istio Issues
+### ALB Ingress Issues
 ```bash
-just istio-analyze                         # Validate configuration
-istioctl proxy-status                      # Check all proxies
-istioctl proxy-config route <pod> -n default  # View routing
-kubectl get peerauthentication -n istio-system  # Check mTLS
-kubectl get gateway,virtualservice -n default   # Check routing resources
+# Check ingress status
+kubectl get ingress --all-namespaces
+kubectl describe ingress frontend-ingress -n microservices-dev
+
+# Check ALB controller logs
+kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+
+# Verify ALB provisioning
+kubectl get ingress frontend-ingress -n microservices-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# Test ALB endpoint
+curl -f http://$(kubectl get ingress frontend-ingress -n microservices-dev -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ```
+
+**Common causes**:
+- ALB not yet provisioned: Wait 2-4 minutes after deploying ingress
+- DNS propagation delay: Wait 15-30 seconds after ALB appears
+- Health checks failing: Check frontend pod logs and `/` endpoint
+- IRSA permissions: Verify ALB controller has correct IAM role
 
 ### Terraform Errors
 ```bash
@@ -550,8 +563,9 @@ source .envrc                              # Reload credentials
 ## Security Notes
 
 - **No hardcoded credentials**: Use IRSA for AWS access, Kubernetes Secrets for sensitive data
-- **mTLS enforced**: All service-to-service communication encrypted via Istio
+- **TLS termination**: ALB handles HTTPS termination (configure SSL certificates in Ingress annotations)
 - **Private nodes**: EKS nodes in private subnets, egress via NAT gateway
+- **Network policies**: Kubernetes NetworkPolicies control pod-to-pod communication
 - **Vulnerability scanning**: Every image scanned by Trivy before push
 - **SAST**: CodeQL scans 5 languages on every PR
 - **Secret detection**: Gitleaks scans all commits
@@ -563,11 +577,11 @@ source .envrc                              # Reload credentials
 ### Infrastructure-Level Isolation (Separate Clusters)
 **Promote changes through environments**:
 1. Deploy to **dev** first: `just tf-apply && just k8s-deploy`
-2. Test in dev environment
+2. Test in dev environment via ALB endpoint
 3. Deploy to **qa**: `just tf-apply qa && just k8s-deploy`
 4. Run QA tests, manual testing
 5. Deploy to **prod**: `just tf-apply prod && just k8s-deploy`
-6. Monitor via Istio dashboards
+6. Monitor via CloudWatch metrics and application logs
 
 **Environment isolation**:
 - Each environment has separate VPC (different CIDR)
@@ -598,13 +612,13 @@ source .envrc                              # Reload credentials
    kubectl apply -k .
    kubectl rollout status deployment/frontend -n microservices-prod
    ```
-5. **Monitor**: Use Istio dashboards and check metrics per namespace
+5. **Monitor**: Check CloudWatch metrics and pod logs per namespace
 
 **Kustomize environment isolation**:
 - Same EKS cluster, separate namespaces (microservices-dev, microservices-qa, microservices-prod)
 - Resource quotas prevent environment overconsumption
 - Different replica counts and resource allocations per environment
-- Istio policies can be scoped per namespace
+- Separate ALB Ingress per environment with environment-specific tags
 - Cost-effective for smaller deployments or testing
 - See `kustomize/overlays/README.md` for detailed promotion workflow
 
@@ -915,7 +929,7 @@ Based on analysis in [docs/_archive/WORKFLOW-REFACTORING-ANALYSIS.md](docs/_arch
 2. **Editing release/kubernetes-manifests.yaml**: Changes will be overwritten, edit kubernetes-manifests/ instead
 3. **Not configuring kubectl**: Run `just k8s-config <env>` before kubectl commands
 4. **Terraform state conflicts**: Don't run Terraform from multiple terminals simultaneously
-5. **Not waiting for Istio**: After deploying Istio, wait ~2 minutes for control plane to be ready
+5. **Not waiting for ALB**: After deploying ingress, wait 2-4 minutes for ALB to provision and become healthy
 6. **Ignoring security scan failures**: Fix vulnerabilities before merging PRs
 7. **Not testing in dev first**: Always test in dev before deploying to qa/prod
 8. **Editing Kustomize base files directly**: Always use overlays for environment-specific changes
@@ -938,7 +952,7 @@ Based on analysis in [docs/_archive/WORKFLOW-REFACTORING-ANALYSIS.md](docs/_arch
 | Preview Kustomize changes | `kubectl kustomize overlays/dev` |
 | Check namespace status | `kubectl get pods -n microservices-dev` |
 | View application | `just k8s-url` |
-| View service mesh | `just istio-kiali` |
+| Get ALB URL (dev) | `kubectl get ingress frontend-ingress -n microservices-dev` |
 | Build container | `just docker-build frontend` |
 | View logs | `just k8s-logs frontend` |
 | View logs (Kustomize) | `kubectl logs -l app=frontend -n microservices-dev` |
