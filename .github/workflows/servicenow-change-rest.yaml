@@ -305,32 +305,49 @@ jobs:
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
-          echo "📱 Using ServiceNow DevOps Application..."
+          echo "📱 Using ServiceNow Application..."
 
-          # Use the existing "Online Boutique" application from sn_devops_app table
-          # Application name: "Online Boutique"
-          # Sys ID: e489efd1c3383e14e1bbf0cb050131d5
-          # URL: https://calitiiltddemo3.service-now.com/now/devops-change/record/sn_devops_app/e489efd1c3383e14e1bbf0cb050131d5
+          # Use the existing "Online Boutique" application
+          # We have TWO sys_ids for different purposes:
+          #
+          # 1. DevOps App (sn_devops_app table):
+          #    - Sys ID: e489efd1c3383e14e1bbf0cb050131d5
+          #    - Used for: packages, pipeline executions, test results
+          #    - URL: https://calitiiltddemo3.service-now.com/now/devops-change/record/sn_devops_app/e489efd1c3383e14e1bbf0cb050131d5
+          #
+          # 2. CMDB CI Application (cmdb_ci_appl table):
+          #    - Sys ID: 07456b59c305f250b71ef44c05013111
+          #    - Used for: change request cmdb_ci field (for "App" column visibility)
+          #    - URL: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/cmdb_ci_appl.do?sys_id=07456b59c305f250b71ef44c05013111
+          #
           # Environment is tracked via u_environment field in change request
-          APP_NAME="Online Boutique"
-          APP_SYS_ID="e489efd1c3383e14e1bbf0cb050131d5"
 
-          echo "  ✅ Using application: $APP_NAME"
-          echo "     sys_id: $APP_SYS_ID"
+          APP_NAME="Online Boutique"
+          DEVOPS_APP_SYS_ID="e489efd1c3383e14e1bbf0cb050131d5"  # For packages/pipelines/tests
+          CMDB_CI_SYS_ID="07456b59c305f250b71ef44c05013111"      # For change request cmdb_ci
+
+          echo "  ✅ Application: $APP_NAME"
+          echo "     DevOps App sys_id: $DEVOPS_APP_SYS_ID (for packages/pipelines/tests)"
+          echo "     CMDB CI sys_id: $CMDB_CI_SYS_ID (for change request App column)"
           echo "     Environment: $ENVIRONMENT (tracked in u_environment field)"
 
-          # Validate we have a valid sys_id
-          if [ -z "$APP_SYS_ID" ] || [ "$APP_SYS_ID" = "null" ]; then
-            echo "❌ Failed to get application sys_id"
+          # Validate we have valid sys_ids
+          if [ -z "$DEVOPS_APP_SYS_ID" ] || [ "$DEVOPS_APP_SYS_ID" = "null" ]; then
+            echo "❌ Failed to get DevOps App sys_id"
+            exit 1
+          fi
+          if [ -z "$CMDB_CI_SYS_ID" ] || [ "$CMDB_CI_SYS_ID" = "null" ]; then
+            echo "❌ Failed to get CMDB CI sys_id"
             exit 1
           fi
 
           # Export for next steps
-          echo "app_sys_id=$APP_SYS_ID" >> $GITHUB_OUTPUT
+          echo "app_sys_id=$DEVOPS_APP_SYS_ID" >> $GITHUB_OUTPUT
+          echo "cmdb_ci_sys_id=$CMDB_CI_SYS_ID" >> $GITHUB_OUTPUT
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
 
           echo ""
-          echo "✅ Application CI ready: $APP_NAME (sys_id: $APP_SYS_ID)"
+          echo "✅ Application ready for ServiceNow integration"
 
       - name: Create Change Request via REST API
         id: create-cr
@@ -530,7 +547,7 @@ jobs:
             --argjson prod_system "$PROD_SYSTEM" \
             --arg outside_maint "false" \
             --arg business_service "$SERVICE_NAME" \
-            --arg cmdb_ci "${{ steps.get-app-ci.outputs.app_sys_id }}" \
+            --arg cmdb_ci "${{ steps.get-app-ci.outputs.cmdb_ci_sys_id }}" \
             --arg u_source "GitHub Actions" \
             --arg u_env "$ENVIRONMENT" \
             --arg u_type "$CHANGE_TYPE" \
