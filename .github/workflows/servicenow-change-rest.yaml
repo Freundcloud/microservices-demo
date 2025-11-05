@@ -231,6 +231,72 @@ jobs:
           echo "state=$STATE" >> $GITHUB_OUTPUT
           echo "priority=$PRIORITY" >> $GITHUB_OUTPUT
 
+      - name: Validate ServiceNow Configuration
+        id: validate-config
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+        run: |
+          echo "🔍 Validating ServiceNow configuration..."
+          echo ""
+
+          ERRORS=0
+
+          # Validate SN_ORCHESTRATION_TOOL_ID
+          if [ -z "$SN_ORCHESTRATION_TOOL_ID" ]; then
+            echo "❌ SN_ORCHESTRATION_TOOL_ID not set"
+            ERRORS=$((ERRORS + 1))
+          elif [ "$SN_ORCHESTRATION_TOOL_ID" = "null" ]; then
+            echo "❌ SN_ORCHESTRATION_TOOL_ID is literal 'null'"
+            ERRORS=$((ERRORS + 1))
+          elif [ ${#SN_ORCHESTRATION_TOOL_ID} -ne 32 ]; then
+            echo "❌ SN_ORCHESTRATION_TOOL_ID wrong length (expected 32, got ${#SN_ORCHESTRATION_TOOL_ID})"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ SN_ORCHESTRATION_TOOL_ID configured (${#SN_ORCHESTRATION_TOOL_ID} chars)"
+            echo "   Value (first 10 chars): ${SN_ORCHESTRATION_TOOL_ID:0:10}..."
+          fi
+
+          # Validate SERVICENOW_INSTANCE_URL
+          if [ -z "$SERVICENOW_INSTANCE_URL" ]; then
+            echo "❌ SERVICENOW_INSTANCE_URL not set"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ SERVICENOW_INSTANCE_URL configured"
+          fi
+
+          # Validate SERVICENOW_USERNAME
+          if [ -z "$SERVICENOW_USERNAME" ]; then
+            echo "❌ SERVICENOW_USERNAME not set"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ SERVICENOW_USERNAME configured"
+          fi
+
+          # Validate SERVICENOW_PASSWORD
+          if [ -z "$SERVICENOW_PASSWORD" ]; then
+            echo "❌ SERVICENOW_PASSWORD not set"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ SERVICENOW_PASSWORD configured"
+          fi
+
+          echo ""
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ $ERRORS configuration error(s) found"
+            echo ""
+            echo "Please check GitHub Actions secrets:"
+            echo "  - SERVICENOW_USERNAME"
+            echo "  - SERVICENOW_PASSWORD"
+            echo "  - SERVICENOW_INSTANCE_URL"
+            echo "  - SN_ORCHESTRATION_TOOL_ID (should be: f62c4e49c3fcf614e1bbf0cb050131ef)"
+            exit 1
+          else
+            echo "✅ All ServiceNow secrets configured correctly"
+          fi
+
       - name: Create Change Request via REST API
         id: create-cr
         continue-on-error: true
@@ -247,6 +313,10 @@ jobs:
           IMPL_PLAN_INPUT: ${{ inputs.implementation_plan }}
           BACKOUT_PLAN_INPUT: ${{ inputs.backout_plan }}
           TEST_PLAN_INPUT: ${{ inputs.test_plan }}
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
           # Set default plans with proper newline formatting
           if [ -z "$IMPL_PLAN_INPUT" ]; then
@@ -539,14 +609,14 @@ jobs:
 
           echo "Creating change request in ServiceNow..."
 
-          # Make the API call
+          # Make the API call (using environment variables)
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -X POST \
             -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request")
+            "$SERVICENOW_INSTANCE_URL/api/now/table/change_request")
 
           # Extract HTTP code and body
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -570,7 +640,7 @@ jobs:
               echo "**Environment:** ${{ inputs.environment }}"
               echo "**State:** ${{ steps.prepare.outputs.state }}"
               echo ""
-              echo "🔗 [View in ServiceNow](${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID})"
+              echo "🔗 [View in ServiceNow]($SERVICENOW_INSTANCE_URL/change_request.do?sys_id=${CHANGE_SYSID})"
             } >> $GITHUB_STEP_SUMMARY
 
             exit 0
@@ -607,11 +677,15 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
         run: |
           echo "🔗 Linking CR $CHANGE_NUMBER to DevOps workspace..."
 
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -X POST \
@@ -620,17 +694,23 @@ jobs:
               "pipeline_name": "Deploy to ${{ inputs.environment }}",
               "pipeline_id": "${{ github.run_id }}",
               "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+              "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'"
             }' \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_change_reference")
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_change_reference")
 
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
           BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
 
           if [ "$HTTP_CODE" = "201" ]; then
             REF_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+            TOOL_VALUE=$(echo "$BODY" | jq -r '.result.tool.value // .result.tool // "null"')
             echo "✅ Pipeline linked to DevOps workspace (ref: $REF_ID)"
             echo "   CR now visible in: DevOps → Change Velocity"
+            echo "   Tool: $TOOL_VALUE"
+
+            if [ "$TOOL_VALUE" = "null" ]; then
+              echo "   ⚠️  WARNING: Tool field is 'null' - check SN_ORCHESTRATION_TOOL_ID secret"
+            fi
           else
             echo "⚠️  Failed to link to DevOps workspace (HTTP $HTTP_CODE)"
             echo "$BODY" | jq '.' || echo "$BODY"
@@ -646,6 +726,10 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
         run: |
           echo "📊 Registering test results for CR $CHANGE_NUMBER..."
 
@@ -669,7 +753,7 @@ jobs:
           if [ "$UNIT_TEST_TOTAL" != "0" ]; then
             echo "  ↳ Registering unit tests..."
             curl -s \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
               -d '{
@@ -682,7 +766,7 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result" > /dev/null
             echo "    ✅ Unit test results registered"
           fi
 
@@ -690,7 +774,7 @@ jobs:
           if [ -n "$SECURITY_STATUS" ]; then
             echo "  ↳ Registering security scans..."
             curl -s \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
               -d '{
@@ -703,7 +787,7 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "https://github.com/${{ github.repository }}/security/code-scanning"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result" > /dev/null
             echo "    ✅ Security scan results registered"
           fi
 
@@ -714,7 +798,7 @@ jobs:
             [ "$SONAR_RESULT" = "passed" ] && SONAR_TEST_RESULT="success" || SONAR_TEST_RESULT="failure"
 
             curl -s \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
               -d '{
@@ -727,31 +811,43 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "${{ inputs.sonarcloud_url }}"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_result" > /dev/null
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result" > /dev/null
             echo "    ✅ SonarCloud results registered"
           fi
 
-          # Register smoke test / performance test summary (if available)
+          # ===================================
+          # 4. Smoke Test / Performance Test Summary
+          # ===================================
           if [ -n "${{ inputs.smoke_test_status }}" ]; then
-            echo "  ↳ Registering smoke/performance test summary..."
-            SMOKE_STATUS="${{ inputs.smoke_test_status }}"
+            echo "  ↳ Creating smoke/performance test summary..."
 
+            # Validate SN_ORCHESTRATION_TOOL_ID secret
+            if [ -z "$SN_ORCHESTRATION_TOOL_ID" ] || [ "$SN_ORCHESTRATION_TOOL_ID" = "null" ]; then
+              echo "    ⚠️  WARNING: SN_ORCHESTRATION_TOOL_ID secret is not set or is null"
+              echo "    This will cause the tool field to be 'null' in ServiceNow"
+              echo "    Please set the secret to: f62c4e49c3fcf614e1bbf0cb050131ef (GithHubARC tool)"
+            fi
+
+            SMOKE_STATUS="${{ inputs.smoke_test_status }}"
             DURATION="${{ inputs.smoke_test_duration }}"
             [ -z "$DURATION" ] && DURATION="0"
 
             # Calculate times (convert duration to milliseconds for glide_time fields)
             DURATION_MS=$((DURATION * 1000))
             START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
+            FINISH_TIME=$(date -u -d "+${DURATION} seconds" +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date -u +"%Y-%m-%d %H:%M:%S")
 
-            curl -s \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
               -d '{
                 "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
-                "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}",
+                "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
                 "url": "${{ inputs.smoke_test_url }}",
+                "test_type": "functional",
                 "start_time": "'"$START_TIME"'",
+                "finish_time": "'"$FINISH_TIME"'",
                 "duration": '$DURATION',
                 "total_tests": 1,
                 "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
@@ -767,53 +863,280 @@ jobs:
                 "throughput": "1",
                 "maximum_virtual_users": 1
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_performance_test_summary" > /dev/null
-            echo "    ✅ Smoke test performance summary registered (duration: ${DURATION}s)"
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_performance_test_summary")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              TOOL_VALUE=$(echo "$BODY" | jq -r '.result.tool.value // .result.tool // "null"')
+              echo "    ✅ Smoke/performance test summary created (sys_id: $SUMMARY_ID)"
+              echo "       Duration: ${DURATION}s, Status: $SMOKE_STATUS, Tool: $TOOL_VALUE"
+
+              if [ "$TOOL_VALUE" = "null" ]; then
+                echo "    ⚠️  WARNING: Tool field is 'null' - check SN_ORCHESTRATION_TOOL_ID secret"
+              fi
+
+              SUMMARY_COUNT=$((SUMMARY_COUNT + 1))
+            else
+              echo "    ⚠️  Failed to create smoke/performance test summary (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.' || echo "$BODY"
+            fi
           fi
 
           echo "✅ Test results registered in DevOps workspace"
 
-      - name: Create Test Summary
-        if: steps.create-cr.outputs.change_sys_id != '' && inputs.unit_test_total != '0'
+      - name: Create Test Summaries in DevOps Workspace
+        if: steps.create-cr.outputs.change_sys_id != ''
         continue-on-error: true
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
         run: |
-          echo "📈 Creating test summary..."
+          echo "📈 Creating test summaries for CR $CHANGE_NUMBER..."
 
-          # Calculate totals
-          TOTAL_SUITES=1  # Unit tests
-          [ -n "${{ inputs.security_scan_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
-          [ -n "${{ inputs.sonarcloud_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
-          [ -n "${{ inputs.smoke_test_status }}" ] && TOTAL_SUITES=$((TOTAL_SUITES + 1))
+          SUMMARY_COUNT=0
+          CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
 
-          # Determine overall result
-          FAILED="${{ inputs.unit_test_failed }}"
-          CRITICAL="${{ inputs.critical_vulnerabilities }}"
-          if [ "$FAILED" = "0" ] && [ "$CRITICAL" = "0" ]; then
-            OVERALL="passed"
-          else
-            OVERALL="passed_with_failures"
+          # ===================================
+          # 1. Unit Test Summary
+          # ===================================
+          if [ "${{ inputs.unit_test_total }}" != "0" ] && [ "${{ inputs.unit_test_total }}" != "" ]; then
+            echo "  ↳ Creating unit test summary..."
+
+            TOTAL="${{ inputs.unit_test_total }}"
+            PASSED="${{ inputs.unit_test_passed }}"
+            FAILED="${{ inputs.unit_test_failed }}"
+
+            # Calculate passing percentage
+            if [ "$TOTAL" -gt 0 ]; then
+              PASSING_PERCENT=$(awk "BEGIN {printf \"%.2f\", ($PASSED/$TOTAL)*100}")
+            else
+              PASSING_PERCENT="0.00"
+            fi
+
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "name": "Unit Tests - All Services (${{ inputs.environment }})",
+                "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
+                "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                "test_type": "unit",
+                "total_tests": '"$TOTAL"',
+                "passed_tests": '"$PASSED"',
+                "failed_tests": '"$FAILED"',
+                "skipped_tests": 0,
+                "blocked_tests": 0,
+                "passing_percent": '"$PASSING_PERCENT"',
+                "start_time": "'"$CURRENT_TIME"'",
+                "finish_time": "'"$CURRENT_TIME"'"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_summary")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ Unit test summary created (sys_id: $SUMMARY_ID)"
+              echo "       Total: $TOTAL, Passed: $PASSED, Failed: $FAILED, Pass Rate: $PASSING_PERCENT%"
+              SUMMARY_COUNT=$((SUMMARY_COUNT + 1))
+            else
+              echo "    ⚠️  Failed to create unit test summary (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.' || echo "$BODY"
+            fi
           fi
 
-          curl -s \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-            -H "Content-Type: application/json" \
-            -X POST \
-            -d '{
-              "change_request": "'"$CHANGE_SYSID"'",
-              "total_test_suites": '$TOTAL_SUITES',
-              "passed_test_suites": '$((TOTAL_SUITES - (${FAILED:-0} > 0 ? 1 : 0)))',
-              "failed_test_suites": '$((${FAILED:-0} > 0 ? 1 : 0))',
-              "total_tests": '${{ inputs.unit_test_total }}',
-              "passed_tests": '${{ inputs.unit_test_passed }}',
-              "failed_tests": '${{ inputs.unit_test_failed }}',
-              "overall_result": "'"$OVERALL"'",
-              "pipeline_id": "${{ github.run_id }}"
-            }' \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_test_summary" > /dev/null
+          # ===================================
+          # 2. Security Scan Summary
+          # ===================================
+          if [ -n "${{ inputs.security_scan_status }}" ]; then
+            echo "  ↳ Creating security scan summary..."
 
-          echo "✅ Test summary created"
+            SECURITY_STATUS="${{ inputs.security_scan_status }}"
+            CRITICAL="${{ inputs.critical_vulnerabilities }}"
+            HIGH="${{ inputs.high_vulnerabilities }}"
+            MEDIUM="${{ inputs.medium_vulnerabilities }}"
+            LOW="${{ inputs.low_vulnerabilities }}"
+
+            # Total scans = number of scan types (Trivy, CodeQL, Semgrep, Gitleaks)
+            TOTAL_SCANS=4
+
+            # Determine pass/fail based on vulnerabilities
+            if [ "$CRITICAL" = "0" ] && [ "$HIGH" = "0" ]; then
+              PASSED_SCANS=$TOTAL_SCANS
+              FAILED_SCANS=0
+            elif [ "$CRITICAL" != "0" ]; then
+              PASSED_SCANS=0
+              FAILED_SCANS=$TOTAL_SCANS
+            else
+              PASSED_SCANS=$((TOTAL_SCANS - 1))
+              FAILED_SCANS=1
+            fi
+
+            PASSING_PERCENT=$(awk "BEGIN {printf \"%.2f\", ($PASSED_SCANS/$TOTAL_SCANS)*100}")
+
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "name": "Security Scans - Trivy, CodeQL, Semgrep, Gitleaks (${{ inputs.environment }})",
+                "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
+                "url": "https://github.com/${{ github.repository }}/security",
+                "test_type": "security",
+                "total_tests": '"$TOTAL_SCANS"',
+                "passed_tests": '"$PASSED_SCANS"',
+                "failed_tests": '"$FAILED_SCANS"',
+                "skipped_tests": 0,
+                "blocked_tests": 0,
+                "passing_percent": '"$PASSING_PERCENT"',
+                "start_time": "'"$CURRENT_TIME"'",
+                "finish_time": "'"$CURRENT_TIME"'"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_summary")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ Security scan summary created (sys_id: $SUMMARY_ID)"
+              echo "       Critical: $CRITICAL, High: $HIGH, Medium: $MEDIUM, Low: $LOW"
+              SUMMARY_COUNT=$((SUMMARY_COUNT + 1))
+            else
+              echo "    ⚠️  Failed to create security scan summary (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.' || echo "$BODY"
+            fi
+          fi
+
+          # ===================================
+          # 3. SonarCloud Quality Gate Summary
+          # ===================================
+          if [ -n "${{ inputs.sonarcloud_status }}" ]; then
+            echo "  ↳ Creating SonarCloud quality gate summary..."
+
+            SONAR_STATUS="${{ inputs.sonarcloud_status }}"
+            BUGS="${{ inputs.sonarcloud_bugs }}"
+            VULNERABILITIES="${{ inputs.sonarcloud_vulnerabilities }}"
+            CODE_SMELLS="${{ inputs.sonarcloud_code_smells }}"
+
+            # Determine pass/fail
+            if [ "$SONAR_STATUS" = "passed" ]; then
+              PASSED_CHECKS=1
+              FAILED_CHECKS=0
+              PASSING_PERCENT="100.00"
+            else
+              PASSED_CHECKS=0
+              FAILED_CHECKS=1
+              PASSING_PERCENT="0.00"
+            fi
+
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "name": "SonarCloud Quality Gate (${{ inputs.environment }})",
+                "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
+                "url": "${{ inputs.sonarcloud_url }}",
+                "test_type": "quality",
+                "total_tests": 1,
+                "passed_tests": '"$PASSED_CHECKS"',
+                "failed_tests": '"$FAILED_CHECKS"',
+                "skipped_tests": 0,
+                "blocked_tests": 0,
+                "passing_percent": '"$PASSING_PERCENT"',
+                "start_time": "'"$CURRENT_TIME"'",
+                "finish_time": "'"$CURRENT_TIME"'"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_summary")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ SonarCloud summary created (sys_id: $SUMMARY_ID)"
+              echo "       Status: $SONAR_STATUS, Bugs: $BUGS, Vulnerabilities: $VULNERABILITIES, Code Smells: $CODE_SMELLS"
+              SUMMARY_COUNT=$((SUMMARY_COUNT + 1))
+            else
+              echo "    ⚠️  Failed to create SonarCloud summary (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.' || echo "$BODY"
+            fi
+          fi
+
+          # ===================================
+          # 4. Smoke Test Summary (if available)
+          # ===================================
+          if [ -n "${{ inputs.smoke_test_status }}" ]; then
+            echo "  ↳ Creating smoke test summary..."
+
+            SMOKE_STATUS="${{ inputs.smoke_test_status }}"
+            DURATION="${{ inputs.smoke_test_duration }}"
+            [ -z "$DURATION" ] && DURATION="0"
+
+            if [ "$SMOKE_STATUS" = "passed" ]; then
+              PASSED_TESTS=1
+              FAILED_TESTS=0
+              PASSING_PERCENT="100.00"
+            else
+              PASSED_TESTS=0
+              FAILED_TESTS=1
+              PASSING_PERCENT="0.00"
+            fi
+
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "name": "Smoke Tests - Post-Deployment Verification (${{ inputs.environment }})",
+                "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
+                "url": "${{ inputs.smoke_test_url }}",
+                "test_type": "functional",
+                "total_tests": 1,
+                "passed_tests": '"$PASSED_TESTS"',
+                "failed_tests": '"$FAILED_TESTS"',
+                "skipped_tests": 0,
+                "blocked_tests": 0,
+                "passing_percent": '"$PASSING_PERCENT"',
+                "duration": '"$DURATION"',
+                "start_time": "'"$CURRENT_TIME"'",
+                "finish_time": "'"$CURRENT_TIME"'"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_summary")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ Smoke test summary created (sys_id: $SUMMARY_ID)"
+              echo "       Status: $SMOKE_STATUS, Duration: ${DURATION}s"
+              SUMMARY_COUNT=$((SUMMARY_COUNT + 1))
+            else
+              echo "    ⚠️  Failed to create smoke test summary (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.' || echo "$BODY"
+            fi
+          fi
+
+          # Summary
+          if [ $SUMMARY_COUNT -gt 0 ]; then
+            echo ""
+            echo "✅ Created $SUMMARY_COUNT test summary/summaries in DevOps workspace"
+            echo "   View at: $SERVICENOW_INSTANCE_URL/sn_devops_test_summary_list.do"
+          else
+            echo ""
+            echo "⚠️  No test summaries were created"
+          fi
 
       # ========================================
       # PHASE 3: Work Items Integration
@@ -826,6 +1149,10 @@ jobs:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
           echo "🔗 Extracting work items from commits for CR $CHANGE_NUMBER..."
 
@@ -851,7 +1178,7 @@ jobs:
 
               # Register work item in ServiceNow
               curl -s \
-                -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+                -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
                 -H "Content-Type: application/json" \
                 -X POST \
                 -d '{
@@ -862,7 +1189,7 @@ jobs:
                   "work_item_title": "'"$(echo "$ISSUE_TITLE" | sed 's/"/\\"/g')"'",
                   "work_item_state": "'"$ISSUE_STATE"'"
                 }' \
-                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_work_item" > /dev/null
+                "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_work_item" > /dev/null
 
               echo "    ✅ Issue #$ISSUE_NUM registered"
             done
@@ -880,6 +1207,10 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
           echo "📱 Registering application in CMDB for CR $CHANGE_NUMBER..."
 
@@ -889,9 +1220,9 @@ jobs:
 
           echo "  ↳ Checking if application exists: $APP_NAME"
           APP_RESPONSE=$(curl -s \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Accept: application/json" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/cmdb_ci_appl?sysparm_query=$APP_QUERY&sysparm_fields=sys_id,name")
+            "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl?sysparm_query=$APP_QUERY&sysparm_fields=sys_id,name")
 
           APP_COUNT=$(echo "$APP_RESPONSE" | jq -r '.result | length')
 
@@ -903,7 +1234,7 @@ jobs:
             # Create new application
             echo "    ↳ Creating new application in CMDB..."
             CREATE_RESPONSE=$(curl -s \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
               -X POST \
@@ -915,7 +1246,7 @@ jobs:
                 "operational_status": "1",
                 "install_status": "1"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/cmdb_ci_appl")
+              "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl")
 
             APP_SYS_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.sys_id // empty')
 
@@ -934,14 +1265,14 @@ jobs:
 
             # Update change request with application reference
             UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
               -X PATCH \
               -d '{
                 "cmdb_ci": "'"$APP_SYS_ID"'"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYSID")
+              "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
 
             HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
 
@@ -964,6 +1295,10 @@ jobs:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
           SERVICES: ${{ inputs.services_deployed }}
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
           echo "📦 Registering deployed artifacts for CR $CHANGE_NUMBER..."
 
@@ -987,7 +1322,7 @@ jobs:
               ECR_URL="533267307120.dkr.ecr.eu-west-2.amazonaws.com/$SERVICE:$VERSION"
 
               curl -s \
-                -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+                -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
                 -H "Content-Type: application/json" \
                 -X POST \
                 -d '{
@@ -1000,7 +1335,7 @@ jobs:
                   "deployment_environment": "${{ inputs.environment }}",
                   "pipeline_id": "${{ github.run_id }}"
                 }' \
-                "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_artifact" > /dev/null
+                "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_artifact" > /dev/null
 
               echo "    ✅ $SERVICE registered"
             done
@@ -1020,6 +1355,10 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
           echo "📦 Registering package for CR $CHANGE_NUMBER..."
 
@@ -1034,10 +1373,10 @@ jobs:
 
           # Check if package already exists in ServiceNow
           PACKAGE_RESPONSE=$(curl -s \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_package?sysparm_query=name=$PACKAGE_NAME&sysparm_limit=1")
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package?sysparm_query=name=$PACKAGE_NAME&sysparm_limit=1")
 
           PACKAGE_COUNT=$(echo "$PACKAGE_RESPONSE" | jq -r '.result | length')
 
@@ -1050,7 +1389,7 @@ jobs:
             echo "  ↳ Creating new package: $PACKAGE_NAME..."
 
             CREATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
               -X POST \
@@ -1066,7 +1405,7 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_package")
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package")
 
             HTTP_CODE=$(echo "$CREATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
             BODY=$(echo "$CREATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
@@ -1085,14 +1424,14 @@ jobs:
             echo "  ↳ Linking package to change request..."
 
             UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
               -X PATCH \
               -d '{
                 "u_package": "'"$PACKAGE_SYS_ID"'"
               }' \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/$CHANGE_SYSID")
+              "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
 
             HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
 
@@ -1114,6 +1453,11 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
         run: |
           echo "🚀 Registering pipeline execution for CR $CHANGE_NUMBER..."
 
@@ -1135,7 +1479,7 @@ jobs:
 
           # Register pipeline execution in sn_devops_pipeline_execution
           EXEC_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -X POST \
@@ -1154,10 +1498,10 @@ jobs:
               "commit_sha": "${{ github.sha }}",
               "commit_message": "${{ github.event.head_commit.message }}",
               "repository": "${{ github.repository }}",
-              "tool": "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}",
+              "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
               "workflow_file": "${{ github.workflow }}"
             }' \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_pipeline_execution")
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_pipeline_execution")
 
           HTTP_CODE=$(echo "$EXEC_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
           BODY=$(echo "$EXEC_RESPONSE" | sed 's/HTTP_CODE:.*//')
@@ -1176,12 +1520,17 @@ jobs:
 
       - name: Wait for Change Approval (QA/PROD)
         if: inputs.environment != 'dev' && steps.create-cr.outputs.change_number != ''
+        env:
+          # ServiceNow API credentials
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
           CHANGE_SYSID="${{ steps.create-cr.outputs.change_sys_id }}"
           CHANGE_NUMBER="${{ steps.create-cr.outputs.change_number }}"
 
           echo "⏳ Waiting for approval of Change Request: $CHANGE_NUMBER"
-          echo "🔗 View: ${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sys_id=${CHANGE_SYSID}"
+          echo "🔗 View: $SERVICENOW_INSTANCE_URL/change_request.do?sys_id=${CHANGE_SYSID}"
 
           MAX_WAIT=3600  # 1 hour
           ELAPSED=0
@@ -1190,8 +1539,8 @@ jobs:
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             # Get current state
             RESPONSE=$(curl -s \
-              -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
-              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/change_request/${CHANGE_SYSID}?sysparm_fields=state,approval")
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/${CHANGE_SYSID}?sysparm_fields=state,approval")
 
             STATE=$(echo "$RESPONSE" | jq -r '.result.state')
             APPROVAL=$(echo "$RESPONSE" | jq -r '.result.approval')
