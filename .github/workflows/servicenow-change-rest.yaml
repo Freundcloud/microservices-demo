@@ -343,7 +343,7 @@ jobs:
           ASSIGNED_TO: ${{ inputs.assigned_to }}
           ENVIRONMENT: ${{ inputs.environment }}
           CHANGE_TYPE: ${{ inputs.change_type }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_MESSAGE: ${{ toJSON(github.event.head_commit.message) }}
           IMPL_PLAN_INPUT: ${{ inputs.implementation_plan }}
           BACKOUT_PLAN_INPUT: ${{ inputs.backout_plan }}
           TEST_PLAN_INPUT: ${{ inputs.test_plan }}
@@ -421,8 +421,9 @@ jobs:
           # Try to extract PR number from merge commit message (e.g., "Merge pull request #123")
           if [ -z "$PR_NUM" ]; then
             # Extract from first line only to avoid parsing entire commit body
-            # Use printf instead of echo to safely handle special characters like < >
-            COMMIT_FIRST_LINE="$(printf '%s\n' "$COMMIT_MESSAGE" | head -1)"
+            # COMMIT_MESSAGE is JSON-escaped, so parse it with jq first to get the raw string
+            COMMIT_RAW=$(echo "$COMMIT_MESSAGE" | jq -r '.')
+            COMMIT_FIRST_LINE="$(printf '%s\n' "$COMMIT_RAW" | head -1)"
             if [[ "$COMMIT_FIRST_LINE" =~ Merge\ pull\ request\ \#([0-9]+) ]]; then
               PR_NUM="${BASH_REMATCH[1]}"
               echo "Extracted PR number from commit message: #$PR_NUM"
@@ -550,7 +551,7 @@ jobs:
             --arg u_infrastructure_changes "${{ inputs.infrastructure_changes }}" \
             --arg u_security_scanners "$SCANNERS" \
             --arg u_previous_version "${{ inputs.previous_version }}" \
-            --arg u_commit_message "$COMMIT_MESSAGE" \
+            --argjson u_commit_message "$COMMIT_MESSAGE" \
             --arg u_security_scan_status "$SECURITY_STATUS" \
             --arg u_critical_vulnerabilities "$CRITICAL" \
             --arg u_high_vulnerabilities "$HIGH" \
@@ -1235,7 +1236,7 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_MESSAGE: ${{ toJSON(github.event.head_commit.message) }}
           # ServiceNow API credentials
           SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
@@ -1244,8 +1245,10 @@ jobs:
           echo "🔗 Extracting work items from commits for CR $CHANGE_NUMBER..."
 
           # Extract issue numbers from commit message
+          # COMMIT_MESSAGE is JSON-escaped, so parse it with jq first to get the raw string
+          COMMIT_RAW=$(echo "$COMMIT_MESSAGE" | jq -r '.')
           # Looks for: Fixes #7, Closes #123, Resolves #456, etc.
-          ISSUES=$(echo "$COMMIT_MESSAGE" | grep -oP '(?:Fixes|Closes|Resolves|References|Refs|Issue|#)\s*#?\K\d+' | sort -u)
+          ISSUES=$(echo "$COMMIT_RAW" | grep -oP '(?:Fixes|Closes|Resolves|References|Refs|Issue|#)\s*#?\K\d+' | sort -u)
 
           if [ -z "$ISSUES" ]; then
             echo "  No issue references found in commit message"
@@ -1471,6 +1474,7 @@ jobs:
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          COMMIT_MESSAGE: ${{ toJSON(github.event.head_commit.message) }}
           # ServiceNow API credentials
           SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
@@ -1496,6 +1500,7 @@ jobs:
           fi
 
           # Build JSON payload using jq to properly escape all special characters
+          # Note: COMMIT_MESSAGE is JSON-escaped via toJSON(), so we pass it through jq's --argjson
           PAYLOAD=$(jq -n \
             --arg change_request "$CHANGE_SYSID" \
             --arg application "${{ steps.get-app-ci.outputs.app_sys_id }}" \
@@ -1510,7 +1515,7 @@ jobs:
             --arg trigger_event "${{ github.event_name }}" \
             --arg branch "${{ github.ref_name }}" \
             --arg commit_sha "${{ github.sha }}" \
-            --arg commit_message "${{ github.event.head_commit.message }}" \
+            --argjson commit_message "$COMMIT_MESSAGE" \
             --arg repository "${{ github.repository }}" \
             --arg tool "$SN_ORCHESTRATION_TOOL_ID" \
             --arg workflow_file "${{ github.workflow }}" \
