@@ -829,7 +829,7 @@ jobs:
           fi
 
           # Register unit test results
-          if [ "$UNIT_TEST_TOTAL" != "0" ]; then
+          if [ -n "$UNIT_TEST_TOTAL" ] && [ "$UNIT_TEST_TOTAL" != "0" ]; then
             echo "  ↳ Registering unit tests..."
             RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
