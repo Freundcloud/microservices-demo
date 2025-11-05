@@ -48,31 +48,60 @@ echo "Pipeline Run: $GITHUB_RUN_ID"
 echo ""
 
 # Find packages registered in this pipeline run
-# Strategy: Find packages created around the same time as this workflow started
-# We'll search for packages created in the last 10 minutes
+# Strategy: Query by pipeline_id field for exact match (reliable and fast)
 echo "🔍 Finding packages from this pipeline run..."
+echo "   Pipeline ID: $GITHUB_RUN_ID"
+echo ""
 
-# Get workflow start time (approximation - use current time minus a few minutes)
-SEARCH_TIME=$(date -u -d '10 minutes ago' '+%Y-%m-%d %H:%M:%S')
-
-# Search for packages matching our repository and recent creation time
-PACKAGES_RESPONSE=$(curl -s \
+# Query packages by pipeline_id (exact match, no URL encoding issues)
+PACKAGES_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
   -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
   -H "Accept: application/json" \
-  "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package?sysparm_query=sys_created_on>=$SEARCH_TIME^nameLIKE$GITHUB_REPOSITORY&sysparm_fields=sys_id,name,version,change_request")
+  "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package?sysparm_query=pipeline_id=$GITHUB_RUN_ID&sysparm_fields=sys_id,name,version,change_request")
 
-PACKAGE_COUNT=$(echo "$PACKAGES_RESPONSE" | jq '.result | length')
+# Extract HTTP status code
+HTTP_CODE=$(echo "$PACKAGES_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+BODY=$(echo "$PACKAGES_RESPONSE" | sed '/HTTP_CODE:/d')
 
-echo -e "${GREEN}Found $PACKAGE_COUNT packages from this run${NC}"
+# Validate HTTP response
+if [ "$HTTP_CODE" != "200" ]; then
+  echo -e "${RED}❌ ERROR: ServiceNow API returned HTTP $HTTP_CODE${NC}"
+  echo ""
+  echo "Response body:"
+  echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+  echo ""
+  echo "Troubleshooting:"
+  echo "  1. Verify ServiceNow credentials are correct"
+  echo "  2. Check if sn_devops_package table exists and is accessible"
+  echo "  3. Verify API access permissions for the github_integration user"
+  echo "  4. Check ServiceNow instance URL: $SERVICENOW_INSTANCE_URL"
+  exit 1
+fi
+
+# Validate JSON and extract package count with error handling
+if ! PACKAGE_COUNT=$(echo "$BODY" | jq -e '.result | length' 2>/dev/null); then
+  echo -e "${RED}❌ ERROR: Failed to parse ServiceNow response${NC}"
+  echo ""
+  echo "Response was not valid JSON or missing .result field"
+  echo "Raw response:"
+  echo "$BODY"
+  exit 1
+fi
+
+echo -e "${GREEN}✓ Found $PACKAGE_COUNT package(s) from this run${NC}"
 echo ""
 
 if [ "$PACKAGE_COUNT" -eq 0 ]; then
-  echo -e "${YELLOW}⚠️  No packages found for this pipeline run${NC}"
+  echo -e "${YELLOW}⚠️  No packages found for pipeline run $GITHUB_RUN_ID${NC}"
   echo ""
   echo "This could mean:"
-  echo "  1. Packages haven't been registered yet (register-packages job may be running)"
+  echo "  1. Packages haven't been registered yet (register-packages job may still be running)"
   echo "  2. No services were built in this run"
   echo "  3. Package registration failed"
+  echo "  4. The pipeline_id field was not set during package registration"
+  echo ""
+  echo "To verify, check ServiceNow:"
+  echo "  $SERVICENOW_INSTANCE_URL/sn_devops_package_list.do?sysparm_query=pipeline_id=$GITHUB_RUN_ID"
   echo ""
   echo "Skipping package linkage..."
   exit 0
@@ -123,7 +152,7 @@ while IFS= read -r pkg; do
     echo -e "${RED}  ✗ $PKG_NAME (HTTP $HTTP_CODE)${NC}"
     FAILED_COUNT=$((FAILED_COUNT + 1))
   fi
-done < <(echo "$PACKAGES_RESPONSE" | jq -c '.result[]')
+done < <(echo "$BODY" | jq -c '.result[]')
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
