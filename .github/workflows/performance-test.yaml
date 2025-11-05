@@ -161,12 +161,13 @@ jobs:
           fi
 
           # Parse CSV results (skip header)
-          TOTAL_REQUESTS=$(awk -F',' 'NR>1 && $1=="Aggregated" {sum+=$3} END {print sum}' locust-stats_stats.csv)
-          FAILURES=$(awk -F',' 'NR>1 && $1=="Aggregated" {sum+=$4} END {print sum}' locust-stats_stats.csv)
-          AVG_RESPONSE=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $6; exit}' locust-stats_stats.csv)
-          REQUESTS_PER_SEC=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $11; exit}' locust-stats_stats.csv)
-          P50=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $7; exit}' locust-stats_stats.csv)
-          P95=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $9; exit}' locust-stats_stats.csv)
+          # Note: Aggregated row has blank Type column, so "Aggregated" is in column 2
+          TOTAL_REQUESTS=$(awk -F',' 'NR>1 && $2=="Aggregated" {sum+=$3} END {print sum}' locust-stats_stats.csv)
+          FAILURES=$(awk -F',' 'NR>1 && $2=="Aggregated" {sum+=$4} END {print sum}' locust-stats_stats.csv)
+          AVG_RESPONSE=$(awk -F',' 'NR>1 && $2=="Aggregated" {print $6; exit}' locust-stats_stats.csv)
+          REQUESTS_PER_SEC=$(awk -F',' 'NR>1 && $2=="Aggregated" {print $11; exit}' locust-stats_stats.csv)
+          P50=$(awk -F',' 'NR>1 && $2=="Aggregated" {print $7; exit}' locust-stats_stats.csv)
+          P95=$(awk -F',' 'NR>1 && $2=="Aggregated" {print $9; exit}' locust-stats_stats.csv)
 
           # Default values if parsing failed
           TOTAL_REQUESTS=${TOTAL_REQUESTS:-0}
