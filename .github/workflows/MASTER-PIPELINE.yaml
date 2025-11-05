@@ -735,24 +735,62 @@ jobs:
       - name: Test Frontend Endpoint
         id: test-frontend
         run: |
-          # Get frontend URL from AWS ALB Ingress
-          FRONTEND_URL=$(kubectl get svc -n istio-system istio-ingressgateway \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          NAMESPACE="microservices-${{ needs.pipeline-init.outputs.environment }}"
+          echo "⏳ Waiting for ALB Ingress to be ready in $NAMESPACE..."
 
-          if [ -z "$FRONTEND_URL" ]; then
-            echo "⚠️ Frontend URL not yet available (LoadBalancer provisioning)"
-            echo "status=pending" >> $GITHUB_OUTPUT
-          else
-            echo "Testing frontend at: http://$FRONTEND_URL/"
-            if curl -f -s -o /dev/null -w "%{http_code}" "http://$FRONTEND_URL/" | grep -q "200"; then
-              echo "✅ Frontend is accessible"
-              echo "status=success" >> $GITHUB_OUTPUT
-              echo "url=http://$FRONTEND_URL" >> $GITHUB_OUTPUT
+          MAX_RETRIES=30        # 30 attempts
+          RETRY_DELAY=10        # 10 seconds between attempts
+          MAX_WAIT=300          # 5 minutes total
+          ATTEMPT=0
+          START_TIME=$(date +%s)
+
+          while [ $ATTEMPT -lt $MAX_RETRIES ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            ELAPSED=$(($(date +%s) - START_TIME))
+
+            echo "Attempt $ATTEMPT/$MAX_RETRIES (${ELAPSED}s elapsed)..."
+
+            # Get ALB hostname from Ingress resource (not Istio service)
+            FRONTEND_URL=$(kubectl get ingress frontend-ingress -n $NAMESPACE \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+            if [ -n "$FRONTEND_URL" ]; then
+              echo "✅ ALB Ingress hostname found: $FRONTEND_URL"
+              echo "⏳ Waiting for DNS propagation and health checks..."
+              sleep 15  # Allow DNS and ALB health checks to stabilize
+
+              # Test endpoint
+              echo "Testing frontend at: http://$FRONTEND_URL/"
+              HTTP_CODE=$(curl -f -s -o /dev/null -w "%{http_code}" "http://$FRONTEND_URL/" \
+                --connect-timeout 10 --max-time 30 2>&1 || echo "000")
+
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ Frontend is accessible (HTTP $HTTP_CODE)"
+                echo "status=success" >> $GITHUB_OUTPUT
+                echo "url=http://$FRONTEND_URL" >> $GITHUB_OUTPUT
+                exit 0
+              else
+                echo "⚠️ Frontend returned HTTP $HTTP_CODE (expected 200)"
+              fi
             else
-              echo "❌ Frontend returned non-200 status"
-              echo "status=failure" >> $GITHUB_OUTPUT
+              echo "⏳ ALB Ingress hostname not yet available..."
             fi
-          fi
+
+            # Check if we've exceeded max wait time
+            if [ $ELAPSED -ge $MAX_WAIT ]; then
+              echo "❌ Timeout: ALB Ingress did not become ready within ${MAX_WAIT}s"
+              echo "status=failure" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+
+            echo "Retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          done
+
+          # Exhausted retries
+          echo "❌ Failed to verify frontend after $MAX_RETRIES attempts"
+          echo "status=failure" >> $GITHUB_OUTPUT
+          exit 1
 
       - name: Calculate Duration
         id: calculate-duration
