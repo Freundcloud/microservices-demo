@@ -297,6 +297,81 @@ jobs:
             echo "✅ All ServiceNow secrets configured correctly"
           fi
 
+      - name: Get or Create Application CI
+        id: get-app-ci
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        run: |
+          echo "📱 Getting or creating Application CI in CMDB..."
+
+          # Determine application name based on environment
+          APP_NAME="Online Boutique ($ENVIRONMENT)"
+          APP_QUERY="name=$APP_NAME"
+
+          echo "  ↳ Checking if application exists: $APP_NAME"
+
+          # Check if application already exists in CMDB
+          APP_RESPONSE=$(curl -s \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Accept: application/json" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl?sysparm_query=$APP_QUERY&sysparm_fields=sys_id,name,u_environment")
+
+          APP_COUNT=$(echo "$APP_RESPONSE" | jq -r '.result | length')
+
+          if [ "$APP_COUNT" -gt 0 ]; then
+            # Application exists - get sys_id
+            APP_SYS_ID=$(echo "$APP_RESPONSE" | jq -r '.result[0].sys_id')
+            echo "    ✅ Application already exists"
+            echo "       sys_id: $APP_SYS_ID"
+            echo "       name: $APP_NAME"
+          else
+            # Create new application in CMDB
+            echo "    ↳ Creating new application in CMDB..."
+
+            CREATE_RESPONSE=$(curl -s \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X POST \
+              -d '{
+                "name": "'"$APP_NAME"'",
+                "short_description": "Microservices demo application ('"$ENVIRONMENT"' environment)",
+                "u_environment": "'"$ENVIRONMENT"'",
+                "u_github_repo": "${{ github.repository }}",
+                "operational_status": "1",
+                "install_status": "1"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl")
+
+            APP_SYS_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.sys_id // empty')
+
+            if [ -n "$APP_SYS_ID" ] && [ "$APP_SYS_ID" != "null" ]; then
+              echo "    ✅ Application created successfully"
+              echo "       sys_id: $APP_SYS_ID"
+              echo "       name: $APP_NAME"
+            else
+              echo "    ❌ Failed to create application"
+              echo "Response: $CREATE_RESPONSE" | jq '.'
+              exit 1
+            fi
+          fi
+
+          # Validate we have a valid sys_id
+          if [ -z "$APP_SYS_ID" ] || [ "$APP_SYS_ID" = "null" ]; then
+            echo "❌ Failed to get application sys_id"
+            exit 1
+          fi
+
+          # Export for next steps
+          echo "app_sys_id=$APP_SYS_ID" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+
+          echo ""
+          echo "✅ Application CI ready: $APP_NAME (sys_id: $APP_SYS_ID)"
+
       - name: Create Change Request via REST API
         id: create-cr
         continue-on-error: true
@@ -499,6 +574,7 @@ jobs:
             --argjson prod_system "$PROD_SYSTEM" \
             --arg outside_maint "false" \
             --arg business_service "$SERVICE_NAME" \
+            --arg cmdb_ci "${{ steps.get-app-ci.outputs.app_sys_id }}" \
             --arg u_source "GitHub Actions" \
             --arg u_env "$ENVIRONMENT" \
             --arg u_type "$CHANGE_TYPE" \
@@ -562,6 +638,7 @@ jobs:
               production_system: $prod_system,
               outside_maintenance_schedule: $outside_maint,
               business_service: $business_service,
+              cmdb_ci: $cmdb_ci,
               u_source: $u_source,
               u_environment: $u_env,
               u_change_type: $u_type,
@@ -1201,91 +1278,11 @@ jobs:
           fi
 
       # ========================================
-      # PHASE 4: Application Registration
+      # PHASE 4: Application Registration (REMOVED - Now done before CR creation)
       # ========================================
-
-      - name: Register Application in CMDB
-        if: steps.create-cr.outputs.change_sys_id != ''
-        continue-on-error: true
-        env:
-          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
-          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
-          # ServiceNow API credentials
-          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
-          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
-          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
-        run: |
-          echo "📱 Registering application in CMDB for CR $CHANGE_NUMBER..."
-
-          # Check if application already exists
-          APP_NAME="Online Boutique (${{ inputs.environment }})"
-          APP_QUERY="name=$APP_NAME"
-
-          echo "  ↳ Checking if application exists: $APP_NAME"
-          APP_RESPONSE=$(curl -s \
-            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-            -H "Accept: application/json" \
-            "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl?sysparm_query=$APP_QUERY&sysparm_fields=sys_id,name")
-
-          APP_COUNT=$(echo "$APP_RESPONSE" | jq -r '.result | length')
-
-          if [ "$APP_COUNT" -gt 0 ]; then
-            # Application exists - get sys_id
-            APP_SYS_ID=$(echo "$APP_RESPONSE" | jq -r '.result[0].sys_id')
-            echo "    ✅ Application already exists (sys_id: $APP_SYS_ID)"
-          else
-            # Create new application
-            echo "    ↳ Creating new application in CMDB..."
-            CREATE_RESPONSE=$(curl -s \
-              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -X POST \
-              -d '{
-                "name": "'"$APP_NAME"'",
-                "short_description": "Microservices demo application (${{ inputs.environment }} environment)",
-                "u_environment": "${{ inputs.environment }}",
-                "u_github_repo": "${{ github.repository }}",
-                "operational_status": "1",
-                "install_status": "1"
-              }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl")
-
-            APP_SYS_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.sys_id // empty')
-
-            if [ -n "$APP_SYS_ID" ]; then
-              echo "    ✅ Application created (sys_id: $APP_SYS_ID)"
-            else
-              echo "    ⚠️  Failed to create application"
-              echo "$CREATE_RESPONSE" | jq '.'
-              exit 0
-            fi
-          fi
-
-          # Link application to change request
-          if [ -n "$APP_SYS_ID" ]; then
-            echo "  ↳ Linking application to change request..."
-
-            # Update change request with application reference
-            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -X PATCH \
-              -d '{
-                "cmdb_ci": "'"$APP_SYS_ID"'"
-              }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
-
-            HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
-
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "    ✅ Application linked to change request"
-              echo "✅ App: $APP_NAME"
-            else
-              echo "    ⚠️  Failed to link application (HTTP $HTTP_CODE)"
-            fi
-          fi
+      # NOTE: Application CI registration has been moved to "Get or Create Application CI" step
+      # This ensures cmdb_ci field is populated during initial change request creation
+      # instead of being patched afterwards. See issue #54 for details.
 
       # ========================================
       # PHASE 5: Artifact Tracking
