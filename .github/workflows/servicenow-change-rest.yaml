@@ -987,6 +987,13 @@ jobs:
           SUMMARY_COUNT=0
           CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
 
+          # ServiceNow test_type sys_id references (fixes #56)
+          # These are references to sn_devops_test_type table records
+          TEST_TYPE_UNIT="0bd1b86a4780395095703c72846d432b"        # UnitTest
+          TEST_TYPE_SECURITY="849449ddc34d3250b71ef44c0501316f"    # Security Scan
+          TEST_TYPE_QUALITY="c8944191c38d3250b71ef44c0501313d"     # Quality Gate
+          TEST_TYPE_SMOKE="f2c5851e07e01010412806607bd300fb"       # Smoke (functional)
+
           # ===================================
           # 1. Unit Test Summary
           # ===================================
@@ -1012,7 +1019,7 @@ jobs:
                 "name": "Unit Tests - All Services (${{ inputs.environment }})",
                 "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
                 "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                "test_type": "unit",
+                "test_type": "'"$TEST_TYPE_UNIT"'",
                 "total_tests": '"$TOTAL"',
                 "passed_tests": '"$PASSED"',
                 "failed_tests": '"$FAILED"',
@@ -1075,7 +1082,7 @@ jobs:
                 "name": "Security Scans - Trivy, CodeQL, Semgrep, Gitleaks (${{ inputs.environment }})",
                 "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
                 "url": "https://github.com/${{ github.repository }}/security",
-                "test_type": "security",
+                "test_type": "'"$TEST_TYPE_SECURITY"'",
                 "total_tests": '"$TOTAL_SCANS"',
                 "passed_tests": '"$PASSED_SCANS"',
                 "failed_tests": '"$FAILED_SCANS"',
@@ -1123,6 +1130,10 @@ jobs:
               PASSING_PERCENT="0.00"
             fi
 
+            # URL fallback - use GitHub Actions run if SonarCloud URL not provided (fixes #56)
+            SONAR_URL="${{ inputs.sonarcloud_url }}"
+            [ -z "$SONAR_URL" ] && SONAR_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
             RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
@@ -1130,8 +1141,8 @@ jobs:
               -d '{
                 "name": "SonarCloud Quality Gate (${{ inputs.environment }})",
                 "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
-                "url": "${{ inputs.sonarcloud_url }}",
-                "test_type": "quality",
+                "url": "'"$SONAR_URL"'",
+                "test_type": "'"$TEST_TYPE_QUALITY"'",
                 "total_tests": 1,
                 "passed_tests": '"$PASSED_CHECKS"',
                 "failed_tests": '"$FAILED_CHECKS"',
@@ -1177,6 +1188,10 @@ jobs:
               PASSING_PERCENT="0.00"
             fi
 
+            # URL fallback - use GitHub Actions run if smoke test URL not provided (fixes #56)
+            SMOKE_URL="${{ inputs.smoke_test_url }}"
+            [ -z "$SMOKE_URL" ] && SMOKE_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
             RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
@@ -1184,8 +1199,8 @@ jobs:
               -d '{
                 "name": "Smoke Tests - Post-Deployment Verification (${{ inputs.environment }})",
                 "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
-                "url": "${{ inputs.smoke_test_url }}",
-                "test_type": "functional",
+                "url": "'"$SMOKE_URL"'",
+                "test_type": "'"$TEST_TYPE_SMOKE"'",
                 "total_tests": 1,
                 "passed_tests": '"$PASSED_TESTS"',
                 "failed_tests": '"$FAILED_TESTS"',
