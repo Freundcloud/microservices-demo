@@ -309,9 +309,13 @@ jobs:
 
           # Determine application name based on environment
           APP_NAME="Online Boutique ($ENVIRONMENT)"
-          APP_QUERY="name=$APP_NAME"
+
+          # URL-encode the application name for query (fixes #57)
+          ENCODED_APP_NAME=$(printf '%s' "$APP_NAME" | jq -sRr @uri)
+          APP_QUERY="name=$ENCODED_APP_NAME"
 
           echo "  ↳ Checking if application exists: $APP_NAME"
+          echo "  ↳ Query: $APP_QUERY"
 
           # Check if application already exists in CMDB
           APP_RESPONSE=$(curl -s \
