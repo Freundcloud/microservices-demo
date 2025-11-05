@@ -801,7 +801,6 @@ jobs:
 
       - name: Register Test Results in DevOps Workspace
         if: steps.create-cr.outputs.change_sys_id != '' && (inputs.unit_test_total != '0' || inputs.security_scan_status != '')
-        continue-on-error: true
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
@@ -831,7 +830,7 @@ jobs:
           # Register unit test results
           if [ "$UNIT_TEST_TOTAL" != "0" ]; then
             echo "  ↳ Registering unit tests..."
-            curl -s \
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
@@ -846,14 +845,26 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result" > /dev/null
-            echo "    ✅ Unit test results registered"
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              TEST_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ Unit test results registered"
+              echo "       Test sys_id: $TEST_SYS_ID"
+              echo "       Total: ${{ inputs.unit_test_total }}, Passed: ${{ inputs.unit_test_passed }}, Failed: ${{ inputs.unit_test_failed }}"
+            else
+              echo "    ❌ Failed to register unit test results (HTTP $HTTP_CODE)"
+              echo "    Response: $BODY" | jq '.'
+            fi
           fi
 
           # Register security scan results
           if [ -n "$SECURITY_STATUS" ]; then
             echo "  ↳ Registering security scans..."
-            curl -s \
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
@@ -868,8 +879,19 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "https://github.com/${{ github.repository }}/security/code-scanning"
               }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result" > /dev/null
-            echo "    ✅ Security scan results registered"
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              TEST_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ Security scan results registered"
+              echo "       Test sys_id: $TEST_SYS_ID"
+            else
+              echo "    ❌ Failed to register security scan results (HTTP $HTTP_CODE)"
+              echo "    Response: $BODY" | jq '.'
+            fi
           fi
 
           # Register SonarCloud results (if available)
@@ -878,7 +900,7 @@ jobs:
             SONAR_RESULT="${{ inputs.sonarcloud_status }}"
             [ "$SONAR_RESULT" = "passed" ] && SONAR_TEST_RESULT="success" || SONAR_TEST_RESULT="failure"
 
-            curl -s \
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
               -X POST \
@@ -893,8 +915,19 @@ jobs:
                 "pipeline_id": "${{ github.run_id }}",
                 "pipeline_url": "${{ inputs.sonarcloud_url }}"
               }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result" > /dev/null
-            echo "    ✅ SonarCloud results registered"
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_test_result")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              TEST_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "    ✅ SonarCloud results registered"
+              echo "       Test sys_id: $TEST_SYS_ID"
+            else
+              echo "    ❌ Failed to register SonarCloud results (HTTP $HTTP_CODE)"
+              echo "    Response: $BODY" | jq '.'
+            fi
           fi
 
           # ===================================
@@ -1430,9 +1463,13 @@ jobs:
             if [ "$HTTP_CODE" = "201" ]; then
               PACKAGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
               echo "    ✅ Package created: $PACKAGE_NAME"
+              echo "       Package sys_id: $PACKAGE_SYS_ID"
+              echo "       Response: $(echo "$BODY" | jq -c '{sys_id: .result.sys_id, name: .result.name, version: .result.version}')"
             else
-              echo "    ⚠️  Failed to create package (HTTP $HTTP_CODE)"
+              echo "    ❌ Failed to create package (HTTP $HTTP_CODE)"
+              echo "    Response body:"
               echo "$BODY" | jq '.'
+              echo "    This failure means packages are NOT being registered in ServiceNow"
             fi
           fi
 
@@ -1451,12 +1488,18 @@ jobs:
               "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
 
             HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+            BODY=$(echo "$UPDATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
 
             if [ "$HTTP_CODE" = "200" ]; then
               echo "    ✅ Package linked to change request"
+              echo "       Change request: $CHANGE_NUMBER"
+              echo "       Package: $PACKAGE_NAME"
               echo "✅ Package: $PACKAGE_NAME"
             else
-              echo "    ⚠️  Failed to link package (HTTP $HTTP_CODE)"
+              echo "    ❌ Failed to link package (HTTP $HTTP_CODE)"
+              echo "    Response body:"
+              echo "$BODY" | jq '.'
+              echo "    This means package exists but is NOT linked to change request"
             fi
           fi
 
@@ -1466,7 +1509,6 @@ jobs:
 
       - name: Register Pipeline Execution
         if: steps.create-cr.outputs.change_sys_id != ''
-        continue-on-error: true
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
@@ -1529,10 +1571,15 @@ jobs:
             echo "     Execution ID: $EXECUTION_SYS_ID"
             echo "     Status: $EXECUTION_STATUS"
             echo "     Run: ${{ github.run_number }}"
+            echo "     Change Request: $CHANGE_NUMBER"
+            echo "     Response: $(echo "$BODY" | jq -c '{sys_id: .result.sys_id, status: .result.execution_status, pipeline_id: .result.pipeline_id}')"
             echo "✅ Pipeline: 🚀 Master CI/CD Pipeline (#${{ github.run_number }})"
           else
-            echo "  ⚠️  Failed to register pipeline execution (HTTP $HTTP_CODE)"
+            echo "  ❌ Failed to register pipeline execution (HTTP $HTTP_CODE)"
+            echo "  Response body:"
             echo "$BODY" | jq '.'
+            echo "  This failure means pipeline executions are NOT being tracked in ServiceNow"
+            echo "  Without pipeline executions, DevOps Insights cannot aggregate data"
           fi
 
       - name: Wait for Change Approval (QA/PROD)
