@@ -145,7 +145,6 @@ jobs:
 
       - name: Create Change Request via DevOps API
         id: create-cr
-        continue-on-error: true
         env:
           SHORT_DESC: ${{ inputs.short_description }} [${{ inputs.environment }}]
           DESCRIPTION: ${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions using DevOps Change Control API', inputs.environment) }}
@@ -191,7 +190,8 @@ jobs:
                 "test_plan": $test_plan,
                 "category": "DevOps",
                 "subcategory": "Deployment",
-                "justification": "Automated deployment via CI/CD pipeline. Changes have been tested and approved via pull request workflow."
+                "justification": "Automated deployment via CI/CD pipeline. Changes have been tested and approved via pull request workflow.",
+                "application": "e489efd1c3383e14e1bbf0cb050131d5"
               }
             }'
           )

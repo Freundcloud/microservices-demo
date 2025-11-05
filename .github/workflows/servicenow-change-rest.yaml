@@ -378,7 +378,6 @@ jobs:
 
       - name: Create Change Request via REST API
         id: create-cr
-        continue-on-error: true
         env:
           SHORT_DESC: ${{ inputs.short_description }} [${{ inputs.environment }}]
           DESCRIPTION: ${{ inputs.description || format('Automated deployment to {0} environment via GitHub Actions', inputs.environment) }}
@@ -754,7 +753,6 @@ jobs:
 
       - name: Link Change Request to DevOps Pipeline
         if: steps.create-cr.outputs.change_sys_id != ''
-        continue-on-error: true
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
           CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
