@@ -234,3 +234,4 @@ func mustConnGRPC(ctx context.Context, conn **grpc.ClientConn, addr string) {
 	}
 }
 // Test ServiceNow integration
+// ServiceNow integration test - verifying App field fix
