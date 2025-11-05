@@ -1,0 +1,273 @@
+---
+name: "⚡ Performance Tests (Locust)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test (dev/qa/prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+        default: 'dev'
+      users:
+        description: 'Number of concurrent users'
+        required: false
+        type: number
+        default: 50
+      spawn_rate:
+        description: 'User spawn rate per second'
+        required: false
+        type: number
+        default: 10
+      duration:
+        description: 'Test duration (e.g., 5m, 30s)'
+        required: false
+        type: string
+        default: '2m'
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        type: string
+      users:
+        description: 'Number of concurrent users'
+        required: false
+        type: number
+        default: 50
+      spawn_rate:
+        description: 'User spawn rate per second'
+        required: false
+        type: number
+        default: 10
+      duration:
+        description: 'Test duration'
+        required: false
+        type: string
+        default: '2m'
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  CLUSTER_NAME: microservices
+
+jobs:
+  performance-test:
+    name: "⚡ Run Locust Load Test"
+    runs-on: ubuntu-latest
+    outputs:
+      test_status: ${{ steps.parse-results.outputs.status }}
+      total_requests: ${{ steps.parse-results.outputs.total_requests }}
+      failures: ${{ steps.parse-results.outputs.failures }}
+      avg_response_time: ${{ steps.parse-results.outputs.avg_response_time }}
+      requests_per_sec: ${{ steps.parse-results.outputs.requests_per_sec }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup AWS Credentials
+        uses: ./.github/actions/setup-aws-credentials
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Configure kubectl
+        uses: ./.github/actions/configure-kubectl
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+          verify-connection: 'false'
+
+      - name: Get Frontend URL
+        id: get-url
+        run: |
+          NAMESPACE="microservices-${{ inputs.environment }}"
+          echo "Getting ALB Ingress URL from $NAMESPACE..."
+
+          # Wait for ingress to be ready
+          for i in {1..30}; do
+            FRONTEND_URL=$(kubectl get ingress frontend-ingress -n $NAMESPACE \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+
+            if [ -n "$FRONTEND_URL" ]; then
+              echo "✅ Frontend URL: http://$FRONTEND_URL"
+              echo "url=http://$FRONTEND_URL" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            echo "⏳ Waiting for ALB Ingress... ($i/30)"
+            sleep 10
+          done
+
+          echo "❌ Failed to get frontend URL"
+          exit 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Locust
+        run: |
+          pip install locust
+
+      - name: Run Locust Load Test
+        id: run-locust
+        run: |
+          cd src/loadgenerator
+
+          echo "⚡ Starting Locust load test..."
+          echo "  Users: ${{ inputs.users }}"
+          echo "  Spawn rate: ${{ inputs.spawn_rate }}/s"
+          echo "  Duration: ${{ inputs.duration }}"
+          echo "  Target: ${{ steps.get-url.outputs.url }}"
+          echo ""
+
+          # Run Locust in headless mode
+          locust \
+            --host="${{ steps.get-url.outputs.url }}" \
+            --users=${{ inputs.users }} \
+            --spawn-rate=${{ inputs.spawn_rate }} \
+            --run-time=${{ inputs.duration }} \
+            --headless \
+            --html=locust-report.html \
+            --csv=locust-stats \
+            --only-summary || true
+
+          echo "✅ Load test complete"
+
+      - name: Parse Test Results
+        id: parse-results
+        run: |
+          cd src/loadgenerator
+
+          # Check if stats file exists
+          if [ ! -f "locust-stats_stats.csv" ]; then
+            echo "⚠️ No results file found - test may have failed"
+            echo "status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Parse CSV results (skip header)
+          TOTAL_REQUESTS=$(awk -F',' 'NR>1 && $1=="Aggregated" {sum+=$3} END {print sum}' locust-stats_stats.csv)
+          FAILURES=$(awk -F',' 'NR>1 && $1=="Aggregated" {sum+=$4} END {print sum}' locust-stats_stats.csv)
+          AVG_RESPONSE=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $6; exit}' locust-stats_stats.csv)
+          REQUESTS_PER_SEC=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $11; exit}' locust-stats_stats.csv)
+          P50=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $7; exit}' locust-stats_stats.csv)
+          P95=$(awk -F',' 'NR>1 && $1=="Aggregated" {print $9; exit}' locust-stats_stats.csv)
+
+          # Default values if parsing failed
+          TOTAL_REQUESTS=${TOTAL_REQUESTS:-0}
+          FAILURES=${FAILURES:-0}
+          AVG_RESPONSE=${AVG_RESPONSE:-0}
+          REQUESTS_PER_SEC=${REQUESTS_PER_SEC:-0}
+          P50=${P50:-0}
+          P95=${P95:-0}
+
+          # Calculate success rate
+          if [ "$TOTAL_REQUESTS" -gt 0 ]; then
+            SUCCESS_RATE=$(echo "scale=2; ($TOTAL_REQUESTS - $FAILURES) * 100 / $TOTAL_REQUESTS" | bc)
+          else
+            SUCCESS_RATE="0.0"
+          fi
+
+          # Determine status
+          if [ "$TOTAL_REQUESTS" -gt 0 ] && [ "$FAILURES" -eq 0 ]; then
+            STATUS="success"
+          elif [ "$TOTAL_REQUESTS" -gt 0 ]; then
+            STATUS="partial"
+          else
+            STATUS="failure"
+          fi
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "total_requests=$TOTAL_REQUESTS" >> $GITHUB_OUTPUT
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          echo "avg_response_time=$AVG_RESPONSE" >> $GITHUB_OUTPUT
+          echo "requests_per_sec=$REQUESTS_PER_SEC" >> $GITHUB_OUTPUT
+          echo "success_rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+          echo "p50=$P50" >> $GITHUB_OUTPUT
+          echo "p95=$P95" >> $GITHUB_OUTPUT
+
+          echo ""
+          echo "## ⚡ Performance Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Requests | $TOTAL_REQUESTS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failures | $FAILURES |" >> $GITHUB_STEP_SUMMARY
+          echo "| Success Rate | $SUCCESS_RATE% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Avg Response Time | ${AVG_RESPONSE}ms |" >> $GITHUB_STEP_SUMMARY
+          echo "| P50 Response Time | ${P50}ms |" >> $GITHUB_STEP_SUMMARY
+          echo "| P95 Response Time | ${P95}ms |" >> $GITHUB_STEP_SUMMARY
+          echo "| Requests/sec | $REQUESTS_PER_SEC |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "$STATUS" = "success" ]; then
+            echo "✅ **All requests succeeded**" >> $GITHUB_STEP_SUMMARY
+          elif [ "$STATUS" = "partial" ]; then
+            echo "⚠️ **Some requests failed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Load test failed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Locust Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report-${{ inputs.environment }}
+          path: |
+            src/loadgenerator/locust-report.html
+            src/loadgenerator/locust-stats*.csv
+
+  upload-to-servicenow:
+    name: "📤 Upload to ServiceNow"
+    needs: performance-test
+    if: always() && needs.performance-test.result != 'cancelled'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Upload Performance Test Results
+        run: |
+          chmod +x scripts/upload-performance-test-results.sh
+          ./scripts/upload-performance-test-results.sh
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          VIRTUAL_USERS: ${{ inputs.users }}
+          TOTAL_REQUESTS: ${{ needs.performance-test.outputs.total_requests }}
+          FAILURES: ${{ needs.performance-test.outputs.failures }}
+          AVG_RESPONSE_TIME: ${{ needs.performance-test.outputs.avg_response_time }}
+          REQUESTS_PER_SEC: ${{ needs.performance-test.outputs.requests_per_sec }}
+          SUCCESS_RATE: ${{ needs.performance-test.outputs.success_rate }}
+          P50: ${{ needs.performance-test.outputs.p50 }}
+          P95: ${{ needs.performance-test.outputs.p95 }}
+          TEST_STATUS: ${{ needs.performance-test.outputs.test_status }}
+
+      - name: ServiceNow Upload Summary
+        if: always()
+        run: |
+          echo "## 📤 ServiceNow Upload" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Performance test results uploaded to ServiceNow" >> $GITHUB_STEP_SUMMARY
+          echo "- Pipeline: [\`${{ github.run_id }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: **${{ inputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Virtual Users: **${{ inputs.users }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: **${{ needs.performance-test.outputs.test_status }}**" >> $GITHUB_STEP_SUMMARY
