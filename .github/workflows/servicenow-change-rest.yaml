@@ -1540,30 +1540,50 @@ jobs:
             EXECUTION_STATUS="cancelled"
           fi
 
+          # Build JSON payload using jq to properly escape all special characters
+          PAYLOAD=$(jq -n \
+            --arg change_request "$CHANGE_SYSID" \
+            --arg pipeline_name "🚀 Master CI/CD Pipeline" \
+            --arg pipeline_id "${{ github.run_id }}" \
+            --arg pipeline_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg execution_number "${{ github.run_number }}" \
+            --arg execution_status "$EXECUTION_STATUS" \
+            --arg start_time "$START_TIME" \
+            --arg environment "${{ inputs.environment }}" \
+            --arg triggered_by "${{ github.actor }}" \
+            --arg trigger_event "${{ github.event_name }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg commit_sha "${{ github.sha }}" \
+            --arg commit_message "${{ github.event.head_commit.message }}" \
+            --arg repository "${{ github.repository }}" \
+            --arg tool "$SN_ORCHESTRATION_TOOL_ID" \
+            --arg workflow_file "${{ github.workflow }}" \
+            '{
+              change_request: $change_request,
+              pipeline_name: $pipeline_name,
+              pipeline_id: $pipeline_id,
+              pipeline_url: $pipeline_url,
+              execution_number: $execution_number,
+              execution_status: $execution_status,
+              start_time: $start_time,
+              environment: $environment,
+              triggered_by: $triggered_by,
+              trigger_event: $trigger_event,
+              branch: $branch,
+              commit_sha: $commit_sha,
+              commit_message: $commit_message,
+              repository: $repository,
+              tool: $tool,
+              workflow_file: $workflow_file
+            }')
+
           # Register pipeline execution in sn_devops_pipeline_execution
           EXEC_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
             -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -X POST \
-            -d '{
-              "change_request": "'"$CHANGE_SYSID"'",
-              "pipeline_name": "🚀 Master CI/CD Pipeline",
-              "pipeline_id": "${{ github.run_id }}",
-              "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "execution_number": "${{ github.run_number }}",
-              "execution_status": "'"$EXECUTION_STATUS"'",
-              "start_time": "'"$START_TIME"'",
-              "environment": "${{ inputs.environment }}",
-              "triggered_by": "${{ github.actor }}",
-              "trigger_event": "${{ github.event_name }}",
-              "branch": "${{ github.ref_name }}",
-              "commit_sha": "${{ github.sha }}",
-              "commit_message": "${{ github.event.head_commit.message }}",
-              "repository": "${{ github.repository }}",
-              "tool": "'"$SN_ORCHESTRATION_TOOL_ID"'",
-              "workflow_file": "${{ github.workflow }}"
-            }' \
+            -d "$PAYLOAD" \
             "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_pipeline_execution")
 
           HTTP_CODE=$(echo "$EXEC_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
