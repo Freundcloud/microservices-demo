@@ -305,64 +305,19 @@ jobs:
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
-          echo "📱 Getting or creating Application CI in CMDB..."
+          echo "📱 Using ServiceNow DevOps Application..."
 
-          # Determine application name based on environment (uppercase)
-          ENV_UPPER=$(echo "$ENVIRONMENT" | tr '[:lower:]' '[:upper:]')
-          APP_NAME="Online Boutique ($ENV_UPPER)"
+          # Use the existing "Online Boutique" application from sn_devops_app table
+          # Application name: "Online Boutique"
+          # Sys ID: e489efd1c3383e14e1bbf0cb050131d5
+          # URL: https://calitiiltddemo3.service-now.com/now/devops-change/record/sn_devops_app/e489efd1c3383e14e1bbf0cb050131d5
+          # Environment is tracked via u_environment field in change request
+          APP_NAME="Online Boutique"
+          APP_SYS_ID="e489efd1c3383e14e1bbf0cb050131d5"
 
-          # URL-encode the application name for query (fixes #57)
-          ENCODED_APP_NAME=$(printf '%s' "$APP_NAME" | jq -sRr @uri)
-          APP_QUERY="name=$ENCODED_APP_NAME"
-
-          echo "  ↳ Checking if application exists: $APP_NAME"
-          echo "  ↳ Query: $APP_QUERY"
-
-          # Check if application already exists in CMDB
-          APP_RESPONSE=$(curl -s \
-            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-            -H "Accept: application/json" \
-            "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl?sysparm_query=$APP_QUERY&sysparm_fields=sys_id,name,u_environment")
-
-          APP_COUNT=$(echo "$APP_RESPONSE" | jq -r '.result | length')
-
-          if [ "$APP_COUNT" -gt 0 ]; then
-            # Application exists - get sys_id
-            APP_SYS_ID=$(echo "$APP_RESPONSE" | jq -r '.result[0].sys_id')
-            echo "    ✅ Application already exists"
-            echo "       sys_id: $APP_SYS_ID"
-            echo "       name: $APP_NAME"
-          else
-            # Create new application in CMDB
-            echo "    ↳ Creating new application in CMDB..."
-
-            CREATE_RESPONSE=$(curl -s \
-              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -X POST \
-              -d '{
-                "name": "'"$APP_NAME"'",
-                "short_description": "Microservices demo application ('"$ENVIRONMENT"' environment)",
-                "u_environment": "'"$ENVIRONMENT"'",
-                "u_github_repo": "${{ github.repository }}",
-                "operational_status": "1",
-                "install_status": "1"
-              }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/cmdb_ci_appl")
-
-            APP_SYS_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.sys_id // empty')
-
-            if [ -n "$APP_SYS_ID" ] && [ "$APP_SYS_ID" != "null" ]; then
-              echo "    ✅ Application created successfully"
-              echo "       sys_id: $APP_SYS_ID"
-              echo "       name: $APP_NAME"
-            else
-              echo "    ❌ Failed to create application"
-              echo "Response: $CREATE_RESPONSE" | jq '.'
-              exit 1
-            fi
-          fi
+          echo "  ✅ Using application: $APP_NAME"
+          echo "     sys_id: $APP_SYS_ID"
+          echo "     Environment: $ENVIRONMENT (tracked in u_environment field)"
 
           # Validate we have a valid sys_id
           if [ -z "$APP_SYS_ID" ] || [ "$APP_SYS_ID" = "null" ]; then
