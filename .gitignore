@@ -58,7 +58,9 @@ terraform-aws/*.bak
 
 # Claude Code settings (may contain credentials)
 .claude/settings.local.json
-.claude/
+.claude/*
+# Allow shared commands to be committed
+!.claude/commands/
 
 # ServiceNow credentials
 .github_sn_credentials
