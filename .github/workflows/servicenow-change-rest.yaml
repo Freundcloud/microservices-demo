@@ -683,7 +683,8 @@ jobs:
               u_signatures_url: $u_signatures_url,
               u_sarif_results_url: $u_sarif_results_url,
               u_infrastructure_report_url: $u_infrastructure_report_url,
-              u_github_artifacts_url: $u_github_artifacts_url
+              u_github_artifacts_url: $u_github_artifacts_url,
+              application: $cmdb_ci
             }'
           )
 
