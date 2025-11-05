@@ -307,8 +307,9 @@ jobs:
         run: |
           echo "📱 Getting or creating Application CI in CMDB..."
 
-          # Determine application name based on environment
-          APP_NAME="Online Boutique ($ENVIRONMENT)"
+          # Determine application name based on environment (uppercase)
+          ENV_UPPER=$(echo "$ENVIRONMENT" | tr '[:lower:]' '[:upper:]')
+          APP_NAME="Online Boutique ($ENV_UPPER)"
 
           # URL-encode the application name for query (fixes #57)
           ENCODED_APP_NAME=$(printf '%s' "$APP_NAME" | jq -sRr @uri)
@@ -1458,7 +1459,8 @@ jobs:
               }' \
               "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package")
 
-            HTTP_CODE=$(echo "$CREATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+            HTTP_CODE=$(echo "$CREATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+            [ -z "$HTTP_CODE" ] && HTTP_CODE="000"
             BODY=$(echo "$CREATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
 
             if [ "$HTTP_CODE" = "201" ]; then
@@ -1488,7 +1490,8 @@ jobs:
               }' \
               "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
 
-            HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+            HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+            [ -z "$HTTP_CODE" ] && HTTP_CODE="000"
             BODY=$(echo "$UPDATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
 
             if [ "$HTTP_CODE" = "200" ]; then
@@ -1563,7 +1566,8 @@ jobs:
             }' \
             "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_pipeline_execution")
 
-          HTTP_CODE=$(echo "$EXEC_RESPONSE" | grep -oP 'HTTP_CODE:\K\d+')
+          HTTP_CODE=$(echo "$EXEC_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+          [ -z "$HTTP_CODE" ] && HTTP_CODE="000"
           BODY=$(echo "$EXEC_RESPONSE" | sed 's/HTTP_CODE:.*//')
 
           if [ "$HTTP_CODE" = "201" ]; then
