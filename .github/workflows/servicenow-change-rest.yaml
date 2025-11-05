@@ -440,14 +440,9 @@ jobs:
             SCANNERS="CodeQL, Trivy, Semgrep, OWASP Dependency Check, Gitleaks, Checkov, Kubesec"
           fi
 
-          # Determine service name based on environment
-          if [ "$ENVIRONMENT" = "dev" ]; then
-            SERVICE_NAME="Online Boutique (DEV)"
-          elif [ "$ENVIRONMENT" = "qa" ]; then
-            SERVICE_NAME="Online Boutique (QA)"
-          else
-            SERVICE_NAME="Online Boutique (PROD)"
-          fi
+          # Use single application name for all environments
+          # Environment is tracked via u_environment field in change request
+          SERVICE_NAME="Online Boutique"
 
           # Determine security scan status
           SECURITY_STATUS="${{ inputs.security_scan_status }}"
