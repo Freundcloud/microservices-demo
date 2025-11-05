@@ -67,6 +67,9 @@ jobs:
       failures: ${{ steps.parse-results.outputs.failures }}
       avg_response_time: ${{ steps.parse-results.outputs.avg_response_time }}
       requests_per_sec: ${{ steps.parse-results.outputs.requests_per_sec }}
+      success_rate: ${{ steps.parse-results.outputs.success_rate }}
+      p50: ${{ steps.parse-results.outputs.p50 }}
+      p95: ${{ steps.parse-results.outputs.p95 }}
 
     steps:
       - name: Checkout Code
