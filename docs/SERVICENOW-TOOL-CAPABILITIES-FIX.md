@@ -3,7 +3,9 @@
 **Date**: 2025-01-28 (Updated with breakthrough findings)
 **Severity**: Critical
 **Impact**: All ServiceNow DevOps GitHub Actions failing
-**Status**: ✅ BREAKTHROUGH - DevOps API works with basic auth, GitHub Action needs tool capabilities enabled
+**Status**: ✅ **RESOLVED** - Root cause identified and fixed (pipeline-to-application linkage issue)
+
+**UPDATE 2025-11-06**: The actual problem was NOT tool capabilities (those were already enabled). The real issue was that the `build-images.yaml` pipeline record wasn't linked to the "Online Boutique" application, causing packages to be registered with `application: null`. See [SERVICENOW-PIPELINE-APP-LINKAGE-FIX.md](SERVICENOW-PIPELINE-APP-LINKAGE-FIX.md) for the complete solution.
 
 ---
 

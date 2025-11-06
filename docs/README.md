@@ -247,6 +247,12 @@ Official ServiceNow DevOps Change action documentation:
   - Troubleshooting and support
 
 - **[Change Velocity Dashboard Setup](SERVICENOW-CHANGE-VELOCITY-DASHBOARD.md)** - Populate DORA metrics dashboard 📊
+
+- **[Pipeline-to-Application Linkage Fix](SERVICENOW-PIPELINE-APP-LINKAGE-FIX.md)** - Resolve packages not appearing in DevOps Insights ✅ **CRITICAL FIX**
+  - Root cause: Pipeline records not linked to application
+  - Symptoms: Packages registered successfully but `application: null`
+  - Solution: PATCH pipeline record to link to application
+  - Complete troubleshooting and prevention guide
   - Why the dashboard is empty
   - Plugin installation and configuration
   - Change control setup for Change Velocity
