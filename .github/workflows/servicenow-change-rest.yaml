@@ -1417,22 +1417,10 @@ jobs:
             echo "  ↳ Found existing package: $PACKAGE_NAME"
             echo "  ↳ Updating application field..."
 
-            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -X PATCH \
-              -d '{
-                "application": "${{ steps.get-app-ci.outputs.app_sys_id }}"
-              }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package/$PACKAGE_SYS_ID")
-
-            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
-            if [ "$UPDATE_HTTP_CODE" = "200" ]; then
-              echo "    ✅ Package updated with application field"
-            else
-              echo "    ⚠️ Failed to update package application field (HTTP $UPDATE_HTTP_CODE)"
-            fi
+            # NOTE: sn_devops_package table does NOT have an 'application' field in schema
+            # Package → Application linkage happens via pipeline_execution → pipeline → app
+            # No need to update package record - just export sys_id for DevOps Change Reference
+            echo "    ℹ️  Package found (application linkage via pipeline, not package field)"
 
             # Export package sys_id for linking to DevOps Change Reference
             echo "package_sys_id=$PACKAGE_SYS_ID" >> $GITHUB_OUTPUT
@@ -1440,6 +1428,9 @@ jobs:
             # Create new package
             echo "  ↳ Creating new package: $PACKAGE_NAME..."
 
+            # NOTE: sn_devops_package does NOT have 'application' field in schema
+            # Application linkage happens via: pipeline_execution → pipeline → app
+            # Removed 'application' field - ServiceNow ignores it anyway
             CREATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
               -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
               -H "Content-Type: application/json" \
@@ -1449,7 +1440,6 @@ jobs:
                 "name": "'"$PACKAGE_NAME"'",
                 "version": "'"$VERSION"'",
                 "environment": "${{ inputs.environment }}",
-                "application": "${{ steps.get-app-ci.outputs.app_sys_id }}",
                 "repository": "${{ github.repository }}",
                 "branch": "${{ github.ref_name }}",
                 "commit_sha": "${{ github.sha }}",
@@ -1578,9 +1568,10 @@ jobs:
 
           # Build JSON payload using jq to properly escape all special characters
           # Note: COMMIT_MESSAGE is JSON-escaped via toJSON(), so we pass it through jq's --argjson
+          # NOTE: sn_devops_pipeline_execution does NOT have 'application' field in schema
+          # Application linkage: pipeline_execution → pipeline → app (automatic via pipeline_url/name)
           PAYLOAD=$(jq -n \
             --arg change_request "$CHANGE_SYSID" \
-            --arg application "${{ steps.get-app-ci.outputs.app_sys_id }}" \
             --arg pipeline_name "🚀 Master CI/CD Pipeline" \
             --arg pipeline_id "${{ github.run_id }}" \
             --arg pipeline_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
@@ -1598,7 +1589,6 @@ jobs:
             --arg workflow_file "${{ github.workflow }}" \
             '{
               change_request: $change_request,
-              application: $application,
               pipeline_name: $pipeline_name,
               pipeline_id: $pipeline_id,
               pipeline_url: $pipeline_url,
