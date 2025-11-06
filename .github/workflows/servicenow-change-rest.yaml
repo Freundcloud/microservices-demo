@@ -1406,9 +1406,27 @@ jobs:
           PACKAGE_COUNT=$(echo "$PACKAGE_RESPONSE" | jq -r '.result | length')
 
           if [ "$PACKAGE_COUNT" -gt 0 ]; then
-            # Package exists - get sys_id
+            # Package exists - get sys_id and update application field
             PACKAGE_SYS_ID=$(echo "$PACKAGE_RESPONSE" | jq -r '.result[0].sys_id')
             echo "  ↳ Found existing package: $PACKAGE_NAME"
+            echo "  ↳ Updating application field..."
+
+            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X PATCH \
+              -d '{
+                "application": "${{ steps.get-app-ci.outputs.app_sys_id }}"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package/$PACKAGE_SYS_ID")
+
+            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+            if [ "$UPDATE_HTTP_CODE" = "200" ]; then
+              echo "    ✅ Package updated with application field"
+            else
+              echo "    ⚠️ Failed to update package application field (HTTP $UPDATE_HTTP_CODE)"
+            fi
           else
             # Create new package
             echo "  ↳ Creating new package: $PACKAGE_NAME..."
