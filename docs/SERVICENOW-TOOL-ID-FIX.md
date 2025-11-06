@@ -51,7 +51,7 @@ The workflows were using `${{ secrets.SN_ORCHESTRATION_TOOL_ID }}` which either:
 
 ### Files Changed
 
-1. **`.github/actions/servicenow-auth/action.yaml`**
+1. **`.github/actions/servicenow-auth/action.yaml`** (Commit 49e77676)
    - Changed tool_id output from `$SN_ORCHESTRATION_TOOL_ID` to hardcoded `f62c4e49c3fcf614e1bbf0cb050131ef`
    - This affects ALL workflows using this composite action:
      - `build-images.yaml`
@@ -59,13 +59,25 @@ The workflows were using `${{ secrets.SN_ORCHESTRATION_TOOL_ID }}` which either:
      - `run-unit-tests.yaml`
      - Any other workflows using `servicenow-auth`
 
-2. **`.github/workflows/servicenow-change-rest.yaml`**
+2. **`.github/workflows/servicenow-change-rest.yaml`** (Commits 49e77676, 912aef50)
    - Updated `Register Package with ServiceNow DevOps` step
    - Changed `tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}` to `tool-id: 'f62c4e49c3fcf614e1bbf0cb050131ef'`
+   - Fixed 7 additional tool-id references in test summary/performance uploads:
+     - Line 751: `sn_devops_change_reference` (pipeline to change request link)
+     - Line 939: `sn_devops_performance_test_summary` (smoke tests)
+     - Line 1029: `sn_devops_test_summary` (unit tests)
+     - Line 1092: `sn_devops_test_summary` (security scans)
+     - Line 1152: `sn_devops_test_summary` (SonarCloud quality gate)
+     - Line 1210: `sn_devops_test_summary` (smoke test verification)
+     - Line 1595: `sn_devops_pipeline_execution` (pipeline execution)
 
-3. **`.github/workflows/servicenow-change-devops-api.yaml`**
+3. **`.github/workflows/servicenow-change-devops-api.yaml`** (Commit 49e77676)
    - Updated DevOps API curl header: `sn_devops_orchestration_tool_id: f62c4e49c3fcf614e1bbf0cb050131ef`
    - Updated URL query parameter: `toolId=f62c4e49c3fcf614e1bbf0cb050131ef`
+
+4. **`.github/workflows/upload-test-results-servicenow.yaml`** (Commit 912aef50)
+   - Fixed tool ID resolution in resolve step (line 54)
+   - Hardcoded `TOOL="f62c4e49c3fcf614e1bbf0cb050131ef"` instead of using secret
 
 ### Code Changes
 
@@ -239,9 +251,12 @@ Since we only have ONE ServiceNow instance and ONE GithHubARC tool, hardcoding i
 3. **Composite actions are powerful**: Updating the `servicenow-auth` composite action fixed multiple workflows at once
 4. **Test summaries depend on tool linkage**: "Tools" data only appears when test summaries are linked to the correct tool
 5. **Always verify end-to-end**: Even if package registration succeeds (HTTP 201), verify the linkage is correct
+6. **Multiple fix iterations may be needed**: Initial fix (composite action) addressed packages, but test summaries required additional fixes in workflow files
 
 ---
 
-**Status**: ✅ **RESOLVED**
-**Next Workflow Run**: 19146477980 (commit 49e77676)
-**Verification**: Pending workflow completion
+**Status**: ✅ **FULLY RESOLVED**
+**Commits**:
+- 49e77676 - Initial fix (composite action, package registration)
+- 912aef50 - Complete fix (test summary uploads, performance tests, pipeline execution)
+**Verification**: All tool-id references now use hardcoded GithHubARC tool (f62c4e49c3fcf614e1bbf0cb050131ef)
