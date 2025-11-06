@@ -725,6 +725,7 @@ jobs:
       # ========================================
 
       - name: Link Change Request to DevOps Pipeline
+        id: link-devops
         if: steps.create-cr.outputs.change_sys_id != ''
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
@@ -743,6 +744,7 @@ jobs:
             -X POST \
             -d '{
               "change_request": "'"$CHANGE_SYSID"'",
+              "app": "${{ steps.get-app-ci.outputs.app_sys_id }}",
               "pipeline_name": "Deploy to ${{ inputs.environment }}",
               "pipeline_id": "${{ github.run_id }}",
               "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
@@ -759,6 +761,9 @@ jobs:
             echo "✅ Pipeline linked to DevOps workspace (ref: $REF_ID)"
             echo "   CR now visible in: DevOps → Change Velocity"
             echo "   Tool: $TOOL_VALUE"
+
+            # Export REF_ID for later steps to link packages and pipeline executions
+            echo "devops_ref_id=$REF_ID" >> $GITHUB_OUTPUT
 
             if [ "$TOOL_VALUE" = "null" ]; then
               echo "   ⚠️  WARNING: Tool field is 'null' - check SN_ORCHESTRATION_TOOL_ID secret"
@@ -1375,6 +1380,7 @@ jobs:
       # ========================================
 
       - name: Register Package
+        id: register-package
         if: steps.create-cr.outputs.change_sys_id != ''
         continue-on-error: true
         env:
@@ -1427,6 +1433,9 @@ jobs:
             else
               echo "    ⚠️ Failed to update package application field (HTTP $UPDATE_HTTP_CODE)"
             fi
+
+            # Export package sys_id for linking to DevOps Change Reference
+            echo "package_sys_id=$PACKAGE_SYS_ID" >> $GITHUB_OUTPUT
           else
             # Create new package
             echo "  ↳ Creating new package: $PACKAGE_NAME..."
@@ -1459,6 +1468,9 @@ jobs:
               echo "    ✅ Package created: $PACKAGE_NAME"
               echo "       Package sys_id: $PACKAGE_SYS_ID"
               echo "       Response: $(echo "$BODY" | jq -c '{sys_id: .result.sys_id, name: .result.name, version: .result.version}')"
+
+              # Export package sys_id for linking to DevOps Change Reference
+              echo "package_sys_id=$PACKAGE_SYS_ID" >> $GITHUB_OUTPUT
             else
               echo "    ❌ Failed to create package (HTTP $HTTP_CODE)"
               echo "    Response body:"
@@ -1498,11 +1510,43 @@ jobs:
             fi
           fi
 
+      - name: Link Package to DevOps Change Reference
+        if: steps.link-devops.outputs.devops_ref_id != '' && steps.register-package.outputs.package_sys_id != ''
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          DEVOPS_REF_ID: ${{ steps.link-devops.outputs.devops_ref_id }}
+          PACKAGE_SYS_ID: ${{ steps.register-package.outputs.package_sys_id }}
+        run: |
+          echo "🔗 Linking package to DevOps Change Reference..."
+
+          UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X PATCH \
+            -d '{
+              "package_ref": "'"$PACKAGE_SYS_ID"'"
+            }' \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_change_reference/$DEVOPS_REF_ID")
+
+          HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Package linked to DevOps Change Reference"
+            echo "   Reference ID: $DEVOPS_REF_ID"
+            echo "   Package ID: $PACKAGE_SYS_ID"
+          else
+            echo "⚠️ Failed to link package to DevOps Change Reference (HTTP $HTTP_CODE)"
+            echo "$UPDATE_RESPONSE" | sed 's/HTTP_CODE:.*//' | jq '.' || echo "$UPDATE_RESPONSE"
+          fi
+
       # ========================================
       # PHASE 7: Pipeline Execution Tracking
       # ========================================
 
       - name: Register Pipeline Execution
+        id: register-pipeline
         if: steps.create-cr.outputs.change_sys_id != ''
         env:
           CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
@@ -1594,12 +1638,46 @@ jobs:
             echo "     Change Request: $CHANGE_NUMBER"
             echo "     Response: $(echo "$BODY" | jq -c '{sys_id: .result.sys_id, status: .result.execution_status, pipeline_id: .result.pipeline_id}')"
             echo "✅ Pipeline: 🚀 Master CI/CD Pipeline (#${{ github.run_number }})"
+
+            # Export pipeline execution sys_id for linking to DevOps Change Reference
+            echo "pipeline_execution_sys_id=$EXECUTION_SYS_ID" >> $GITHUB_OUTPUT
           else
             echo "  ❌ Failed to register pipeline execution (HTTP $HTTP_CODE)"
             echo "  Response body:"
             echo "$BODY" | jq '.'
             echo "  This failure means pipeline executions are NOT being tracked in ServiceNow"
             echo "  Without pipeline executions, DevOps Insights cannot aggregate data"
+          fi
+
+      - name: Link Pipeline Execution to DevOps Change Reference
+        if: steps.link-devops.outputs.devops_ref_id != '' && steps.register-pipeline.outputs.pipeline_execution_sys_id != ''
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          DEVOPS_REF_ID: ${{ steps.link-devops.outputs.devops_ref_id }}
+          PIPELINE_EXEC_ID: ${{ steps.register-pipeline.outputs.pipeline_execution_sys_id }}
+        run: |
+          echo "🔗 Linking pipeline execution to DevOps Change Reference..."
+
+          UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X PATCH \
+            -d '{
+              "pipeline_executions": "'"$PIPELINE_EXEC_ID"'"
+            }' \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_change_reference/$DEVOPS_REF_ID")
+
+          HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Pipeline execution linked to DevOps Change Reference"
+            echo "   Reference ID: $DEVOPS_REF_ID"
+            echo "   Pipeline Execution ID: $PIPELINE_EXEC_ID"
+          else
+            echo "⚠️ Failed to link pipeline execution to DevOps Change Reference (HTTP $HTTP_CODE)"
+            echo "$UPDATE_RESPONSE" | sed 's/HTTP_CODE:.*//' | jq '.' || echo "$UPDATE_RESPONSE"
           fi
 
       - name: Wait for Change Approval (QA/PROD)
