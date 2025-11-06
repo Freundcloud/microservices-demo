@@ -49,7 +49,9 @@ jobs:
           if [ -z "$USER" ]; then USER="${{ secrets.SERVICENOW_USERNAME }}"; fi
           PASS="${{ secrets.SN_DEVOPS_PASSWORD }}"
           if [ -z "$PASS" ]; then PASS="${{ secrets.SERVICENOW_PASSWORD }}"; fi
-          TOOL="${{ secrets.SN_ORCHESTRATION_TOOL_ID }}"
+          # Use hardcoded GithHubARC tool ID (f62c4e49c3fcf614e1bbf0cb050131ef)
+          # This ensures all workflows use the same existing tool instead of creating new ones
+          TOOL="f62c4e49c3fcf614e1bbf0cb050131ef"
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "user=$USER" >> $GITHUB_OUTPUT
           echo "pass=$PASS" >> $GITHUB_OUTPUT
