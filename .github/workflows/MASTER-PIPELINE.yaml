@@ -302,6 +302,8 @@ jobs:
       # Always pass 'all' when force_build_all is true or when services_changed is empty
       services: ${{ (inputs.force_build_all || needs.detect-service-changes.outputs.services_changed == '' || needs.detect-service-changes.outputs.services_changed == '[]') && 'all' || needs.detect-service-changes.outputs.services_changed }}
       push_images: ${{ github.event_name != 'pull_request' }}
+    # Outputs from reusable workflow are automatically available via jobs.<job_id>.outputs.<output_name>
+    # The register-packages job can access them via needs.build-and-push.outputs.services_built
 
   # ============================================================================
   # STAGE 3.5: ServiceNow Integration (Package Registration)
