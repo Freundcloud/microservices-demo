@@ -1,0 +1,627 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "DevOps",
+    "description": "",
+    "version": "latest"
+  },
+  "externalDocs": {
+    "url": ""
+  },
+  "servers": [
+    {
+      "url": "https://calitiiltddemo3.service-now.com/"
+    }
+  ],
+  "paths": {
+    "/api/sn_devops/devops/artifact/registration": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "description": "Project Id",
+            "required": false,
+            "schema": {},
+            "example": "ba84e5640f12330d08d9a0799767efd"
+          },
+          {
+            "name": "orchestrationToolId",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "projectNativeId",
+            "in": "query",
+            "description": "Project NativeId",
+            "required": false,
+            "schema": {},
+            "example": "074f1002-ede3-4a44-9d81-9e80ce3292d9"
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/callback": {
+      "get": {
+        "description": "",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/changeControl": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "testConnection",
+            "in": "query",
+            "description": "Test connection",
+            "required": false,
+            "schema": {},
+            "example": ""
+          },
+          {
+            "name": "orchestrationTaskName",
+            "in": "query",
+            "description": "Orchestration Task Name",
+            "required": true,
+            "schema": {},
+            "example": "Build Product"
+          },
+          {
+            "name": "changeControIId",
+            "in": "query",
+            "description": "Change Control Id",
+            "required": false,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Tool Type",
+            "required": false,
+            "schema": {},
+            "example": "plan"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/changeControl/{changeControlId}": {
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "changeControlId",
+            "in": "path",
+            "required": true,
+            "schema": {}
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/changeInfo": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "pipelineName",
+            "in": "query",
+            "description": "Name of  orchestration pipeline in external tool",
+            "required": true,
+            "schema": {},
+            "example": "automation-ng"
+          },
+          {
+            "name": "attemptNumber",
+            "in": "query",
+            "description": "Specifies about the attempt if same task execution is run multiple times",
+            "required": false,
+            "schema": {},
+            "example": "2"
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "projectName",
+            "in": "query",
+            "description": "Orchestration tool project name ( e.g. Jenkins freestyle/maven project name)",
+            "required": false,
+            "schema": {},
+            "example": ""
+          },
+          {
+            "name": "buildNumber",
+            "in": "query",
+            "description": "Build number for a  orchestration pipeline in external tool",
+            "required": true,
+            "schema": {},
+            "example": "108"
+          },
+          {
+            "name": "stageName",
+            "in": "query",
+            "description": "Name of  orchestration stage/job in external tool",
+            "required": true,
+            "schema": {},
+            "example": "build"
+          },
+          {
+            "name": "branchName",
+            "in": "query",
+            "description": "Branch Name for a MultiBranch pipeline",
+            "required": false,
+            "schema": {},
+            "example": "scratch/app"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "changeRequestNumber",
+            "in": "query",
+            "description": "change request number",
+            "required": true,
+            "schema": {},
+            "example": "CHG000001"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/changeStatus": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "branchName",
+            "in": "query",
+            "description": "Branch Name for a MultiBranch pipeline",
+            "required": false,
+            "schema": {},
+            "example": "scratch/app"
+          },
+          {
+            "name": "stageName",
+            "in": "query",
+            "description": "Name of  orchestration stage/job in external tool",
+            "required": true,
+            "schema": {},
+            "example": "build"
+          },
+          {
+            "name": "buildNumber",
+            "in": "query",
+            "description": "Build number for a  orchestration pipeline in external tool",
+            "required": true,
+            "schema": {},
+            "example": "108"
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "attemptNumber",
+            "in": "query",
+            "description": "Specifies about the attempt if same task execution is run multiple times",
+            "required": false,
+            "schema": {},
+            "example": "2"
+          },
+          {
+            "name": "pipelineName",
+            "in": "query",
+            "description": "Name of  orchestration pipeline in external tool",
+            "required": true,
+            "schema": {},
+            "example": "automation-ng"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/pipelineInfo": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "description": "URL",
+            "required": true,
+            "schema": {},
+            "example": "https://www.servicenow.com/"
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Tool Name",
+            "required": false,
+            "schema": {},
+            "example": "My Tool"
+          },
+          {
+            "name": "branchName",
+            "in": "query",
+            "description": "Branch Name for a MultiBranch pipeline",
+            "required": false,
+            "schema": {},
+            "example": "scratch/app"
+          },
+          {
+            "name": "pronoun",
+            "in": "query",
+            "description": "Indicates the type of a pipeline",
+            "required": true,
+            "schema": {},
+            "example": "Pipeline"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/orchestration/stepMapping": {
+      "post": {
+        "description": "",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/package/registration": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "orchestrationToolId",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/tool/apps": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/tool/event/{sn_tool_id}": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "sn_tool_id",
+            "in": "path",
+            "required": true,
+            "schema": {}
+          },
+          {
+            "name": "ni.nolog.token",
+            "in": "query",
+            "description": "Secure token expected from third party tools as part of the URL.",
+            "required": false,
+            "schema": {},
+            "example": "AyMR7Xqxngl4uV5BeLdQYwLGF4TC4w9X91wXBob6MF96C0kByDeblHj"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/sn_devops/devops/tool/{capability}": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "capability",
+            "in": "path",
+            "required": true,
+            "schema": {}
+          },
+          {
+            "name": "toolId",
+            "in": "query",
+            "description": "Tool Id",
+            "required": true,
+            "schema": {},
+            "example": "1234edfs34563"
+          },
+          {
+            "name": "testType",
+            "in": "query",
+            "description": "Test type of a test results",
+            "required": false,
+            "schema": {},
+            "example": "unit"
+          },
+          {
+            "name": "ni.nolog.token",
+            "in": "query",
+            "description": "Secure token expected from third party tools as part of the URL.",
+            "required": false,
+            "schema": {},
+            "example": "AyMR7Xqxngl4uV5BeLdQYwLGF4TC4w9X91wXBob6MF96C0kByDeblHj"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {},
+            "application/xml": {},
+            "text/xml": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {},
+              "application/xml": {},
+              "text/xml": {}
+            }
+          }
+        }
+      }
+    }
+  }
+}
