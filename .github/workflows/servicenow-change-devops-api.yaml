@@ -200,14 +200,15 @@ jobs:
           echo "$PAYLOAD" | jq '.'
 
           # Make the API call to DevOps Change Control endpoint
+          # Use hardcoded GithHubARC tool ID (f62c4e49c3fcf614e1bbf0cb050131ef)
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
             -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
-            -H "sn_devops_orchestration_tool_id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}" \
+            -H "sn_devops_orchestration_tool_id: f62c4e49c3fcf614e1bbf0cb050131ef" \
             -X POST \
             -d "$PAYLOAD" \
-            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/sn_devops/v1/devops/orchestration/changeControl?toolId=${{ secrets.SN_ORCHESTRATION_TOOL_ID }}")
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/sn_devops/v1/devops/orchestration/changeControl?toolId=f62c4e49c3fcf614e1bbf0cb050131ef")
 
           # Extract HTTP code and body
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -309,7 +310,7 @@ jobs:
               echo ""
               echo "**Possible causes:**"
               echo "1. ServiceNow DevOps plugin not installed"
-              echo "2. SN_ORCHESTRATION_TOOL_ID secret not configured or invalid"
+              echo "2. Tool ID (using hardcoded GithHubARC: f62c4e49c3fcf614e1bbf0cb050131ef)"
               echo "3. User permissions insufficient for DevOps API"
               echo "4. DevOps Change Velocity plugin not activated"
               echo ""

@@ -32,16 +32,18 @@ runs:
         echo "username=$SERVICENOW_USERNAME" >> $GITHUB_OUTPUT
         echo "password=$SERVICENOW_PASSWORD" >> $GITHUB_OUTPUT
         echo "instance_url=$SERVICENOW_INSTANCE_URL" >> $GITHUB_OUTPUT
-        echo "tool_id=$SN_ORCHESTRATION_TOOL_ID" >> $GITHUB_OUTPUT
+
+        # Use hardcoded GithHubARC tool ID (f62c4e49c3fcf614e1bbf0cb050131ef)
+        # This ensures all workflows use the same existing tool instead of creating new ones
+        echo "tool_id=f62c4e49c3fcf614e1bbf0cb050131ef" >> $GITHUB_OUTPUT
 
         # Generate Base64-encoded Basic Auth for curl commands
         BASIC_AUTH=$(echo -n "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" | base64)
         echo "basic_auth=$BASIC_AUTH" >> $GITHUB_OUTPUT
 
-        echo "✅ ServiceNow authentication prepared"
+        echo "✅ ServiceNow authentication prepared (using GithHubARC tool)"
       shell: bash
       env:
         SERVICENOW_USERNAME: ${{ env.SERVICENOW_USERNAME }}
         SERVICENOW_PASSWORD: ${{ env.SERVICENOW_PASSWORD }}
         SERVICENOW_INSTANCE_URL: ${{ env.SERVICENOW_INSTANCE_URL }}
-        SN_ORCHESTRATION_TOOL_ID: ${{ env.SN_ORCHESTRATION_TOOL_ID }}
