@@ -1397,14 +1397,9 @@ jobs:
 
           PACKAGE_NAME="microservices-demo-${{ inputs.environment }}-$VERSION"
 
-          # Format artifacts for ServiceNow DevOps action
+          # Format artifacts for ServiceNow DevOps action (JSON must be single line)
           # This creates the package with proper linkages
-          ARTIFACTS='[{
-            "name": "microservices-demo",
-            "version": "'"$VERSION"'",
-            "semanticVersion": "'"$VERSION"'",
-            "repositoryName": "${{ github.repository }}"
-          }]'
+          ARTIFACTS='[{"name": "microservices-demo", "version": "'"$VERSION"'", "semanticVersion": "'"$VERSION"'", "repositoryName": "${{ github.repository }}"}]'
 
           echo "artifacts=$ARTIFACTS" >> $GITHUB_OUTPUT
           echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
