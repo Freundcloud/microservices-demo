@@ -1376,24 +1376,19 @@ jobs:
           fi
 
       # ========================================
-      # PHASE 6: Package Registration
+      # PHASE 6: Package Registration (Using ServiceNow DevOps GitHub Action)
       # ========================================
+      # This replaces the previous REST API approach which didn't create proper linkages.
+      # The ServiceNow DevOps action automatically handles:
+      # - Creating pipeline_execution records
+      # - Linking package → pipeline_execution → pipeline → application
+      # - All packages will now appear in DevOps Insights dashboard
 
-      - name: Register Package
-        id: register-package
+      - name: Prepare Package Artifacts
+        id: prepare-artifacts
         if: steps.create-cr.outputs.change_sys_id != ''
-        continue-on-error: true
-        env:
-          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
-          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
-          # ServiceNow API credentials
-          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
-          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
-          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
         run: |
-          echo "📦 Registering package for CR $CHANGE_NUMBER..."
-
-          # Package naming: microservices-demo-{environment}-{version}
+          # Package version: use previous_version if provided, else short SHA
           VERSION="${{ inputs.previous_version }}"
           if [ -z "$VERSION" ]; then
             VERSION="${{ github.sha }}"
@@ -1402,112 +1397,124 @@ jobs:
 
           PACKAGE_NAME="microservices-demo-${{ inputs.environment }}-$VERSION"
 
-          # Check if package already exists in ServiceNow
+          # Format artifacts for ServiceNow DevOps action
+          # This creates the package with proper linkages
+          ARTIFACTS='[{
+            "name": "microservices-demo",
+            "version": "'"$VERSION"'",
+            "semanticVersion": "'"$VERSION"'",
+            "repositoryName": "${{ github.repository }}"
+          }]'
+
+          echo "artifacts=$ARTIFACTS" >> $GITHUB_OUTPUT
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          echo "📦 Prepared package for registration:"
+          echo "  Package name: $PACKAGE_NAME"
+          echo "  Version: $VERSION"
+          echo "  Artifacts: $ARTIFACTS"
+
+      - name: Register Package with ServiceNow DevOps
+        id: register-package
+        if: steps.create-cr.outputs.change_sys_id != ''
+        uses: ServiceNow/servicenow-devops-register-package@v3.1.0
+        with:
+          devops-integration-user-name: ${{ secrets.SERVICENOW_USERNAME }}
+          devops-integration-user-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Register Package - ${{ inputs.environment }}'
+          artifacts: ${{ steps.prepare-artifacts.outputs.artifacts }}
+          package-name: ${{ steps.prepare-artifacts.outputs.package_name }}
+
+      - name: Get Package SysID
+        id: get-package-sysid
+        if: steps.register-package.conclusion == 'success'
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          PACKAGE_NAME: ${{ steps.prepare-artifacts.outputs.package_name }}
+        run: |
+          echo "🔍 Looking up package sys_id for: $PACKAGE_NAME"
+
+          # Query for the package that was just created
           PACKAGE_RESPONSE=$(curl -s \
             -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
-            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package?sysparm_query=name=$PACKAGE_NAME&sysparm_limit=1")
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package?sysparm_query=name=$PACKAGE_NAME&sysparm_limit=1&sysparm_display_value=all")
 
-          PACKAGE_COUNT=$(echo "$PACKAGE_RESPONSE" | jq -r '.result | length')
+          PACKAGE_SYS_ID=$(echo "$PACKAGE_RESPONSE" | jq -r '.result[0].sys_id.value // empty')
+          PACKAGE_APP=$(echo "$PACKAGE_RESPONSE" | jq -r '.result[0].application.display_value // "null"')
 
-          if [ "$PACKAGE_COUNT" -gt 0 ]; then
-            # Package exists - get sys_id and update application field
-            PACKAGE_SYS_ID=$(echo "$PACKAGE_RESPONSE" | jq -r '.result[0].sys_id')
-            echo "  ↳ Found existing package: $PACKAGE_NAME"
-            echo "  ↳ Updating application field..."
-
-            # NOTE: sn_devops_package table does NOT have an 'application' field in schema
-            # Package → Application linkage happens via pipeline_execution → pipeline → app
-            # No need to update package record - just export sys_id for DevOps Change Reference
-            echo "    ℹ️  Package found (application linkage via pipeline, not package field)"
-
-            # Export package sys_id for linking to DevOps Change Reference
+          if [ -n "$PACKAGE_SYS_ID" ]; then
+            echo "✅ Package registered successfully!"
+            echo "  Package sys_id: $PACKAGE_SYS_ID"
+            echo "  Application: $PACKAGE_APP"
             echo "package_sys_id=$PACKAGE_SYS_ID" >> $GITHUB_OUTPUT
-          else
-            # Create new package
-            echo "  ↳ Creating new package: $PACKAGE_NAME..."
 
-            # NOTE: sn_devops_package does NOT have 'application' field in schema
-            # Application linkage happens via: pipeline_execution → pipeline → app
-            # Removed 'application' field - ServiceNow ignores it anyway
-            CREATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -X POST \
-              -d '{
-                "name": "'"$PACKAGE_NAME"'",
-                "version": "'"$VERSION"'",
-                "environment": "${{ inputs.environment }}",
-                "repository": "${{ github.repository }}",
-                "branch": "${{ github.ref_name }}",
-                "commit_sha": "${{ github.sha }}",
-                "build_number": "${{ github.run_number }}",
-                "pipeline_id": "${{ github.run_id }}",
-                "pipeline_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-              }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_package")
-
-            HTTP_CODE=$(echo "$CREATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
-            [ -z "$HTTP_CODE" ] && HTTP_CODE="000"
-            BODY=$(echo "$CREATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
-
-            if [ "$HTTP_CODE" = "201" ]; then
-              PACKAGE_SYS_ID=$(echo "$BODY" | jq -r '.result.sys_id')
-              echo "    ✅ Package created: $PACKAGE_NAME"
-              echo "       Package sys_id: $PACKAGE_SYS_ID"
-              echo "       Response: $(echo "$BODY" | jq -c '{sys_id: .result.sys_id, name: .result.name, version: .result.version}')"
-
-              # Export package sys_id for linking to DevOps Change Reference
-              echo "package_sys_id=$PACKAGE_SYS_ID" >> $GITHUB_OUTPUT
+            # Verify linkage chain
+            if [ "$PACKAGE_APP" = "null" ]; then
+              echo "⚠️  WARNING: Package has no application linkage yet"
+              echo "  This may be normal - linkage happens via pipeline_execution"
             else
-              echo "    ❌ Failed to create package (HTTP $HTTP_CODE)"
-              echo "    Response body:"
-              echo "$BODY" | jq '.'
-              echo "    This failure means packages are NOT being registered in ServiceNow"
+              echo "✅ Package successfully linked to application: $PACKAGE_APP"
             fi
+          else
+            echo "❌ Failed to find package in ServiceNow"
+            echo "Response: $(echo "$PACKAGE_RESPONSE" | jq '.')"
+            exit 1
           fi
 
-          # Link package to change request via PATCH
-          if [ -n "$PACKAGE_SYS_ID" ]; then
-            echo "  ↳ Linking package to change request..."
+      - name: Link Package to Change Request
+        id: link-package-to-cr
+        if: steps.get-package-sysid.outputs.package_sys_id != ''
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          PACKAGE_SYS_ID: ${{ steps.get-package-sysid.outputs.package_sys_id }}
+        run: |
+          echo "  ↳ Linking package to change request..."
 
-            UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -X PATCH \
-              -d '{
-                "u_package": "'"$PACKAGE_SYS_ID"'"
-              }' \
-              "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
+          UPDATE_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -X PATCH \
+            -d '{
+              "u_package": "'"$PACKAGE_SYS_ID"'"
+            }' \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/change_request/$CHANGE_SYSID")
 
-            HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
-            [ -z "$HTTP_CODE" ] && HTTP_CODE="000"
-            BODY=$(echo "$UPDATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
+          HTTP_CODE=$(echo "$UPDATE_RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2 | tr -d ' ')
+          [ -z "$HTTP_CODE" ] && HTTP_CODE="000"
+          BODY=$(echo "$UPDATE_RESPONSE" | sed 's/HTTP_CODE:.*//')
 
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "    ✅ Package linked to change request"
-              echo "       Change request: $CHANGE_NUMBER"
-              echo "       Package: $PACKAGE_NAME"
-              echo "✅ Package: $PACKAGE_NAME"
-            else
-              echo "    ❌ Failed to link package (HTTP $HTTP_CODE)"
-              echo "    Response body:"
-              echo "$BODY" | jq '.'
-              echo "    This means package exists but is NOT linked to change request"
-            fi
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "    ✅ Package linked to change request"
+            echo "       Change request: $CHANGE_NUMBER"
+            echo "       Package sys_id: $PACKAGE_SYS_ID"
+          else
+            echo "    ❌ Failed to link package (HTTP $HTTP_CODE)"
+            echo "    Response body:"
+            echo "$BODY" | jq '.'
+            echo "    This means package exists but is NOT linked to change request"
           fi
 
       - name: Link Package to DevOps Change Reference
-        if: steps.link-devops.outputs.devops_ref_id != '' && steps.register-package.outputs.package_sys_id != ''
+        if: steps.link-devops.outputs.devops_ref_id != '' && steps.get-package-sysid.outputs.package_sys_id != ''
         env:
           SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
           SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           DEVOPS_REF_ID: ${{ steps.link-devops.outputs.devops_ref_id }}
-          PACKAGE_SYS_ID: ${{ steps.register-package.outputs.package_sys_id }}
+          PACKAGE_SYS_ID: ${{ steps.get-package-sysid.outputs.package_sys_id }}
         run: |
           echo "🔗 Linking package to DevOps Change Reference..."
 
