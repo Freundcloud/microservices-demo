@@ -302,8 +302,6 @@ jobs:
       # Always pass 'all' when force_build_all is true or when services_changed is empty
       services: ${{ (inputs.force_build_all || needs.detect-service-changes.outputs.services_changed == '' || needs.detect-service-changes.outputs.services_changed == '[]') && 'all' || needs.detect-service-changes.outputs.services_changed }}
       push_images: ${{ github.event_name != 'pull_request' }}
-    # Outputs from reusable workflow are automatically available via jobs.<job_id>.outputs.<output_name>
-    # The register-packages job can access them via needs.build-and-push.outputs.services_built
 
   # ============================================================================
   # STAGE 3.5: ServiceNow Integration (Package Registration)
@@ -333,11 +331,24 @@ jobs:
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           SN_ORCHESTRATION_TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
 
+      - name: Debug - Check services_built Output
+        run: |
+          echo "========================================="
+          echo "DEBUG: services_built output from build-and-push job"
+          echo "========================================="
+          echo "Raw value: '${{ needs.build-and-push.outputs.services_built }}'"
+          echo "Length: ${#SERVICES}"
+          echo "Is null?: $([ "${{ needs.build-and-push.outputs.services_built }}" == "null" ] && echo "yes" || echo "no")"
+          echo "Is empty?: $([ -z "${{ needs.build-and-push.outputs.services_built }}" ] && echo "yes" || echo "no")"
+          echo "========================================="
+
       - name: Build Package Metadata
         id: package-metadata
         run: |
           # Extract services that were built
           SERVICES="${{ needs.build-and-push.outputs.services_built }}"
+
+          echo "DEBUG: SERVICES='$SERVICES'"
 
           # Build artifacts JSON for ServiceNow
           ARTIFACTS='[]'
