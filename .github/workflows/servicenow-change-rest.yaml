@@ -316,15 +316,18 @@ jobs:
           #    - URL: https://calitiiltddemo3.service-now.com/now/devops-change/record/sn_devops_app/e489efd1c3383e14e1bbf0cb050131d5
           #
           # 2. CMDB CI Application (cmdb_ci_appl table):
-          #    - Sys ID: 07456b59c305f250b71ef44c05013111
+          #    - Sys ID: bcb82fddc3057250e1bbf0cb05013118
           #    - Used for: change request cmdb_ci field (for "App" column visibility)
-          #    - URL: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/cmdb_ci_appl.do?sys_id=07456b59c305f250b71ef44c05013111
+          #    - URL: https://calitiiltddemo3.service-now.com/now/nav/ui/classic/params/target/cmdb_ci_appl.do?sys_id=bcb82fddc3057250e1bbf0cb05013118
+          #    - Owner: Olaf Krasicki-Freund
+          #    - Approval Group: GitHubARC DevOps Admin
+          #    - Location: United Kingdom
           #
           # Environment is tracked via u_environment field in change request
 
           APP_NAME="Online Boutique"
           DEVOPS_APP_SYS_ID="e489efd1c3383e14e1bbf0cb050131d5"  # For packages/pipelines/tests
-          CMDB_CI_SYS_ID="07456b59c305f250b71ef44c05013111"      # For change request cmdb_ci
+          CMDB_CI_SYS_ID="bcb82fddc3057250e1bbf0cb05013118"      # For change request cmdb_ci (existing manual record)
 
           echo "  ✅ Application: $APP_NAME"
           echo "     DevOps App sys_id: $DEVOPS_APP_SYS_ID (for packages/pipelines/tests)"
