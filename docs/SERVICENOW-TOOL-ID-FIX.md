@@ -79,6 +79,12 @@ The workflows were using `${{ secrets.SN_ORCHESTRATION_TOOL_ID }}` which either:
    - Fixed tool ID resolution in resolve step (line 54)
    - Hardcoded `TOOL="f62c4e49c3fcf614e1bbf0cb050131ef"` instead of using secret
 
+5. **`.github/workflows/sonarcloud-scan.yaml`** (Commit d0f31e41)
+   - Fixed SonarCloud ServiceNow upload to use hardcoded tool-id (line 198)
+   - Changed from `tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}`
+   - To `tool-id: f62c4e49c3fcf614e1bbf0cb050131ef`
+   - Resolves empty Software Quality results in ServiceNow DevOps Insights (Issue #76)
+
 ### Code Changes
 
 **Before (composite action)**:
