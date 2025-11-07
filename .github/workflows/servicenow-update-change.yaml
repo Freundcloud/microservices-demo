@@ -30,6 +30,21 @@ on:
         required: false
         type: string
         default: ''
+      smoke_test_status:
+        description: 'Smoke test status (passed/failed)'
+        required: false
+        type: string
+        default: ''
+      smoke_test_duration:
+        description: 'Smoke test duration in seconds'
+        required: false
+        type: string
+        default: ''
+      smoke_test_url:
+        description: 'Smoke test results URL'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   update-change-request:
@@ -170,6 +185,66 @@ jobs:
             exit 1
           fi
 
+      - name: Upload Smoke Test Performance Summary
+        if: inputs.smoke_test_status != ''
+        run: |
+          echo "📊 Uploading smoke test performance summary to ServiceNow..."
+
+          SMOKE_STATUS="${{ inputs.smoke_test_status }}"
+          DURATION="${{ inputs.smoke_test_duration }}"
+          [ -z "$DURATION" ] && DURATION="0"
+
+          # Calculate times (convert duration to milliseconds for glide_time fields)
+          DURATION_MS=$((DURATION * 1000))
+          START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
+          FINISH_TIME=$(date -u -d "+${DURATION} seconds" +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date -u +"%Y-%m-%d %H:%M:%S")
+
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
+              "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
+              "url": "${{ inputs.smoke_test_url }}",
+              "test_type": "functional",
+              "start_time": "'"$START_TIME"'",
+              "finish_time": "'"$FINISH_TIME"'",
+              "duration": '$DURATION',
+              "total_tests": 1,
+              "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
+              "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
+              "skipped_tests": 0,
+              "blocked_tests": 0,
+              "passing_percent": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "100" || echo "0")',
+              "avg_time": '$DURATION_MS',
+              "min_time": '$DURATION_MS',
+              "max_time": '$DURATION_MS',
+              "ninety_percent": '$DURATION_MS',
+              "standard_deviation": 0.0,
+              "throughput": "1",
+              "maximum_virtual_users": 1
+            }' \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_performance_test_summary")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+            TOOL_VALUE=$(echo "$BODY" | jq -r '.result.tool.value // .result.tool // "null"')
+            echo "✅ Smoke test performance summary created (sys_id: $SUMMARY_ID)"
+            echo "   Duration: ${DURATION}s, Status: $SMOKE_STATUS, Tool: $TOOL_VALUE"
+
+            if [ "$TOOL_VALUE" = "null" ]; then
+              echo "⚠️  WARNING: Tool field is 'null' - unexpected issue"
+            fi
+          else
+            echo "⚠️  Failed to create smoke test performance summary (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+            # Don't fail the workflow - smoke test upload is supplementary
+          fi
+
       - name: Update Summary
         if: always()
         run: |
@@ -182,6 +257,12 @@ jobs:
           echo "| Deployment Status | ${{ steps.determine-state.outputs.status_label }} |" >> $GITHUB_STEP_SUMMARY
           echo "| New State | ${{ steps.determine-state.outputs.state }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Close Code | ${{ steps.determine-state.outputs.close_code }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Add smoke test info if available
+          if [ -n "${{ inputs.smoke_test_status }}" ]; then
+            echo "| Smoke Tests | ${{ inputs.smoke_test_status }} (${{ inputs.smoke_test_duration }}s) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**View in ServiceNow:**" >> $GITHUB_STEP_SUMMARY
           echo "${{ secrets.SERVICENOW_INSTANCE_URL }}/change_request.do?sysparm_query=number=${{ inputs.change_request_number }}" >> $GITHUB_STEP_SUMMARY

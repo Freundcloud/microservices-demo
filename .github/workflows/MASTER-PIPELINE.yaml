@@ -964,6 +964,9 @@ jobs:
       running_pods: ${{ needs.deploy-to-environment.outputs.running_pods || '0' }}
       total_pods: ${{ needs.deploy-to-environment.outputs.total_pods || '0' }}
       frontend_url: ${{ needs.deploy-to-environment.outputs.frontend_url || '' }}
+      smoke_test_status: ${{ needs.smoke-tests.outputs.status || '' }}
+      smoke_test_duration: ${{ needs.smoke-tests.outputs.duration || '' }}
+      smoke_test_url: ${{ needs.smoke-tests.outputs.url || '' }}
 
   # ============================================================================
   # STAGE 9: Pipeline Summary
