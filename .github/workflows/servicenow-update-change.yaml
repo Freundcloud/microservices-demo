@@ -207,7 +207,6 @@ jobs:
               "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
               "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
               "url": "${{ inputs.smoke_test_url }}",
-              "test_type": "functional",
               "start_time": "'"$START_TIME"'",
               "finish_time": "'"$FINISH_TIME"'",
               "duration": '$DURATION',
