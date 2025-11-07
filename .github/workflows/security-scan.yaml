@@ -108,6 +108,7 @@ jobs:
           deny-licenses: GPL-2.0, GPL-3.0
 
       - name: Generate SBOM (Software Bill of Materials)
+        id: generate-sbom
         uses: anchore/sbom-action@v0.17.2
         with:
           path: ./
@@ -115,6 +116,100 @@ jobs:
           output-file: sbom.cyclonedx.json
           upload-artifact: true
           upload-artifact-retention: 90
+
+      - name: Upload SBOM Summary to ServiceNow
+        id: upload-sbom-summary
+        if: always() && hashFiles('sbom.cyclonedx.json') != ''
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        run: |
+          echo "📊 Uploading SBOM summary to ServiceNow..."
+
+          SBOM_FILE="sbom.cyclonedx.json"
+
+          # Check if SBOM file exists and is valid JSON
+          if [ ! -f "$SBOM_FILE" ]; then
+            echo "⚠️  SBOM file not found, skipping upload"
+            exit 0
+          fi
+
+          if ! jq empty "$SBOM_FILE" 2>/dev/null; then
+            echo "⚠️  SBOM file is not valid JSON, skipping upload"
+            exit 0
+          fi
+
+          # Extract metadata
+          SCANNER_NAME=$(jq -r '.metadata.tools[0].name // "Syft"' "$SBOM_FILE")
+          SCANNER_VERSION=$(jq -r '.metadata.tools[0].version // "unknown"' "$SBOM_FILE")
+          SCAN_TIME=$(jq -r '.metadata.timestamp // ""' "$SBOM_FILE")
+
+          # Calculate metrics
+          TOTAL_COMPONENTS=$(jq '.components | length' "$SBOM_FILE")
+
+          # Count unique licenses
+          LICENSE_COUNT=$(jq '[.components[].licenses[]?.license.id // "Unknown"] | unique | length' "$SBOM_FILE")
+
+          # Count dependencies
+          DEPENDENCY_COUNT=$(jq '[.dependencies[]?.dependsOn[]?] | length' "$SBOM_FILE")
+
+          # Cross-reference with Grype results for vulnerable components
+          VULNERABLE_COMPONENTS=0
+          if [ -f "results.sarif" ]; then
+            # Extract unique vulnerable package names from SARIF
+            VULNERABLE_COUNT=$(jq '[.runs[].results[].locations[].physicalLocation.artifactLocation.uri] | unique | length' results.sarif 2>/dev/null || echo "0")
+            VULNERABLE_COMPONENTS=$VULNERABLE_COUNT
+            echo "   Vulnerable Components: $VULNERABLE_COMPONENTS (from Grype scan)"
+          else
+            echo "   Vulnerable Components: 0 (Grype results not available)"
+          fi
+
+          # Format timestamps
+          START_TIME=$(date -u -d "$SCAN_TIME" +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date -u +"%Y-%m-%d %H:%M:%S")
+          FINISH_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
+
+          # Calculate duration (SBOM generation is fast, approximate)
+          DURATION=10
+
+          # Upload to ServiceNow
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "name": "SBOM Scan - microservices-demo (${{ github.sha }})",
+              "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
+              "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "scanner_name": "'"$SCANNER_NAME"'",
+              "scanner_version": "'"$SCANNER_VERSION"'",
+              "start_time": "'"$START_TIME"'",
+              "finish_time": "'"$FINISH_TIME"'",
+              "duration": '$DURATION',
+              "total_components": '$TOTAL_COMPONENTS',
+              "vulnerable_components": '$VULNERABLE_COMPONENTS',
+              "license_count": '$LICENSE_COUNT',
+              "dependency_count": '$DEPENDENCY_COUNT'
+            }' \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_software_quality_scan_summary")
+
+          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+          if [ "$HTTP_CODE" = "201" ]; then
+            SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
+            echo "✅ SBOM summary uploaded to ServiceNow (sys_id: $SUMMARY_ID)"
+            echo "   Components: $TOTAL_COMPONENTS, Licenses: $LICENSE_COUNT, Dependencies: $DEPENDENCY_COUNT"
+            echo "   Vulnerable: $VULNERABLE_COMPONENTS, Tool: $SCANNER_NAME v$SCANNER_VERSION"
+
+            # Save summary_id for potential Phase 2 (component details upload)
+            echo "sbom_summary_id=$SUMMARY_ID" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Failed to upload SBOM summary to ServiceNow (HTTP $HTTP_CODE)"
+            echo "$BODY" | jq '.' || echo "$BODY"
+            # Don't fail the workflow - SBOM upload is supplementary
+          fi
+        continue-on-error: true
 
       - name: Scan directory for vulnerabilities with Grype
         id: grype-scan
