@@ -114,8 +114,16 @@ jobs:
           path: ./
           format: cyclonedx-json
           output-file: sbom.cyclonedx.json
-          upload-artifact: true
+          upload-artifact: false  # Disable artifact upload, we'll handle the file directly
           upload-artifact-retention: 90
+
+      - name: Upload SBOM Artifact Manually
+        if: always() && hashFiles('sbom.cyclonedx.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
+          retention-days: 90
 
       - name: Upload SBOM Summary to ServiceNow
         id: upload-sbom-summary
