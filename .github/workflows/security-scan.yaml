@@ -155,8 +155,8 @@ jobs:
           fi
 
           # Extract metadata
-          SCANNER_NAME=$(jq -r '.metadata.tools[0].name // "Syft"' "$SBOM_FILE")
-          SCANNER_VERSION=$(jq -r '.metadata.tools[0].version // "unknown"' "$SBOM_FILE")
+          SCANNER_NAME=$(jq -r '.metadata.tools.components[0].name // "Syft"' "$SBOM_FILE")
+          SCANNER_VERSION=$(jq -r '.metadata.tools.components[0].version // "unknown"' "$SBOM_FILE")
           SCAN_TIME=$(jq -r '.metadata.timestamp // ""' "$SBOM_FILE")
 
           # Calculate metrics
