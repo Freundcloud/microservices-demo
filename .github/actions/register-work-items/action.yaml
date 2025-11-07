@@ -45,11 +45,12 @@ runs:
         echo "🔍 Extracting work items from commit messages..."
 
         # Get commits in this push (or use default base if not available)
+        # Use %s%n%b to get both subject and body for full commit message
         if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-          COMMITS=$(git log --pretty=format:"%s" ${{ github.event.before }}..${{ github.sha }} 2>/dev/null || git log --pretty=format:"%s" -10)
+          COMMITS=$(git log --pretty=format:"%s%n%b" ${{ github.event.before }}..${{ github.sha }} 2>/dev/null || git log --pretty=format:"%s%n%b" -10)
         else
           # For first push or when before SHA not available, get last 10 commits
-          COMMITS=$(git log --pretty=format:"%s" -10)
+          COMMITS=$(git log --pretty=format:"%s%n%b" -10)
         fi
 
         # Extract issue numbers from commit messages
