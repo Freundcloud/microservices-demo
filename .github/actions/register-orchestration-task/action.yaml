@@ -1,0 +1,126 @@
+name: 'Register ServiceNow Orchestration Task'
+description: 'Register GitHub Actions job as ServiceNow orchestration task for CI/CD tracking'
+author: 'Claude Code'
+
+branding:
+  icon: 'database'
+  color: 'blue'
+
+inputs:
+  servicenow-username:
+    description: 'ServiceNow username for authentication'
+    required: true
+  servicenow-password:
+    description: 'ServiceNow password for authentication'
+    required: true
+  servicenow-instance-url:
+    description: 'ServiceNow instance URL (e.g., https://instance.service-now.com)'
+    required: true
+  project-id:
+    description: 'ServiceNow project sys_id'
+    required: false
+    default: 'c6c9eb71c34d7a50b71ef44c05013194'
+  tool-id:
+    description: 'ServiceNow tool sys_id'
+    required: false
+    default: 'f62c4e49c3fcf614e1bbf0cb050131ef'
+
+outputs:
+  task-id:
+    description: 'ServiceNow orchestration task sys_id'
+    value: ${{ steps.register.outputs.task_id }}
+  task-url:
+    description: 'ServiceNow orchestration task URL'
+    value: ${{ steps.register.outputs.task_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Get Job ID from GitHub API
+      id: job-id
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "🔍 Getting job ID for: ${{ github.job }}"
+
+        # Query GitHub API for jobs in this workflow run
+        JOBS_JSON=$(gh api "/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" 2>&1)
+
+        # Check if API call was successful
+        if [ $? -ne 0 ]; then
+          echo "⚠️  Failed to get job ID from GitHub API"
+          echo "   This is non-blocking - orchestration task will not be created"
+          echo "job_id=unknown" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Extract job ID for current job
+        JOB_ID=$(echo "$JOBS_JSON" | jq -r '.jobs[] | select(.name == "${{ github.job }}") | .id')
+
+        if [ -z "$JOB_ID" ] || [ "$JOB_ID" = "null" ]; then
+          echo "⚠️  Could not find job ID for: ${{ github.job }}"
+          echo "   This is non-blocking - orchestration task will not be created"
+          echo "job_id=unknown" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "✅ Job ID: $JOB_ID"
+        echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+
+    - name: Register Orchestration Task in ServiceNow
+      id: register
+      if: steps.job-id.outputs.job_id != 'unknown'
+      shell: bash
+      env:
+        SERVICENOW_USERNAME: ${{ inputs.servicenow-username }}
+        SERVICENOW_PASSWORD: ${{ inputs.servicenow-password }}
+        SERVICENOW_INSTANCE_URL: ${{ inputs.servicenow-instance-url }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        TOOL_ID: ${{ inputs.tool-id }}
+        JOB_ID: ${{ steps.job-id.outputs.job_id }}
+      run: |
+        echo "📝 Registering orchestration task in ServiceNow..."
+
+        # Construct job URL
+        JOB_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${JOB_ID}"
+
+        # Create native ID (format: repo/workflow#job)
+        NATIVE_ID="${{ github.repository }}/${{ github.workflow }}#${{ github.job }}"
+
+        echo "   Task: $NATIVE_ID"
+        echo "   URL: $JOB_URL"
+
+        # Register orchestration task
+        RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+          -H "Content-Type: application/json" \
+          -X POST \
+          -d '{
+            "name": "'"$NATIVE_ID"'",
+            "native_id": "'"$NATIVE_ID"'",
+            "task_url": "'"$JOB_URL"'",
+            "tool": "'"$TOOL_ID"'",
+            "project": "'"$PROJECT_ID"'",
+            "track": true
+          }' \
+          "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_orchestration_task")
+
+        # Check if successful
+        if echo "$RESPONSE" | jq -e '.result' > /dev/null 2>&1; then
+          TASK_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id')
+          TASK_NUMBER=$(echo "$RESPONSE" | jq -r '.result.number // "N/A"')
+
+          echo "✅ Orchestration task created: $TASK_NUMBER"
+          echo "   Sys ID: $TASK_ID"
+          echo "   View: $SERVICENOW_INSTANCE_URL/now/nav/ui/classic/params/target/sn_devops_orchestration_task.do?sys_id=$TASK_ID"
+
+          # Set outputs
+          echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
+          echo "task_url=$SERVICENOW_INSTANCE_URL/now/nav/ui/classic/params/target/sn_devops_orchestration_task.do?sys_id=$TASK_ID" >> $GITHUB_OUTPUT
+        else
+          ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // "Unknown error"')
+          echo "⚠️  Failed to create orchestration task: $ERROR_MSG"
+          echo "   This is non-blocking - workflow will continue"
+          echo "task_id=failed" >> $GITHUB_OUTPUT
+          echo "task_url=" >> $GITHUB_OUTPUT
+        fi

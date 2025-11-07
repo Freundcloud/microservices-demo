@@ -71,6 +71,16 @@ jobs:
       policy_reason: ${{ steps.branch-policy.outputs.policy_reason }}
 
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Register Job in ServiceNow
+        continue-on-error: true
+        uses: ./.github/actions/register-orchestration-task
+        with:
+          servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
+          servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          servicenow-instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+
       - name: Determine Environment
         id: set-env
         run: |
@@ -201,6 +211,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Register Job in ServiceNow
+        continue-on-error: true
+        uses: ./.github/actions/register-orchestration-task
+        with:
+          servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
+          servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          servicenow-instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+
       - name: Check for Terraform Changes
         uses: dorny/paths-filter@v3
         id: filter
@@ -249,6 +267,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Register Job in ServiceNow
+        continue-on-error: true
+        uses: ./.github/actions/register-orchestration-task
+        with:
+          servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
+          servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          servicenow-instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
 
       - name: Detect Changed Services
         uses: dorny/paths-filter@v3
@@ -321,6 +347,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Register Job in ServiceNow
+        continue-on-error: true
+        uses: ./.github/actions/register-orchestration-task
+        with:
+          servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
+          servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          servicenow-instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
 
       - name: Prepare ServiceNow Authentication
         id: sn-auth
@@ -720,6 +754,14 @@ jobs:
 
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Register Job in ServiceNow
+        continue-on-error: true
+        uses: ./.github/actions/register-orchestration-task
+        with:
+          servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
+          servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          servicenow-instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
 
       - name: Setup AWS Credentials
         uses: ./.github/actions/setup-aws-credentials
