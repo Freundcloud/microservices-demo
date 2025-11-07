@@ -186,24 +186,19 @@ jobs:
           # Calculate duration (SBOM generation is fast, approximate)
           DURATION=10
 
-          # Upload to ServiceNow
+          # Upload to ServiceNow (using correct field names)
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
             -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -X POST \
             -d '{
-              "name": "SBOM Scan - microservices-demo (${{ github.sha }})",
+              "short_description": "SBOM Scan - microservices-demo ('"$SCANNER_NAME"' v'"$SCANNER_VERSION"')",
               "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
-              "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "scan_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "scan_id": "${{ github.run_id }}",
               "scanner_name": "'"$SCANNER_NAME"'",
-              "scanner_version": "'"$SCANNER_VERSION"'",
-              "start_time": "'"$START_TIME"'",
-              "finish_time": "'"$FINISH_TIME"'",
-              "duration": '$DURATION',
-              "total_components": '$TOTAL_COMPONENTS',
-              "vulnerable_components": '$VULNERABLE_COMPONENTS',
-              "license_count": '$LICENSE_COUNT',
-              "dependency_count": '$DEPENDENCY_COUNT'
+              "project_name": "${{ github.repository }}",
+              "last_scanned": "'"$START_TIME"'"
             }' \
             "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_software_quality_scan_summary")
 
@@ -212,17 +207,77 @@ jobs:
 
           if [ "$HTTP_CODE" = "201" ]; then
             SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
-            echo "✅ SBOM summary uploaded to ServiceNow (sys_id: $SUMMARY_ID)"
-            echo "   Components: $TOTAL_COMPONENTS, Licenses: $LICENSE_COUNT, Dependencies: $DEPENDENCY_COUNT"
-            echo "   Vulnerable: $VULNERABLE_COMPONENTS, Tool: $SCANNER_NAME v$SCANNER_VERSION"
+            SUMMARY_NUMBER=$(echo "$BODY" | jq -r '.result.number')
+            echo "✅ SBOM summary uploaded to ServiceNow"
+            echo "   Record: $SUMMARY_NUMBER (sys_id: $SUMMARY_ID)"
+            echo "   Project: ${{ github.repository }}"
+            echo "   Scanner: $SCANNER_NAME v$SCANNER_VERSION"
+            echo "   URL: $SERVICENOW_INSTANCE_URL/now/nav/ui/classic/params/target/sn_devops_software_quality_scan_summary.do?sys_id=$SUMMARY_ID"
 
-            # Save summary_id for potential Phase 2 (component details upload)
+            # Save summary_id and metrics for detail records upload
             echo "sbom_summary_id=$SUMMARY_ID" >> $GITHUB_OUTPUT
+            echo "total_components=$TOTAL_COMPONENTS" >> $GITHUB_OUTPUT
+            echo "vulnerable_components=$VULNERABLE_COMPONENTS" >> $GITHUB_OUTPUT
+            echo "license_count=$LICENSE_COUNT" >> $GITHUB_OUTPUT
+            echo "dependency_count=$DEPENDENCY_COUNT" >> $GITHUB_OUTPUT
           else
             echo "⚠️  Failed to upload SBOM summary to ServiceNow (HTTP $HTTP_CODE)"
             echo "$BODY" | jq '.' || echo "$BODY"
             # Don't fail the workflow - SBOM upload is supplementary
           fi
+        continue-on-error: true
+
+      - name: Upload SBOM Metrics to ServiceNow (Detail Records)
+        id: upload-sbom-details
+        if: steps.upload-sbom-summary.outputs.sbom_summary_id != ''
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        run: |
+          echo "📊 Uploading SBOM metrics as detail records to ServiceNow..."
+
+          SUMMARY_ID="${{ steps.upload-sbom-summary.outputs.sbom_summary_id }}"
+          TOTAL_COMPONENTS="${{ steps.upload-sbom-summary.outputs.total_components }}"
+          VULNERABLE_COMPONENTS="${{ steps.upload-sbom-summary.outputs.vulnerable_components }}"
+          LICENSE_COUNT="${{ steps.upload-sbom-summary.outputs.license_count }}"
+          DEPENDENCY_COUNT="${{ steps.upload-sbom-summary.outputs.dependency_count }}"
+
+          # Category sys_ids from ServiceNow (repurposing existing categories for SBOM metrics)
+          # "Lines of Code" → Total Components
+          # "Vulnerabilities" → Vulnerable Components
+          LINES_OF_CODE_CATEGORY="96347cc977632010c1b0f7559f5a99aa"
+          VULNERABILITIES_CATEGORY="e5267c0d77632010c1b0f7559f5a99e1"
+
+          # Upload total components as "Lines of Code" (repurposed)
+          curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "software_quality_summary": "'"$SUMMARY_ID"'",
+              "category": "'"$LINES_OF_CODE_CATEGORY"'",
+              "value": "'"$TOTAL_COMPONENTS"'"
+            }' \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_software_quality_scan_detail" \
+            > /dev/null
+
+          echo "   ✓ Total Components: $TOTAL_COMPONENTS (as 'Lines of Code')"
+
+          # Upload vulnerable components
+          curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "software_quality_summary": "'"$SUMMARY_ID"'",
+              "category": "'"$VULNERABILITIES_CATEGORY"'",
+              "value": "'"$VULNERABLE_COMPONENTS"'"
+            }' \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_software_quality_scan_detail" \
+            > /dev/null
+
+          echo "   ✓ Vulnerable Components: $VULNERABLE_COMPONENTS"
+
+          echo "✅ SBOM detail records uploaded successfully"
         continue-on-error: true
 
       - name: Scan directory for vulnerabilities with Grype

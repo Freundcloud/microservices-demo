@@ -188,6 +188,7 @@ jobs:
           echo "  Duplications: ${DUPS}%"
 
       - name: Upload SonarCloud Results to ServiceNow
+        id: upload-sonarcloud
         if: ${{ !inputs.skip_servicenow && !github.event.pull_request }}
         uses: ServiceNow/servicenow-devops-sonar@v3.1.0
         with:
@@ -201,6 +202,30 @@ jobs:
           sonar-host-url: 'https://sonarcloud.io'
           sonar-project-key: 'Freundcloud_microservices-demo'
           sonar-org-key: 'freundcloud'
+        continue-on-error: true
+
+      - name: Verify SonarCloud Upload to ServiceNow
+        if: ${{ !inputs.skip_servicenow && !github.event.pull_request && steps.get-results.outputs.status != '' }}
+        env:
+          SERVICENOW_USERNAME: ${{ secrets.SN_DEVOPS_USER }}
+          SERVICENOW_PASSWORD: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SN_INSTANCE_URL }}
+        run: |
+          echo "🔍 Verifying SonarCloud results uploaded to ServiceNow..."
+          echo ""
+          echo "Quality Gate: ${{ steps.get-results.outputs.status }}"
+          echo "Bugs: ${{ steps.get-results.outputs.bugs }}"
+          echo "Vulnerabilities: ${{ steps.get-results.outputs.vulnerabilities }}"
+          echo "Code Smells: ${{ steps.get-results.outputs.code_smells }}"
+          echo "Coverage: ${{ steps.get-results.outputs.coverage }}"
+          echo "Duplications: ${{ steps.get-results.outputs.duplications }}"
+          echo ""
+
+          # Query ServiceNow for recent SonarCloud scans
+          echo "📊 Recent SonarCloud scans in ServiceNow:"
+          curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_software_quality_scan_summary?sysparm_query=scanner_name=SonarQube^ORDERBYDESCsys_created_on&sysparm_limit=3&sysparm_fields=number,scanner_name,short_description,sys_created_on,scan_url" \
+            | jq '.result[] | "  - [\(.number)] \(.short_description) (Created: \(.sys_created_on))"' -r || echo "  (Query failed or no records found)"
         continue-on-error: true
 
       - name: Generate SonarCloud Badge
