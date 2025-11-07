@@ -186,20 +186,68 @@ jobs:
           # Calculate duration (SBOM generation is fast, approximate)
           DURATION=10
 
-          # Upload to ServiceNow (using correct field names)
+          echo ""
+          echo "🔍 Querying/Creating ServiceNow project for linkage..."
+
+          # Query for existing project
+          PROJECT_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_project?sysparm_query=name=${{ github.repository }}&sysparm_fields=sys_id,name" \
+            -H "Accept: application/json")
+
+          PROJECT_ID=$(echo "$PROJECT_RESPONSE" | jq -r '.result[0].sys_id // "null"')
+
+          # Create project if doesn't exist
+          if [ "$PROJECT_ID" = "null" ] || [ -z "$PROJECT_ID" ]; then
+            echo "   Project not found, creating new project..."
+            CREATE_PROJECT_RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "name": "${{ github.repository }}",
+                "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
+                "description": "Microservices demo application - automated GitHub integration"
+              }' \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_project")
+
+            PROJECT_ID=$(echo "$CREATE_PROJECT_RESPONSE" | jq -r '.result.sys_id // "null"')
+
+            if [ "$PROJECT_ID" != "null" ] && [ -n "$PROJECT_ID" ]; then
+              PROJECT_NUMBER=$(echo "$CREATE_PROJECT_RESPONSE" | jq -r '.result.number // "N/A"')
+              echo "   ✅ Created new project: $PROJECT_NUMBER (sys_id: $PROJECT_ID)"
+            else
+              echo "   ⚠️  Failed to create project, continuing without project linkage..."
+              PROJECT_ID=""
+            fi
+          else
+            PROJECT_NAME=$(echo "$PROJECT_RESPONSE" | jq -r '.result[0].name // "N/A"')
+            echo "   ✅ Found existing project: $PROJECT_NAME (sys_id: $PROJECT_ID)"
+          fi
+
+          echo ""
+          echo "📤 Uploading SBOM summary to ServiceNow..."
+
+          # Upload to ServiceNow (using correct field names + project linkage)
+          UPLOAD_PAYLOAD='{
+            "short_description": "SBOM Scan - microservices-demo ('"$SCANNER_NAME"' v'"$SCANNER_VERSION"')",
+            "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
+            "scan_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "scan_id": "${{ github.run_id }}",
+            "scanner_name": "'"$SCANNER_NAME"'",
+            "project_name": "${{ github.repository }}",
+            "last_scanned": "'"$START_TIME"'"'
+
+          # Add project linkage if project was created/found
+          if [ -n "$PROJECT_ID" ]; then
+            UPLOAD_PAYLOAD="$UPLOAD_PAYLOAD,\"project\": \"$PROJECT_ID\""
+          fi
+
+          UPLOAD_PAYLOAD="$UPLOAD_PAYLOAD}"
+
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
             -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
             -H "Content-Type: application/json" \
             -X POST \
-            -d '{
-              "short_description": "SBOM Scan - microservices-demo ('"$SCANNER_NAME"' v'"$SCANNER_VERSION"')",
-              "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
-              "scan_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "scan_id": "${{ github.run_id }}",
-              "scanner_name": "'"$SCANNER_NAME"'",
-              "project_name": "${{ github.repository }}",
-              "last_scanned": "'"$START_TIME"'"
-            }' \
+            -d "$UPLOAD_PAYLOAD" \
             "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_software_quality_scan_summary")
 
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -208,11 +256,16 @@ jobs:
           if [ "$HTTP_CODE" = "201" ]; then
             SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
             SUMMARY_NUMBER=$(echo "$BODY" | jq -r '.result.number')
+            LINKED_PROJECT=$(echo "$BODY" | jq -r '.result.project.value // "null"')
             echo "✅ SBOM summary uploaded to ServiceNow"
             echo "   Record: $SUMMARY_NUMBER (sys_id: $SUMMARY_ID)"
-            echo "   Project: ${{ github.repository }}"
+            echo "   Project: ${{ github.repository }} (linked: $([ "$LINKED_PROJECT" != "null" ] && echo "✅" || echo "❌"))"
             echo "   Scanner: $SCANNER_NAME v$SCANNER_VERSION"
             echo "   URL: $SERVICENOW_INSTANCE_URL/now/nav/ui/classic/params/target/sn_devops_software_quality_scan_summary.do?sys_id=$SUMMARY_ID"
+
+            if [ "$LINKED_PROJECT" != "null" ]; then
+              echo "   🔗 Project sys_id: $LINKED_PROJECT"
+            fi
 
             # Save summary_id and metrics for detail records upload
             echo "sbom_summary_id=$SUMMARY_ID" >> $GITHUB_OUTPUT

@@ -199,31 +199,80 @@ jobs:
           START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
           FINISH_TIME=$(date -u -d "+${DURATION} seconds" +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date -u +"%Y-%m-%d %H:%M:%S")
 
+          echo ""
+          echo "🔍 Querying/Creating ServiceNow project for linkage..."
+
+          # Query for existing project
+          PROJECT_RESPONSE=$(curl -s -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+            "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_project?sysparm_query=name=Freundcloud/microservices-demo&sysparm_fields=sys_id,name" \
+            -H "Accept: application/json")
+
+          PROJECT_ID=$(echo "$PROJECT_RESPONSE" | jq -r '.result[0].sys_id // "null"')
+
+          # Create project if doesn't exist
+          if [ "$PROJECT_ID" = "null" ] || [ -z "$PROJECT_ID" ]; then
+            echo "   Project not found, creating new project..."
+            CREATE_PROJECT_RESPONSE=$(curl -s -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d '{
+                "name": "Freundcloud/microservices-demo",
+                "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
+                "description": "Microservices demo application - automated GitHub integration"
+              }' \
+              "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_project")
+
+            PROJECT_ID=$(echo "$CREATE_PROJECT_RESPONSE" | jq -r '.result.sys_id // "null"')
+
+            if [ "$PROJECT_ID" != "null" ] && [ -n "$PROJECT_ID" ]; then
+              PROJECT_NUMBER=$(echo "$CREATE_PROJECT_RESPONSE" | jq -r '.result.number // "N/A"')
+              echo "   ✅ Created new project: $PROJECT_NUMBER (sys_id: $PROJECT_ID)"
+            else
+              echo "   ⚠️  Failed to create project, continuing without project linkage..."
+              PROJECT_ID=""
+            fi
+          else
+            PROJECT_NAME=$(echo "$PROJECT_RESPONSE" | jq -r '.result[0].name // "N/A"')
+            echo "   ✅ Found existing project: $PROJECT_NAME (sys_id: $PROJECT_ID)"
+          fi
+
+          echo ""
+          echo "📤 Uploading smoke test performance summary..."
+
+          # Build payload with project linkage
+          UPLOAD_PAYLOAD='{
+            "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
+            "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
+            "url": "${{ inputs.smoke_test_url }}",
+            "start_time": "'"$START_TIME"'",
+            "finish_time": "'"$FINISH_TIME"'",
+            "duration": '$DURATION',
+            "total_tests": 1,
+            "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
+            "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
+            "skipped_tests": 0,
+            "blocked_tests": 0,
+            "passing_percent": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "100" || echo "0")',
+            "avg_time": '$DURATION_MS',
+            "min_time": '$DURATION_MS',
+            "max_time": '$DURATION_MS',
+            "ninety_percent": '$DURATION_MS',
+            "standard_deviation": 0.0,
+            "throughput": "1",
+            "maximum_virtual_users": 1'
+
+          # Add project linkage if project was created/found
+          if [ -n "$PROJECT_ID" ]; then
+            UPLOAD_PAYLOAD="$UPLOAD_PAYLOAD,\"project\": \"$PROJECT_ID\""
+          fi
+
+          UPLOAD_PAYLOAD="$UPLOAD_PAYLOAD}"
+
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
             -u "${{ secrets.SERVICENOW_USERNAME }}:${{ secrets.SERVICENOW_PASSWORD }}" \
             -H "Content-Type: application/json" \
             -X POST \
-            -d '{
-              "name": "Smoke Tests - Post-Deployment (${{ inputs.environment }})",
-              "tool": "f62c4e49c3fcf614e1bbf0cb050131ef",
-              "url": "${{ inputs.smoke_test_url }}",
-              "start_time": "'"$START_TIME"'",
-              "finish_time": "'"$FINISH_TIME"'",
-              "duration": '$DURATION',
-              "total_tests": 1,
-              "passed_tests": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "1" || echo "0")',
-              "failed_tests": '$([[ "$SMOKE_STATUS" != "passed" ]] && echo "1" || echo "0")',
-              "skipped_tests": 0,
-              "blocked_tests": 0,
-              "passing_percent": '$([[ "$SMOKE_STATUS" == "passed" ]] && echo "100" || echo "0")',
-              "avg_time": '$DURATION_MS',
-              "min_time": '$DURATION_MS',
-              "max_time": '$DURATION_MS',
-              "ninety_percent": '$DURATION_MS',
-              "standard_deviation": 0.0,
-              "throughput": "1",
-              "maximum_virtual_users": 1
-            }' \
+            -d "$UPLOAD_PAYLOAD" \
             "${{ secrets.SERVICENOW_INSTANCE_URL }}/api/now/table/sn_devops_performance_test_summary")
 
           HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -232,8 +281,15 @@ jobs:
           if [ "$HTTP_CODE" = "201" ]; then
             SUMMARY_ID=$(echo "$BODY" | jq -r '.result.sys_id')
             TOOL_VALUE=$(echo "$BODY" | jq -r '.result.tool.value // .result.tool // "null"')
+            LINKED_PROJECT=$(echo "$BODY" | jq -r '.result.project.value // "null"')
             echo "✅ Smoke test performance summary created (sys_id: $SUMMARY_ID)"
-            echo "   Duration: ${DURATION}s, Status: $SMOKE_STATUS, Tool: $TOOL_VALUE"
+            echo "   Duration: ${DURATION}s, Status: $SMOKE_STATUS"
+            echo "   Tool: $TOOL_VALUE"
+            echo "   Project: Freundcloud/microservices-demo (linked: $([ "$LINKED_PROJECT" != "null" ] && echo "✅" || echo "❌"))"
+
+            if [ "$LINKED_PROJECT" != "null" ]; then
+              echo "   🔗 Project sys_id: $LINKED_PROJECT"
+            fi
 
             if [ "$TOOL_VALUE" = "null" ]; then
               echo "⚠️  WARNING: Tool field is 'null' - unexpected issue"
