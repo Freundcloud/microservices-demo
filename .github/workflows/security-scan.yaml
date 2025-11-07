@@ -109,15 +109,21 @@ jobs:
 
       - name: Generate SBOM (Software Bill of Materials)
         id: generate-sbom
-        uses: anchore/sbom-action@v0.17.2
-        with:
-          path: ./
-          format: cyclonedx-json
-          output-file: sbom.cyclonedx.json
-          upload-artifact: false  # Disable artifact upload, we'll handle the file directly
-          upload-artifact-retention: 90
+        run: |
+          echo "🔍 Generating SBOM with Syft..."
 
-      - name: Upload SBOM Artifact Manually
+          # Install syft if not already available
+          if ! command -v syft &> /dev/null; then
+            curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          fi
+
+          # Generate SBOM to file
+          syft scan dir:./ -o cyclonedx-json=sbom.cyclonedx.json
+
+          echo "✅ SBOM generated: sbom.cyclonedx.json"
+          ls -lh sbom.cyclonedx.json
+
+      - name: Upload SBOM Artifact
         if: always() && hashFiles('sbom.cyclonedx.json') != ''
         uses: actions/upload-artifact@v4
         with:
