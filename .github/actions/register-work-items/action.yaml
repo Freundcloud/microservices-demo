@@ -1,0 +1,171 @@
+name: 'Register ServiceNow Work Items'
+description: 'Extract and register GitHub issues as ServiceNow work items for traceability'
+author: 'Claude Code'
+
+branding:
+  icon: 'list'
+  color: 'purple'
+
+inputs:
+  servicenow-username:
+    description: 'ServiceNow username for authentication'
+    required: true
+  servicenow-password:
+    description: 'ServiceNow password for authentication'
+    required: true
+  servicenow-instance-url:
+    description: 'ServiceNow instance URL (e.g., https://instance.service-now.com)'
+    required: true
+  project-id:
+    description: 'ServiceNow project sys_id'
+    required: false
+    default: 'c6c9eb71c34d7a50b71ef44c05013194'
+  tool-id:
+    description: 'ServiceNow tool sys_id'
+    required: false
+    default: 'f62c4e49c3fcf614e1bbf0cb050131ef'
+
+outputs:
+  work-items-registered:
+    description: 'Number of work items registered'
+    value: ${{ steps.register.outputs.count }}
+  work-item-ids:
+    description: 'Comma-separated list of work item sys_ids'
+    value: ${{ steps.register.outputs.ids }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Extract Work Items from Commit Messages
+      id: extract
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "🔍 Extracting work items from commit messages..."
+
+        # Get commits in this push (or use default base if not available)
+        if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+          COMMITS=$(git log --pretty=format:"%s" ${{ github.event.before }}..${{ github.sha }} 2>/dev/null || git log --pretty=format:"%s" -10)
+        else
+          # For first push or when before SHA not available, get last 10 commits
+          COMMITS=$(git log --pretty=format:"%s" -10)
+        fi
+
+        # Extract issue numbers from commit messages
+        # Matches patterns like: "Fixes #123", "Closes #456", "Resolves #789", "Issue #123", "#123"
+        ISSUE_NUMBERS=$(echo "$COMMITS" | grep -oP '(?:Fixes|Closes|Resolves|Issue)?\s*#\K\d+' | sort -u || echo "")
+
+        if [ -z "$ISSUE_NUMBERS" ]; then
+          echo "ℹ️  No issue references found in commit messages"
+          echo "issue_numbers=" >> $GITHUB_OUTPUT
+          echo "count=0" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Convert to space-separated list
+        ISSUE_LIST=$(echo "$ISSUE_NUMBERS" | tr '\n' ' ' | xargs)
+        ISSUE_COUNT=$(echo "$ISSUE_NUMBERS" | wc -l)
+
+        echo "✅ Found $ISSUE_COUNT issue reference(s): $ISSUE_LIST"
+        echo "issue_numbers=$ISSUE_LIST" >> $GITHUB_OUTPUT
+        echo "count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+
+    - name: Register Work Items in ServiceNow
+      id: register
+      if: steps.extract.outputs.count != '0'
+      shell: bash
+      env:
+        SERVICENOW_USERNAME: ${{ inputs.servicenow-username }}
+        SERVICENOW_PASSWORD: ${{ inputs.servicenow-password }}
+        SERVICENOW_INSTANCE_URL: ${{ inputs.servicenow-instance-url }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        TOOL_ID: ${{ inputs.tool-id }}
+        ISSUE_NUMBERS: ${{ steps.extract.outputs.issue_numbers }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "📝 Registering work items in ServiceNow..."
+
+        REGISTERED_COUNT=0
+        WORK_ITEM_IDS=""
+
+        for ISSUE_NUM in $ISSUE_NUMBERS; do
+          echo ""
+          echo "Processing Issue #$ISSUE_NUM..."
+
+          # Get issue details from GitHub API
+          ISSUE_DATA=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM" 2>&1)
+
+          if [ $? -ne 0 ]; then
+            echo "⚠️  Failed to fetch issue #$ISSUE_NUM from GitHub (may not exist or be inaccessible)"
+            continue
+          fi
+
+          ISSUE_TITLE=$(echo "$ISSUE_DATA" | jq -r '.title // "Unknown"')
+          ISSUE_STATE=$(echo "$ISSUE_DATA" | jq -r '.state // "unknown"')
+          ISSUE_URL=$(echo "$ISSUE_DATA" | jq -r '.html_url // ""')
+
+          if [ "$ISSUE_TITLE" = "Unknown" ] || [ -z "$ISSUE_URL" ]; then
+            echo "⚠️  Invalid issue data for #$ISSUE_NUM, skipping"
+            continue
+          fi
+
+          echo "   Title: $ISSUE_TITLE"
+          echo "   State: $ISSUE_STATE"
+
+          # Check if work item already exists for this issue
+          EXISTING=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_work_item?sysparm_query=url=$ISSUE_URL&sysparm_fields=sys_id,number" \
+            | jq -r '.result | length')
+
+          if [ "$EXISTING" != "0" ]; then
+            echo "ℹ️  Work item already exists for Issue #$ISSUE_NUM, skipping"
+            continue
+          fi
+
+          # Create work item in ServiceNow
+          RESPONSE=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "{
+              \"name\": \"$ISSUE_TITLE\",
+              \"external_id\": \"$ISSUE_NUM\",
+              \"url\": \"$ISSUE_URL\",
+              \"status\": \"$ISSUE_STATE\",
+              \"type\": \"issue\",
+              \"project\": \"$PROJECT_ID\",
+              \"tool\": \"$TOOL_ID\"
+            }" \
+            "$SERVICENOW_INSTANCE_URL/api/now/table/sn_devops_work_item")
+
+          # Check if successful
+          if echo "$RESPONSE" | jq -e '.result' > /dev/null 2>&1; then
+            WORK_ITEM_ID=$(echo "$RESPONSE" | jq -r '.result.sys_id')
+            WORK_ITEM_NUMBER=$(echo "$RESPONSE" | jq -r '.result.number // "N/A"')
+
+            echo "   ✅ Created work item: $WORK_ITEM_NUMBER (sys_id: $WORK_ITEM_ID)"
+
+            REGISTERED_COUNT=$((REGISTERED_COUNT + 1))
+            if [ -z "$WORK_ITEM_IDS" ]; then
+              WORK_ITEM_IDS="$WORK_ITEM_ID"
+            else
+              WORK_ITEM_IDS="$WORK_ITEM_IDS,$WORK_ITEM_ID"
+            fi
+          else
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // "Unknown error"')
+            echo "   ⚠️  Failed to create work item: $ERROR_MSG"
+          fi
+        done
+
+        echo ""
+        echo "📊 Summary: Registered $REGISTERED_COUNT work item(s)"
+
+        # Set outputs
+        echo "count=$REGISTERED_COUNT" >> $GITHUB_OUTPUT
+        echo "ids=$WORK_ITEM_IDS" >> $GITHUB_OUTPUT
+
+        if [ "$REGISTERED_COUNT" -gt 0 ]; then
+          echo ""
+          echo "🔗 View work items in ServiceNow:"
+          echo "   $SERVICENOW_INSTANCE_URL/now/nav/ui/classic/params/target/sn_devops_work_item_list.do"
+        fi

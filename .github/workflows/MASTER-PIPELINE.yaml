@@ -72,10 +72,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for work items extraction from commit history
 
       - name: Register Job in ServiceNow
         continue-on-error: true
         uses: ./.github/actions/register-orchestration-task
+        with:
+          servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
+          servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
+          servicenow-instance-url: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+
+      - name: Register Work Items
+        continue-on-error: true
+        uses: ./.github/actions/register-work-items
         with:
           servicenow-username: ${{ secrets.SERVICENOW_USERNAME }}
           servicenow-password: ${{ secrets.SERVICENOW_PASSWORD }}
