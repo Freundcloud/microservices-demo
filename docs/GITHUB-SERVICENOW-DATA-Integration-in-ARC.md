@@ -84,12 +84,14 @@ graph TB
 All API communications utilize HTTP Basic Authentication with credentials managed through GitHub Secrets. The authentication flow implements the following security controls:
 
 **Credential Management:**
+
 - ServiceNow username and password stored as GitHub repository secrets
 - Secrets never logged or exposed in workflow outputs
 - Each API request creates a new authenticated session
 - No long-lived tokens or session persistence
 
 **API Endpoint Security:**
+
 - All requests use HTTPS (TLS 1.2+)
 - ServiceNow instance URL validated before use
 - API responses parsed and validated before processing
@@ -147,7 +149,7 @@ sequenceDiagram
 | `number` | String | Auto-generated | TASK0001234 | Human-readable identifier |
 | `name` | String | Composite | Freundcloud/microservices-demo/Master CI/CD Pipeline#Pipeline Initialization | Fully qualified job name |
 | `native_id` | String | Composite | Same as name | Unique identifier for deduplication |
-| `task_url` | URL | GitHub API | https://github.com/.../job/54808245339 | Direct link to job execution |
+| `task_url` | URL | GitHub API | <https://github.com/.../job/54808245339> | Direct link to job execution |
 | `project` | Reference | Secret | c6c9eb71c34d7a50b71ef44c05013194 | Links to sn_devops_project |
 | `tool` | Reference | Secret | f62c4e49c3fcf614e1bbf0cb050131ef | Links to sn_devops_tool (GithHubARC) |
 | `track` | Boolean | Hardcoded | true | Enables tracking in DevOps workspace |
@@ -242,6 +244,7 @@ sequenceDiagram
 The work item extraction uses a robust regex pattern that handles multiple conventions:
 
 **Supported Patterns:**
+
 - `Fixes #123` - Explicit closure intent
 - `Closes #456` - Alternative closure keyword
 - `Resolves #789` - Resolution keyword
@@ -249,6 +252,7 @@ The work item extraction uses a robust regex pattern that handles multiple conve
 - `#112` - Bare issue number (GitHub auto-linking format)
 
 **Implementation:**
+
 ```bash
 grep -oP '(?:Fixes|Closes|Resolves|Issue)?\s*#\K\d+' | sort -u
 ```
@@ -266,7 +270,7 @@ The initial implementation only parsed commit subject lines (`%s`), missing issu
 | `number` | String | Auto-generated | WI0001197 | Human-readable identifier |
 | `name` | String | GitHub API | Add user authentication | Issue title from GitHub |
 | `external_id` | String | Commit message | 80 | GitHub issue number |
-| `url` | URL | GitHub API | https://github.com/.../issues/80 | Direct link to issue |
+| `url` | URL | GitHub API | <https://github.com/.../issues/80> | Direct link to issue |
 | `status` | String | GitHub API | open / closed | Issue state |
 | `type` | String | Hardcoded | issue | Work item type classification |
 | `project` | Reference | Secret | c6c9eb71c34d7a50b71ef44c05013194 | Links to sn_devops_project |
@@ -346,7 +350,7 @@ sequenceDiagram
 | `test_result` | String | Computed | success / failure / skipped | Overall test outcome |
 | `tool` | Reference | Secret | f62c4e49c3fcf614e1bbf0cb050131ef | Links to sn_devops_tool |
 | `project` | Reference | Secret | c6c9eb71c34d7a50b71ef44c05013194 | Links to sn_devops_project |
-| `execution_url` | URL | GitHub context | https://github.com/.../runs/... | Link to test execution logs |
+| `execution_url` | URL | GitHub context | <https://github.com/.../runs/>... | Link to test execution logs |
 | `start_time` | Datetime | Test report | 2025-11-07T15:02:00Z | Test execution start |
 | `end_time` | Datetime | Test report | 2025-11-07T15:08:30Z | Test execution completion |
 | `duration` | Integer | Calculated | 390 | Duration in seconds |
@@ -378,6 +382,7 @@ Aggregates all test results for a single pipeline execution, providing a rollup 
 The integration captures test results from multiple sources:
 
 **1. Unit Tests (Per Service)**
+
 - Frontend (Go) - via `go test`
 - Cart Service (C#) - via `dotnet test`
 - Product Catalog (Go) - via `go test`
@@ -388,18 +393,21 @@ The integration captures test results from multiple sources:
 - All other microservices following language-specific patterns
 
 **2. Security Scans**
+
 - Trivy vulnerability scanning (CRITICAL/HIGH/MEDIUM/LOW counts)
 - CodeQL static analysis (per language)
 - Semgrep security rule violations
 - Gitleaks secret detection
 
 **3. Code Quality**
+
 - SonarCloud quality gate results
 - Code coverage percentages
 - Technical debt metrics
 - Maintainability ratings
 
 **4. Integration Tests**
+
 - Smoke tests (endpoint accessibility)
 - End-to-end test scenarios
 - Performance test results
@@ -417,6 +425,7 @@ Capture security scanning results including Software Bill of Materials (SBOM), v
 Security scan integration utilizes specialized DevOps tables designed for security artifact management:
 
 **Primary Tables:**
+
 1. `sn_devops_artifact` - SBOM and security artifacts
 2. `sn_devops_test_result` - Security scan execution results
 3. `sn_devops_security_result` - Detailed vulnerability findings (if available)
@@ -516,7 +525,7 @@ sequenceDiagram
 | `project` | Reference | Secret | c6c9eb71c34d7a50b71ef44c05013194 | Links to sn_devops_project |
 | `sbom_data` | Text | SBOM file | <base64-encoded-json> | Complete SBOM content |
 | `component_count` | Integer | Computed | 342 | Number of components in SBOM |
-| `artifact_url` | URL | GitHub | https://github.com/.../runs/... | Link to artifact source |
+| `artifact_url` | URL | GitHub | <https://github.com/.../runs/>... | Link to artifact source |
 
 ### Security Test Results Structure
 
@@ -574,6 +583,7 @@ The implementation uses a hybrid strategy combining:
 2. **DevOps Tables** - Supplementary tracking (sn_devops_change_reference, etc.)
 
 This approach provides:
+
 - Traditional change request numbers (CHG0030XXX) for compliance
 - 40+ custom fields for complete audit trail
 - DevOps workspace visibility
@@ -674,7 +684,7 @@ sequenceDiagram
 | `u_deployment_status` | String | success / failure | Deployment outcome |
 | `u_running_pods` | Integer | 36 | Healthy pods after deployment |
 | `u_total_pods` | Integer | 36 | Total expected pods |
-| `u_frontend_url` | URL | http://alb-xyz.amazonaws.com | Application URL |
+| `u_frontend_url` | URL | <http://alb-xyz.amazonaws.com> | Application URL |
 | `u_smoke_test_status` | String | passed | Smoke test outcome |
 | `u_smoke_test_duration` | Integer | 45 | Smoke test duration (seconds) |
 | `u_correlation_id` | String | 19172412878-prod | Unique correlation ID |
@@ -690,7 +700,7 @@ Links change requests to DevOps pipeline executions, enabling bi-directional tra
 | `change_request` | Reference | stu901vwx234... | Links to change_request.sys_id |
 | `pipeline_name` | String | Deploy to prod | Human-readable pipeline name |
 | `pipeline_id` | String | 19172412878 | GitHub run_id (correlation) |
-| `pipeline_url` | URL | https://github.com/.../runs/... | Direct link to execution |
+| `pipeline_url` | URL | <https://github.com/.../runs/>... | Direct link to execution |
 | `tool` | Reference | f62c4e49... | Links to sn_devops_tool |
 
 ### Approval Workflow Logic
@@ -969,26 +979,31 @@ erDiagram
 ### Table Index Summary
 
 **Core Tables:**
+
 - `sn_devops_tool` - CI/CD tool registration (GitHub, Jenkins, GitLab, etc.)
 - `sn_devops_project` - Project/repository tracking
 - `sn_devops_orchestration_task` - Pipeline job execution tracking
 - `sn_devops_work_item` - Requirements and issue tracking
 
 **Testing Tables:**
+
 - `sn_devops_test_result` - Individual test suite executions
 - `sn_devops_test_summary` - Aggregated test metrics per pipeline
 - `sn_devops_performance_test_summary` - Performance and smoke test results
 
 **Security Tables:**
+
 - `sn_devops_artifact` - SBOM and security artifacts
 - `sn_devops_software_quality_scan_summary` - Code quality scan results
 - `sn_devops_software_quality_scan_detail` - Individual security findings
 
 **Package Management Tables:**
+
 - `sn_devops_package` - Deployment package tracking
 - `sn_devops_artifact` - Individual artifacts within packages
 
 **Change Management Tables:**
+
 - `change_request` - Traditional ServiceNow change requests
 - `sn_devops_change_reference` - Links change requests to pipelines
 
@@ -1007,6 +1022,7 @@ Authorization: Basic <base64-encoded-credentials>
 Where credentials are encoded as: `base64(username:password)`
 
 **Security Considerations:**
+
 - Credentials stored as GitHub encrypted secrets
 - Never logged or exposed in workflow outputs
 - Each request creates new authenticated session
@@ -1025,6 +1041,7 @@ Authorization: Basic <credentials>
 ServiceNow provides two API patterns:
 
 **1. Table API (Standard REST)**
+
 ```
 POST   /api/now/table/{table_name}
 GET    /api/now/table/{table_name}/{sys_id}
@@ -1034,6 +1051,7 @@ DELETE /api/now/table/{table_name}/{sys_id}
 ```
 
 **2. DevOps API (Specialized)**
+
 ```
 POST /api/sn_devops/devops/tool/test
 POST /api/sn_devops/devops/package/registration
@@ -1066,6 +1084,7 @@ POST /api/sn_devops/devops/artifact/registration
 ### Response Format Standards
 
 **Successful Response (201 Created):**
+
 ```json
 {
   "result": {
@@ -1079,6 +1098,7 @@ POST /api/sn_devops/devops/artifact/registration
 ```
 
 **Error Response (400 Bad Request):**
+
 ```json
 {
   "error": {
@@ -1090,6 +1110,7 @@ POST /api/sn_devops/devops/artifact/registration
 ```
 
 **Query Result (200 OK):**
+
 ```json
 {
   "result": [
@@ -1114,11 +1135,14 @@ POST /api/sn_devops/devops/artifact/registration
 **Problem:** Initial implementation used incorrect tool sys_id, causing records to not link to correct project.
 
 **Root Cause:** ServiceNow instance had multiple tools registered for GitHub integration:
+
 - GithHubARC (correct, sys_id: f62c4e49c3fcf614e1bbf0cb050131ef)
 - GitHub (incorrect, different sys_id)
 
 **Solution:**
+
 1. Query ServiceNow to identify correct tool:
+
 ```bash
 curl -u "$USER:$PASS" \
   "$SN_URL/api/now/table/sn_devops_tool?sysparm_query=nameLIKEGith" \
@@ -1156,16 +1180,19 @@ COMMITS=$(git log --pretty=format:"%s%n%b" -10)
 **Problem:** Uncertainty about which API to use for change request creation.
 
 **Analysis:**
+
 - DevOps Change Control API requires plugin configuration
 - Table API works immediately with any ServiceNow instance
 - Custom fields not available in DevOps Change Control API
 
 **Solution:** Implement hybrid approach:
+
 1. Use Table API for change request creation (with 40+ custom fields)
 2. Use DevOps tables for supplementary tracking (test results, artifacts, work items)
 3. Link via `sn_devops_change_reference` table
 
 **Benefits:**
+
 - No ServiceNow configuration required
 - Full compliance data capture
 - DevOps workspace visibility
@@ -1180,11 +1207,13 @@ COMMITS=$(git log --pretty=format:"%s%n%b" -10)
 **Root Cause:** Parallel job execution - test jobs complete before change request creation job.
 
 **Solution:**
+
 1. Create change request first
 2. Pass change_sys_id to downstream jobs via outputs
 3. Associate test results with change request in subsequent jobs
 
 **Implementation:**
+
 ```yaml
 jobs:
   servicenow-change:
@@ -1206,12 +1235,14 @@ jobs:
 **Current State:** Change requests updated post-deployment with final status.
 
 **Enhancement:** Stream deployment progress to ServiceNow in real-time:
+
 - Pod readiness updates every 30 seconds
 - Service health check results
 - Rolling update progress percentage
 - Error and warning log streaming
 
 **Implementation Approach:**
+
 ```yaml
 - name: Stream Deployment Status
   run: |
@@ -1230,12 +1261,14 @@ jobs:
 ### 2. Automated Rollback Integration
 
 **Enhancement:** Link ServiceNow change request state to automatic rollback:
+
 - Monitor change request state during deployment
 - If changed to "cancelled", trigger rollback
 - Update change request with rollback evidence
 - Restore previous version from package registry
 
 **Implementation Approach:**
+
 ```yaml
 - name: Monitor for Cancellation
   run: |
@@ -1257,6 +1290,7 @@ jobs:
 ### 3. Advanced Analytics Integration
 
 **Enhancement:** Populate ServiceNow analytics tables for trend analysis:
+
 - Deployment frequency metrics
 - Lead time for changes
 - Mean time to recovery (MTTR)
@@ -1264,6 +1298,7 @@ jobs:
 - DORA metrics calculation
 
 **Tables to Populate:**
+
 - `sn_devops_deployment_metrics`
 - `sn_devops_change_velocity`
 - `sn_devops_reliability_metrics`
@@ -1271,6 +1306,7 @@ jobs:
 ### 4. Bi-Directional Synchronization
 
 **Enhancement:** Sync change request updates back to GitHub:
+
 - Create GitHub issue when change request created
 - Update issue status based on change request state
 - Link ServiceNow change number in GitHub issue
@@ -1279,12 +1315,14 @@ jobs:
 ### 5. Configuration Item (CI) Integration
 
 **Enhancement:** Register deployed services as Configuration Items in ServiceNow CMDB:
+
 - Create CI records for each microservice
 - Link CIs to change requests
 - Track service dependencies via CI relationships
 - Maintain CI version history
 
 **Implementation:**
+
 ```bash
 # Create CI for each service
 curl -X POST -u "$USER:$PASS" \
@@ -1301,6 +1339,7 @@ curl -X POST -u "$USER:$PASS" \
 ### 6. Performance Test Integration
 
 **Enhancement:** Capture performance test results from load testing tools:
+
 - Locust load test metrics
 - K6 performance test results
 - JMeter test execution data
@@ -1312,6 +1351,7 @@ curl -X POST -u "$USER:$PASS" \
 ### 7. Security Vulnerability Tracking
 
 **Enhancement:** Detailed vulnerability management in ServiceNow:
+
 - Individual vulnerability records (CVE tracking)
 - Severity-based assignment rules
 - Remediation tracking and verification
@@ -1319,6 +1359,7 @@ curl -X POST -u "$USER:$PASS" \
 - Integration with security information and event management (SIEM)
 
 **Tables:**
+
 - `sn_devops_security_result`
 - `sn_devops_vulnerability`
 
@@ -1373,12 +1414,14 @@ curl -X POST -u "$USER:$PASS" \
 **Issue: Orchestration tasks not appearing in ServiceNow**
 
 **Diagnosis:**
+
 1. Check workflow logs for API response codes
 2. Verify tool sys_id matches project configuration
 3. Confirm GitHub token has correct permissions
 4. Validate ServiceNow credentials
 
 **Resolution:**
+
 ```bash
 # Verify tool sys_id
 curl -u "$USER:$PASS" \
@@ -1394,11 +1437,13 @@ curl -u "$USER:$PASS" \
 **Issue: Work items not extracted from commits**
 
 **Diagnosis:**
+
 1. Check commit message format for issue references
 2. Verify GitHub token has `issues: read` permission
 3. Confirm issue numbers are valid and accessible
 
 **Resolution:**
+
 ```bash
 # Test issue extraction locally
 git log --pretty=format:"%s%n%b" -10 \
@@ -1412,11 +1457,13 @@ gh api /repos/Freundcloud/microservices-demo/issues/80
 **Issue: Test results not linked to change request**
 
 **Diagnosis:**
+
 1. Verify change request created before test result upload
 2. Check change_sys_id output from change request job
 3. Confirm test result API payload includes change_request field
 
 **Resolution:**
+
 ```yaml
 # Add debug output in workflow
 - name: Debug Change Request
@@ -1489,7 +1536,7 @@ All ServiceNow credentials stored as GitHub repository or organization secrets:
 |-------------|---------|---------------|
 | `SERVICENOW_USERNAME` | API authentication username | github_integration |
 | `SERVICENOW_PASSWORD` | API authentication password | (encrypted) |
-| `SERVICENOW_INSTANCE_URL` | ServiceNow instance base URL | https://calitiiltddemo3.service-now.com |
+| `SERVICENOW_INSTANCE_URL` | ServiceNow instance base URL | <https://calitiiltddemo3.service-now.com> |
 | `SN_ORCHESTRATION_TOOL_ID` | Tool sys_id for record linking | f62c4e49c3fcf614e1bbf0cb050131ef |
 
 **Secret Rotation Policy:**
@@ -1502,11 +1549,13 @@ All ServiceNow credentials stored as GitHub repository or organization secrets:
 ### API Request Security
 
 **TLS/SSL Enforcement:**
+
 - All API requests use HTTPS (TLS 1.2 minimum)
 - Certificate validation enabled (no self-signed certs in production)
 - Hostname verification enforced
 
 **Request Validation:**
+
 ```bash
 # Validate instance URL before API call
 if [[ ! "$SERVICENOW_INSTANCE_URL" =~ ^https://[a-z0-9-]+\.service-now\.com$ ]]; then
@@ -1516,6 +1565,7 @@ fi
 ```
 
 **Input Sanitization:**
+
 ```bash
 # Sanitize user-controlled input before API call
 COMMIT_MESSAGE=$(echo "$RAW_COMMIT_MSG" | jq -Rs .)  # JSON-safe escaping
@@ -1526,6 +1576,7 @@ COMMIT_MESSAGE=$(echo "$RAW_COMMIT_MSG" | jq -Rs .)  # JSON-safe escaping
 **Logging Requirements:**
 
 1. **Log all API calls** (without credentials):
+
 ```yaml
 - name: Create Orchestration Task
   run: |
@@ -1536,11 +1587,13 @@ COMMIT_MESSAGE=$(echo "$RAW_COMMIT_MSG" | jq -Rs .)  # JSON-safe escaping
 ```
 
 2. **Log ServiceNow record identifiers:**
+
 ```yaml
 echo "Created: $TASK_NUMBER (sys_id: $TASK_SYS_ID)"
 ```
 
 3. **Retain logs for compliance:**
+
 - GitHub Actions logs retained for 90 days minimum
 - ServiceNow audit tables (`sys_audit`) track all record changes
 - Export critical logs to long-term storage (S3, CloudWatch)
@@ -1552,18 +1605,21 @@ echo "Created: $TASK_NUMBER (sys_id: $TASK_SYS_ID)"
 The GitHub-ServiceNow integration implemented in ARC establishes a comprehensive DevOps platform that bridges development workflows with enterprise change management and compliance requirements. By utilizing ServiceNow's REST API and DevOps-specific tables, the solution achieves:
 
 **Technical Excellence:**
+
 - Complete automation of manual data entry processes
 - Real-time synchronization between GitHub Actions and ServiceNow
 - Robust error handling and non-blocking failure modes
 - Scalable architecture supporting 12+ microservices
 
 **Business Value:**
+
 - Compliance-ready audit trails for SOC 2, ISO 27001, PCI DSS
 - Reduced deployment friction through automated approvals
 - Complete traceability from commit to production
 - Risk-based decision making with comprehensive test evidence
 
 **Operational Benefits:**
+
 - Zero-configuration deployment (no ServiceNow plugins required)
 - Environment-agnostic implementation (works on all ServiceNow instances)
 - Extensible architecture supporting future enhancements
@@ -1614,18 +1670,21 @@ This integration serves as a reference implementation for organizations seeking 
 ### Key Workflows
 
 **Master CI/CD Pipeline:**
+
 - Path: `.github/workflows/MASTER-PIPELINE.yaml`
 - Trigger: Push to main, pull requests, manual dispatch
 - Jobs: 15+ jobs orchestrating build, test, scan, deploy
 - ServiceNow Integration: Orchestration tasks, work items, test results, change requests
 
 **Change Request Creation:**
+
 - Path: `.github/workflows/servicenow-change-rest.yaml`
 - Type: Reusable workflow
 - Purpose: Create change request with 40+ custom fields
 - Outputs: change_number, change_sys_id
 
 **Test Result Upload:**
+
 - Path: `.github/workflows/upload-test-results-servicenow.yaml`
 - Type: Reusable workflow
 - Purpose: Upload test execution results to ServiceNow
@@ -1634,11 +1693,13 @@ This integration serves as a reference implementation for organizations seeking 
 ### Composite Actions
 
 **Register Orchestration Task:**
+
 - Path: `.github/actions/register-orchestration-task/action.yaml`
 - Usage: Track GitHub Actions jobs in ServiceNow
 - Integration: sn_devops_orchestration_task table
 
 **Register Work Items:**
+
 - Path: `.github/actions/register-work-items/action.yaml`
 - Usage: Extract issues from commits and register in ServiceNow
 - Integration: sn_devops_work_item table
@@ -1655,6 +1716,7 @@ This integration serves as a reference implementation for organizations seeking 
 **Audience:** Engineers, Architects, Technical Partners
 
 **Related Documentation:**
+
 - [GITHUB-SERVICENOW-DATA-FLOW.md](GITHUB-SERVICENOW-DATA-FLOW.md) - Visual demo guide
 - [SERVICENOW-HYBRID-APPROACH.md](implemented/SERVICENOW-HYBRID-APPROACH.md) - Implementation strategy
 - [SERVICENOW-DEVOPS-TABLES-REFERENCE.md](implemented/SERVICENOW-DEVOPS-TABLES-REFERENCE.md) - Table schemas
@@ -1663,4 +1725,4 @@ This integration serves as a reference implementation for organizations seeking 
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.0 | 2025-11-10 | Claude Code | Initial technical deep dive document |
+| 1.0 | 2025-11-10 | Olaf Krasicki-Freund | Initial technical deep dive document |
