@@ -1,0 +1,2744 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>GitHub-ServiceNow Data Integration in ARC</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown.min.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">GitHub-ServiceNow Data Integration in ARC</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#github-servicenow-data-integration-in-arc"
+id="toc-github-servicenow-data-integration-in-arc">GitHub-ServiceNow
+Data Integration in ARC</a>
+<ul>
+<li><a href="#executive-summary" id="toc-executive-summary">Executive
+Summary</a>
+<ul>
+<li><a href="#architecture-overview"
+id="toc-architecture-overview">Architecture Overview</a></li>
+<li><a href="#key-integration-points"
+id="toc-key-integration-points">Key Integration Points</a></li>
+</ul></li>
+<li><a href="#solution-architecture"
+id="toc-solution-architecture">Solution Architecture</a>
+<ul>
+<li><a href="#high-level-integration-flow"
+id="toc-high-level-integration-flow">High-Level Integration
+Flow</a></li>
+<li><a href="#authentication-and-security-model"
+id="toc-authentication-and-security-model">Authentication and Security
+Model</a></li>
+</ul></li>
+<li><a href="#component-1-orchestration-task-registration"
+id="toc-component-1-orchestration-task-registration">Component 1:
+Orchestration Task Registration</a>
+<ul>
+<li><a href="#purpose" id="toc-purpose">Purpose</a></li>
+<li><a href="#technical-implementation"
+id="toc-technical-implementation">Technical Implementation</a></li>
+<li><a href="#data-model" id="toc-data-model">Data Model</a></li>
+<li><a href="#api-request-structure" id="toc-api-request-structure">API
+Request Structure</a></li>
+<li><a href="#error-handling-strategy"
+id="toc-error-handling-strategy">Error Handling Strategy</a></li>
+</ul></li>
+<li><a href="#component-2-work-item-extraction-and-registration"
+id="toc-component-2-work-item-extraction-and-registration">Component 2:
+Work Item Extraction and Registration</a>
+<ul>
+<li><a href="#purpose-1" id="toc-purpose-1">Purpose</a></li>
+<li><a href="#technical-implementation-1"
+id="toc-technical-implementation-1">Technical Implementation</a></li>
+<li><a href="#commit-message-parsing-logic"
+id="toc-commit-message-parsing-logic">Commit Message Parsing
+Logic</a></li>
+<li><a href="#data-model-1" id="toc-data-model-1">Data Model</a></li>
+<li><a href="#deduplication-strategy"
+id="toc-deduplication-strategy">Deduplication Strategy</a></li>
+</ul></li>
+<li><a href="#component-3-test-result-integration"
+id="toc-component-3-test-result-integration">Component 3: Test Result
+Integration</a>
+<ul>
+<li><a href="#purpose-2" id="toc-purpose-2">Purpose</a></li>
+<li><a href="#architecture" id="toc-architecture">Architecture</a></li>
+<li><a href="#test-result-data-flow" id="toc-test-result-data-flow">Test
+Result Data Flow</a></li>
+<li><a href="#test-result-table-schema"
+id="toc-test-result-table-schema">Test Result Table Schema</a></li>
+<li><a href="#test-summary-table-schema"
+id="toc-test-summary-table-schema">Test Summary Table Schema</a></li>
+<li><a href="#test-type-coverage" id="toc-test-type-coverage">Test Type
+Coverage</a></li>
+</ul></li>
+<li><a href="#component-4-security-scan-integration"
+id="toc-component-4-security-scan-integration">Component 4: Security
+Scan Integration</a>
+<ul>
+<li><a href="#purpose-3" id="toc-purpose-3">Purpose</a></li>
+<li><a href="#architecture-1"
+id="toc-architecture-1">Architecture</a></li>
+<li><a href="#security-scan-flow-diagram"
+id="toc-security-scan-flow-diagram">Security Scan Flow Diagram</a></li>
+<li><a href="#sbom-artifact-structure"
+id="toc-sbom-artifact-structure">SBOM Artifact Structure</a></li>
+<li><a href="#artifact-table-schema"
+id="toc-artifact-table-schema">Artifact Table Schema</a></li>
+<li><a href="#security-test-results-structure"
+id="toc-security-test-results-structure">Security Test Results
+Structure</a></li>
+</ul></li>
+<li><a href="#component-5-change-request-automation"
+id="toc-component-5-change-request-automation">Component 5: Change
+Request Automation</a>
+<ul>
+<li><a href="#purpose-4" id="toc-purpose-4">Purpose</a></li>
+<li><a href="#hybrid-approach-architecture"
+id="toc-hybrid-approach-architecture">Hybrid Approach
+Architecture</a></li>
+<li><a href="#change-request-creation-flow"
+id="toc-change-request-creation-flow">Change Request Creation
+Flow</a></li>
+<li><a href="#change-request-data-model"
+id="toc-change-request-data-model">Change Request Data Model</a></li>
+<li><a href="#change-reference-linking"
+id="toc-change-reference-linking">Change Reference Linking</a></li>
+<li><a href="#approval-workflow-logic"
+id="toc-approval-workflow-logic">Approval Workflow Logic</a></li>
+</ul></li>
+<li><a href="#component-6-package-registration"
+id="toc-component-6-package-registration">Component 6: Package
+Registration</a>
+<ul>
+<li><a href="#purpose-5" id="toc-purpose-5">Purpose</a></li>
+<li><a href="#technical-implementation-2"
+id="toc-technical-implementation-2">Technical Implementation</a></li>
+<li><a href="#package-registration-flow"
+id="toc-package-registration-flow">Package Registration Flow</a></li>
+<li><a href="#package-data-structure"
+id="toc-package-data-structure">Package Data Structure</a></li>
+</ul></li>
+<li><a href="#database-schema-reference"
+id="toc-database-schema-reference">Database Schema Reference</a>
+<ul>
+<li><a href="#entity-relationship-diagram"
+id="toc-entity-relationship-diagram">Entity Relationship
+Diagram</a></li>
+<li><a href="#table-index-summary" id="toc-table-index-summary">Table
+Index Summary</a></li>
+</ul></li>
+<li><a href="#rest-api-specifications"
+id="toc-rest-api-specifications">REST API Specifications</a>
+<ul>
+<li><a href="#authentication"
+id="toc-authentication">Authentication</a></li>
+<li><a href="#common-request-headers"
+id="toc-common-request-headers">Common Request Headers</a></li>
+<li><a href="#api-endpoint-patterns" id="toc-api-endpoint-patterns">API
+Endpoint Patterns</a></li>
+<li><a href="#query-parameter-reference"
+id="toc-query-parameter-reference">Query Parameter Reference</a></li>
+<li><a href="#response-format-standards"
+id="toc-response-format-standards">Response Format Standards</a></li>
+</ul></li>
+<li><a href="#implementation-challenges-and-solutions"
+id="toc-implementation-challenges-and-solutions">Implementation
+Challenges and Solutions</a>
+<ul>
+<li><a href="#challenge-1-tool-id-mismatch"
+id="toc-challenge-1-tool-id-mismatch">Challenge 1: Tool ID
+Mismatch</a></li>
+<li><a href="#challenge-2-commit-message-parsing-for-work-items"
+id="toc-challenge-2-commit-message-parsing-for-work-items">Challenge 2:
+Commit Message Parsing for Work Items</a></li>
+<li><a href="#challenge-3-devops-api-vs-table-api-selection"
+id="toc-challenge-3-devops-api-vs-table-api-selection">Challenge 3:
+DevOps API vs Table API Selection</a></li>
+<li><a href="#challenge-4-test-result-upload-timing"
+id="toc-challenge-4-test-result-upload-timing">Challenge 4: Test Result
+Upload Timing</a></li>
+</ul></li>
+<li><a href="#future-enhancement-opportunities"
+id="toc-future-enhancement-opportunities">Future Enhancement
+Opportunities</a>
+<ul>
+<li><a href="#real-time-deployment-status-updates"
+id="toc-real-time-deployment-status-updates">1. Real-Time Deployment
+Status Updates</a></li>
+<li><a href="#automated-rollback-integration"
+id="toc-automated-rollback-integration">2. Automated Rollback
+Integration</a></li>
+<li><a href="#advanced-analytics-integration"
+id="toc-advanced-analytics-integration">3. Advanced Analytics
+Integration</a></li>
+<li><a href="#bi-directional-synchronization"
+id="toc-bi-directional-synchronization">4. Bi-Directional
+Synchronization</a></li>
+<li><a href="#configuration-item-ci-integration"
+id="toc-configuration-item-ci-integration">5. Configuration Item (CI)
+Integration</a></li>
+<li><a href="#performance-test-integration"
+id="toc-performance-test-integration">6. Performance Test
+Integration</a></li>
+<li><a href="#security-vulnerability-tracking"
+id="toc-security-vulnerability-tracking">7. Security Vulnerability
+Tracking</a></li>
+</ul></li>
+<li><a href="#operational-considerations"
+id="toc-operational-considerations">Operational Considerations</a>
+<ul>
+<li><a href="#monitoring-and-alerting"
+id="toc-monitoring-and-alerting">Monitoring and Alerting</a></li>
+<li><a href="#troubleshooting-guide"
+id="toc-troubleshooting-guide">Troubleshooting Guide</a></li>
+<li><a href="#performance-optimization"
+id="toc-performance-optimization">Performance Optimization</a></li>
+</ul></li>
+<li><a href="#security-best-practices"
+id="toc-security-best-practices">Security Best Practices</a>
+<ul>
+<li><a href="#credential-management"
+id="toc-credential-management">Credential Management</a></li>
+<li><a href="#api-request-security" id="toc-api-request-security">API
+Request Security</a></li>
+<li><a href="#audit-trail" id="toc-audit-trail">Audit Trail</a></li>
+</ul></li>
+<li><a href="#conclusion" id="toc-conclusion">Conclusion</a></li>
+<li><a href="#appendix-a-api-endpoint-reference"
+id="toc-appendix-a-api-endpoint-reference">Appendix A: API Endpoint
+Reference</a>
+<ul>
+<li><a href="#servicenow-table-api-endpoints"
+id="toc-servicenow-table-api-endpoints">ServiceNow Table API
+Endpoints</a></li>
+<li><a href="#servicenow-devops-api-endpoints"
+id="toc-servicenow-devops-api-endpoints">ServiceNow DevOps API
+Endpoints</a></li>
+</ul></li>
+<li><a href="#appendix-b-workflow-reference"
+id="toc-appendix-b-workflow-reference">Appendix B: Workflow
+Reference</a>
+<ul>
+<li><a href="#key-workflows" id="toc-key-workflows">Key
+Workflows</a></li>
+<li><a href="#composite-actions" id="toc-composite-actions">Composite
+Actions</a></li>
+</ul></li>
+<li><a href="#document-metadata" id="toc-document-metadata">Document
+Metadata</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="github-servicenow-data-integration-in-arc">GitHub-ServiceNow
+Data Integration in ARC</h1>
+<blockquote>
+<p>Technical Implementation Deep Dive Last Updated: 2025-11-10 Status:
+Production</p>
+</blockquote>
+<h2 id="executive-summary">Executive Summary</h2>
+<p>This document provides a comprehensive technical analysis of the
+bi-directional integration between GitHub Actions and ServiceNow DevOps
+implemented in the Application Release Center (ARC). The integration
+establishes complete traceability from code commits through testing,
+security scanning, and deployment, with all artifacts and evidence
+automatically synchronized to ServiceNow for compliance and audit
+purposes.</p>
+<h3 id="architecture-overview">Architecture Overview</h3>
+<p>The integration employs a hybrid approach combining ServiceNow’s
+traditional Change Management API (Table API) with DevOps-specific
+tables to achieve both compliance requirements and operational
+visibility. All communication occurs via authenticated REST API calls
+over HTTPS, with no ServiceNow plugins required on the GitHub side.</p>
+<h3 id="key-integration-points">Key Integration Points</h3>
+<ol type="1">
+<li>Orchestration Task Registration - GitHub Actions job tracking</li>
+<li>Work Item Extraction - Automated issue linking from commit
+messages</li>
+<li>Test Result Reporting - Comprehensive test evidence collection</li>
+<li>Security Scan Integration - Vulnerability and SBOM tracking</li>
+<li>Change Request Automation - Compliance-driven deployment gates</li>
+<li>Package Registration - Artifact and configuration management</li>
+</ol>
+<hr />
+<h2 id="solution-architecture">Solution Architecture</h2>
+<h3 id="high-level-integration-flow">High-Level Integration Flow</h3>
+<pre class="mermaid"><code>graph TB
+    subgraph &quot;GitHub Ecosystem&quot;
+        A[Developer Commit] --&gt; B[GitHub Actions Trigger]
+        B --&gt; C[Master CI/CD Pipeline]
+        C --&gt; D[Parallel Jobs]
+        D --&gt; E1[Build Services]
+        D --&gt; E2[Security Scans]
+        D --&gt; E3[Unit Tests]
+        D --&gt; E4[Infrastructure]
+    end
+
+    subgraph &quot;ServiceNow DevOps Platform&quot;
+        F[sn_devops_orchestration_task]
+        G[sn_devops_work_item]
+        H[sn_devops_test_result]
+        I[sn_devops_test_summary]
+        J[change_request]
+        K[sn_devops_artifact]
+        L[sn_devops_change_reference]
+    end
+
+    subgraph &quot;Integration Layer&quot;
+        M[REST API Authentication]
+        N[Composite Actions]
+        O[Reusable Workflows]
+    end
+
+    C --&gt; M
+    M --&gt; N
+    N --&gt; F
+    N --&gt; G
+    E2 --&gt; O
+    E3 --&gt; O
+    O --&gt; H
+    O --&gt; I
+    E1 --&gt; O
+    O --&gt; K
+    C --&gt; O
+    O --&gt; J
+    J --&gt; L
+    F -.-&gt; J
+    G -.-&gt; J
+    H -.-&gt; J
+    K -.-&gt; J
+
+    style A fill:#e1f5ff
+    style C fill:#fff4e1
+    style M fill:#ffe1f5
+    style J fill:#e8f5e9</code></pre>
+<h3 id="authentication-and-security-model">Authentication and Security
+Model</h3>
+<p>All API communications utilize HTTP Basic Authentication with
+credentials managed through GitHub Secrets. The authentication flow
+implements the following security controls:</p>
+<p><strong>Credential Management:</strong> - ServiceNow username and
+password stored as GitHub repository secrets - Secrets never logged or
+exposed in workflow outputs - Each API request creates a new
+authenticated session - No long-lived tokens or session persistence</p>
+<p><strong>API Endpoint Security:</strong> - All requests use HTTPS (TLS
+1.2+) - ServiceNow instance URL validated before use - API responses
+parsed and validated before processing - Non-blocking error handling
+prevents pipeline failures</p>
+<hr />
+<h2 id="component-1-orchestration-task-registration">Component 1:
+Orchestration Task Registration</h2>
+<h3 id="purpose">Purpose</h3>
+<p>Track individual GitHub Actions jobs as orchestration tasks in
+ServiceNow, enabling visibility into CI/CD pipeline execution at the job
+level rather than just the workflow level.</p>
+<h3 id="technical-implementation">Technical Implementation</h3>
+<p><strong>Composite Action:</strong>
+<code>.github/actions/register-orchestration-task/action.yaml</code></p>
+<p><strong>Execution Flow:</strong></p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant GHA as GitHub Actions Job
+    participant GHAPI as GitHub REST API
+    participant Action as Composite Action
+    participant SNAPI as ServiceNow Table API
+    participant SNDB as sn_devops_orchestration_task
+
+    GHA-&gt;&gt;GHAPI: GET /repos/{repo}/actions/runs/{run_id}/jobs
+    Note over GHA,GHAPI: Authenticate with GITHUB_TOKEN
+    GHAPI--&gt;&gt;GHA: Return jobs array with status
+
+    GHA-&gt;&gt;Action: Filter jobs by status=in_progress or queued
+    Action-&gt;&gt;Action: Extract job_id and job_name from matching job
+    Action-&gt;&gt;Action: Construct native_id: {repo}/{workflow}#{job_name}
+    Action-&gt;&gt;Action: Construct job_url: GitHub Actions job URL
+
+    Action-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_orchestration_task
+    Note over Action,SNAPI: Basic Auth with ServiceNow credentials
+    Note over Action,SNAPI: Payload: name, native_id, task_url, tool, project, track
+
+    SNAPI-&gt;&gt;SNDB: INSERT orchestration_task
+    SNDB--&gt;&gt;SNAPI: Return sys_id and generated task number
+
+    SNAPI--&gt;&gt;Action: Return created record with TASK number
+    Action--&gt;&gt;GHA: Output task_id and task_url for downstream jobs</code></pre>
+<h3 id="data-model">Data Model</h3>
+<p><strong>Table:</strong> <code>sn_devops_orchestration_task</code></p>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 12%" />
+<col style="width: 16%" />
+<col style="width: 30%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Source</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sys_id</code></td>
+<td>UUID</td>
+<td>Generated</td>
+<td>abc123def456…</td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>number</code></td>
+<td>String</td>
+<td>Auto-generated</td>
+<td>TASK0001234</td>
+<td>Human-readable identifier</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>String</td>
+<td>Composite</td>
+<td>Freundcloud/microservices-demo/Master CI/CD Pipeline#Pipeline
+Initialization</td>
+<td>Fully qualified job name</td>
+</tr>
+<tr>
+<td><code>native_id</code></td>
+<td>String</td>
+<td>Composite</td>
+<td>Same as name</td>
+<td>Unique identifier for deduplication</td>
+</tr>
+<tr>
+<td><code>task_url</code></td>
+<td>URL</td>
+<td>GitHub API</td>
+<td>https://github.com/…/job/54808245339</td>
+<td>Direct link to job execution</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>c6c9eb71c34d7a50b71ef44c05013194</td>
+<td>Links to sn_devops_project</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>f62c4e49c3fcf614e1bbf0cb050131ef</td>
+<td>Links to sn_devops_tool (GithHubARC)</td>
+</tr>
+<tr>
+<td><code>track</code></td>
+<td>Boolean</td>
+<td>Hardcoded</td>
+<td>true</td>
+<td>Enables tracking in DevOps workspace</td>
+</tr>
+<tr>
+<td><code>sys_created_on</code></td>
+<td>Datetime</td>
+<td>Auto</td>
+<td>2025-11-07 15:01:23</td>
+<td>Record creation timestamp</td>
+</tr>
+</tbody>
+</table>
+<h3 id="api-request-structure">API Request Structure</h3>
+<pre class="http"><code>POST /api/now/table/sn_devops_orchestration_task HTTP/1.1
+Host: calitiiltddemo3.service-now.com
+Authorization: Basic &lt;base64-credentials&gt;
+Content-Type: application/json
+
+{
+  &quot;name&quot;: &quot;Freundcloud/microservices-demo/Master CI/CD Pipeline#Pipeline Initialization&quot;,
+  &quot;native_id&quot;: &quot;Freundcloud/microservices-demo/Master CI/CD Pipeline#Pipeline Initialization&quot;,
+  &quot;task_url&quot;: &quot;https://github.com/Freundcloud/microservices-demo/actions/runs/19172412878/job/54808245339&quot;,
+  &quot;tool&quot;: &quot;f62c4e49c3fcf614e1bbf0cb050131ef&quot;,
+  &quot;project&quot;: &quot;c6c9eb71c34d7a50b71ef44c05013194&quot;,
+  &quot;track&quot;: true
+}</code></pre>
+<h3 id="error-handling-strategy">Error Handling Strategy</h3>
+<p>The implementation uses a non-blocking approach:</p>
+<ol type="1">
+<li>GitHub API failures return “unknown” job_id (continues
+execution)</li>
+<li>ServiceNow API failures log warning (continues execution)</li>
+<li><code>continue-on-error: true</code> at workflow level prevents
+pipeline stoppage</li>
+<li>All errors logged to workflow output for debugging</li>
+</ol>
+<p>This design ensures that ServiceNow integration issues never block
+deployments while maintaining complete audit trails when successful.</p>
+<hr />
+<h2 id="component-2-work-item-extraction-and-registration">Component 2:
+Work Item Extraction and Registration</h2>
+<h3 id="purpose-1">Purpose</h3>
+<p>Automatically extract GitHub issue references from commit messages
+and register them as work items in ServiceNow, establishing traceability
+between code changes and requirements.</p>
+<h3 id="technical-implementation-1">Technical Implementation</h3>
+<p><strong>Composite Action:</strong>
+<code>.github/actions/register-work-items/action.yaml</code></p>
+<p><strong>Execution Flow:</strong></p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant GHA as GitHub Actions
+    participant Git as Local Git Repository
+    participant GHAPI as GitHub Issues API
+    participant Action as Composite Action
+    participant SNAPI as ServiceNow Table API
+    participant SNDB as sn_devops_work_item
+
+    GHA-&gt;&gt;Git: git log --pretty=format:&quot;%s%n%b&quot; {range}
+    Note over GHA,Git: Fetch commit messages (subject + body)
+    Git--&gt;&gt;GHA: Return commit history
+
+    GHA-&gt;&gt;Action: Parse commit messages with regex
+    Note over Action: Pattern: (?:Fixes|Closes|Resolves|Issue)?\\s*#\\K\\d+
+    Action-&gt;&gt;Action: Extract unique issue numbers
+    Action-&gt;&gt;Action: Sort and deduplicate issue list
+
+    loop For each issue number
+        Action-&gt;&gt;GHAPI: GET /repos/{repo}/issues/{number}
+        Note over Action,GHAPI: Authenticate with GITHUB_TOKEN
+        GHAPI--&gt;&gt;Action: Return issue metadata (title, state, url)
+
+        Action-&gt;&gt;SNAPI: GET /api/now/table/sn_devops_work_item?sysparm_query=url={url}
+        Note over Action,SNAPI: Check if work item already exists
+        SNAPI--&gt;&gt;Action: Return existing records (if any)
+
+        alt Work item does not exist
+            Action-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_work_item
+            Note over Action,SNAPI: Payload: name, external_id, url, status, type, project, tool
+            SNAPI-&gt;&gt;SNDB: INSERT work_item
+            SNDB--&gt;&gt;SNAPI: Return sys_id and generated WI number
+            SNAPI--&gt;&gt;Action: Return created record
+        else Work item already exists
+            Action-&gt;&gt;Action: Skip creation (idempotency)
+        end
+    end
+
+    Action--&gt;&gt;GHA: Output: work_items_registered count and sys_ids</code></pre>
+<h3 id="commit-message-parsing-logic">Commit Message Parsing Logic</h3>
+<p>The work item extraction uses a robust regex pattern that handles
+multiple conventions:</p>
+<p><strong>Supported Patterns:</strong> - <code>Fixes #123</code> -
+Explicit closure intent - <code>Closes #456</code> - Alternative closure
+keyword - <code>Resolves #789</code> - Resolution keyword -
+<code>Issue #101</code> - Explicit issue reference - <code>#112</code> -
+Bare issue number (GitHub auto-linking format)</p>
+<p><strong>Implementation:</strong></p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-oP</span> <span class="st">&#39;(?:Fixes|Closes|Resolves|Issue)?\s*#\K\d+&#39;</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span></span></code></pre></div>
+<p><strong>Critical Fix Implemented:</strong> The initial implementation
+only parsed commit subject lines (<code>%s</code>), missing issue
+references in commit bodies. This was corrected to use
+<code>%s%n%b</code> (subject + body), significantly improving extraction
+accuracy.</p>
+<h3 id="data-model-1">Data Model</h3>
+<p><strong>Table:</strong> <code>sn_devops_work_item</code></p>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 12%" />
+<col style="width: 16%" />
+<col style="width: 30%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Source</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sys_id</code></td>
+<td>UUID</td>
+<td>Generated</td>
+<td>xyz789abc456…</td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>number</code></td>
+<td>String</td>
+<td>Auto-generated</td>
+<td>WI0001197</td>
+<td>Human-readable identifier</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>String</td>
+<td>GitHub API</td>
+<td>Add user authentication</td>
+<td>Issue title from GitHub</td>
+</tr>
+<tr>
+<td><code>external_id</code></td>
+<td>String</td>
+<td>Commit message</td>
+<td>80</td>
+<td>GitHub issue number</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td>URL</td>
+<td>GitHub API</td>
+<td>https://github.com/…/issues/80</td>
+<td>Direct link to issue</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>String</td>
+<td>GitHub API</td>
+<td>open / closed</td>
+<td>Issue state</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>String</td>
+<td>Hardcoded</td>
+<td>issue</td>
+<td>Work item type classification</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>c6c9eb71c34d7a50b71ef44c05013194</td>
+<td>Links to sn_devops_project</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>f62c4e49c3fcf614e1bbf0cb050131ef</td>
+<td>Links to sn_devops_tool</td>
+</tr>
+<tr>
+<td><code>sys_created_on</code></td>
+<td>Datetime</td>
+<td>Auto</td>
+<td>2025-11-07 15:01:25</td>
+<td>Record creation timestamp</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deduplication-strategy">Deduplication Strategy</h3>
+<p>To prevent duplicate work item creation across multiple pipeline
+runs:</p>
+<ol type="1">
+<li><strong>Pre-creation check:</strong> Query
+<code>sn_devops_work_item</code> table by <code>url</code> field</li>
+<li><strong>Existence evaluation:</strong> If result count &gt; 0, skip
+creation</li>
+<li><strong>Atomic operations:</strong> Each work item creation is
+independent</li>
+<li><strong>Idempotency:</strong> Multiple executions produce same end
+state</li>
+</ol>
+<p>This ensures that the same GitHub issue is never registered twice,
+even if referenced in multiple commits or pipeline runs.</p>
+<hr />
+<h2 id="component-3-test-result-integration">Component 3: Test Result
+Integration</h2>
+<h3 id="purpose-2">Purpose</h3>
+<p>Capture comprehensive test execution evidence from unit tests,
+integration tests, security scans, and code quality analysis, providing
+complete test coverage visibility in ServiceNow.</p>
+<h3 id="architecture">Architecture</h3>
+<p>The test result integration uses two complementary ServiceNow
+tables:</p>
+<ol type="1">
+<li><strong><code>sn_devops_test_result</code></strong> - Individual
+test suite executions</li>
+<li><strong><code>sn_devops_test_summary</code></strong> - Aggregated
+test metrics per pipeline</li>
+</ol>
+<h3 id="test-result-data-flow">Test Result Data Flow</h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Build as Build Job
+    participant Tests as Test Execution
+    participant Action as ServiceNow DevOps Action
+    participant SNAPI as ServiceNow API
+    participant TR as sn_devops_test_result
+    participant TS as sn_devops_test_summary
+
+    Build-&gt;&gt;Tests: Execute test suite (JUnit, pytest, Go test, etc.)
+    Tests--&gt;&gt;Build: Generate test report (XML/JSON)
+
+    Build-&gt;&gt;Action: ServiceNow/servicenow-devops-test-report@v6.0.0
+    Note over Build,Action: Inputs: test-results, devops-integration-* credentials
+
+    Action-&gt;&gt;Action: Parse test report format
+    Action-&gt;&gt;Action: Extract metrics: total, passed, failed, skipped
+    Action-&gt;&gt;Action: Calculate test duration
+
+    Action-&gt;&gt;SNAPI: POST /api/sn_devops/devops/tool/test
+    Note over Action,SNAPI: DevOps-specific API endpoint
+    Note over Action,SNAPI: Payload: testResults (JUnit XML or JSON)
+
+    SNAPI-&gt;&gt;TR: INSERT individual test_result
+    SNAPI-&gt;&gt;TS: INSERT or UPDATE test_summary
+
+    TR--&gt;&gt;SNAPI: Return test_result sys_id
+    TS--&gt;&gt;SNAPI: Return test_summary sys_id
+    SNAPI--&gt;&gt;Action: Return 201 Created + record identifiers
+    Action--&gt;&gt;Build: Output test registration confirmation</code></pre>
+<h3 id="test-result-table-schema">Test Result Table Schema</h3>
+<p><strong>Table:</strong> <code>sn_devops_test_result</code></p>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 12%" />
+<col style="width: 16%" />
+<col style="width: 30%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Source</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sys_id</code></td>
+<td>UUID</td>
+<td>Generated</td>
+<td>def456ghi789…</td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>number</code></td>
+<td>String</td>
+<td>Auto-generated</td>
+<td>TR0005678</td>
+<td>Human-readable identifier</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>String</td>
+<td>Workflow input</td>
+<td>Unit Tests - Frontend Service</td>
+<td>Descriptive test suite name</td>
+</tr>
+<tr>
+<td><code>test_suite_name</code></td>
+<td>String</td>
+<td>Workflow input</td>
+<td>Frontend Unit Tests</td>
+<td>Test suite classification</td>
+</tr>
+<tr>
+<td><code>test_result</code></td>
+<td>String</td>
+<td>Computed</td>
+<td>success / failure / skipped</td>
+<td>Overall test outcome</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>f62c4e49c3fcf614e1bbf0cb050131ef</td>
+<td>Links to sn_devops_tool</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>c6c9eb71c34d7a50b71ef44c05013194</td>
+<td>Links to sn_devops_project</td>
+</tr>
+<tr>
+<td><code>execution_url</code></td>
+<td>URL</td>
+<td>GitHub context</td>
+<td>https://github.com/…/runs/…</td>
+<td>Link to test execution logs</td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>Datetime</td>
+<td>Test report</td>
+<td>2025-11-07T15:02:00Z</td>
+<td>Test execution start</td>
+</tr>
+<tr>
+<td><code>end_time</code></td>
+<td>Datetime</td>
+<td>Test report</td>
+<td>2025-11-07T15:08:30Z</td>
+<td>Test execution completion</td>
+</tr>
+<tr>
+<td><code>duration</code></td>
+<td>Integer</td>
+<td>Calculated</td>
+<td>390</td>
+<td>Duration in seconds</td>
+</tr>
+<tr>
+<td><code>test_cases_total</code></td>
+<td>Integer</td>
+<td>Test report</td>
+<td>150</td>
+<td>Total test cases executed</td>
+</tr>
+<tr>
+<td><code>test_cases_passed</code></td>
+<td>Integer</td>
+<td>Test report</td>
+<td>148</td>
+<td>Passed test cases</td>
+</tr>
+<tr>
+<td><code>test_cases_failed</code></td>
+<td>Integer</td>
+<td>Test report</td>
+<td>2</td>
+<td>Failed test cases</td>
+</tr>
+<tr>
+<td><code>test_cases_skipped</code></td>
+<td>Integer</td>
+<td>Test report</td>
+<td>0</td>
+<td>Skipped test cases</td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-summary-table-schema">Test Summary Table Schema</h3>
+<p><strong>Table:</strong> <code>sn_devops_test_summary</code></p>
+<p>Aggregates all test results for a single pipeline execution,
+providing a rollup view of test coverage and quality.</p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 14%" />
+<col style="width: 35%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pipeline_id</code></td>
+<td>String</td>
+<td>19172412878</td>
+<td>GitHub run_id (correlation key)</td>
+</tr>
+<tr>
+<td><code>total_test_suites</code></td>
+<td>Integer</td>
+<td>10</td>
+<td>Number of test suites executed</td>
+</tr>
+<tr>
+<td><code>passed_test_suites</code></td>
+<td>Integer</td>
+<td>9</td>
+<td>Fully passing test suites</td>
+</tr>
+<tr>
+<td><code>failed_test_suites</code></td>
+<td>Integer</td>
+<td>1</td>
+<td>Test suites with failures</td>
+</tr>
+<tr>
+<td><code>total_tests</code></td>
+<td>Integer</td>
+<td>500</td>
+<td>Total individual test cases</td>
+</tr>
+<tr>
+<td><code>passed_tests</code></td>
+<td>Integer</td>
+<td>485</td>
+<td>Passed test cases</td>
+</tr>
+<tr>
+<td><code>failed_tests</code></td>
+<td>Integer</td>
+<td>15</td>
+<td>Failed test cases</td>
+</tr>
+<tr>
+<td><code>test_execution_time</code></td>
+<td>Integer</td>
+<td>300</td>
+<td>Total test time (seconds)</td>
+</tr>
+<tr>
+<td><code>overall_result</code></td>
+<td>String</td>
+<td>passed_with_failures</td>
+<td>Aggregated test outcome</td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-type-coverage">Test Type Coverage</h3>
+<p>The integration captures test results from multiple sources:</p>
+<p><strong>1. Unit Tests (Per Service)</strong> - Frontend (Go) - via
+<code>go test</code> - Cart Service (C#) - via <code>dotnet test</code>
+- Product Catalog (Go) - via <code>go test</code> - Currency Service
+(Node.js) - via <code>npm test</code> - Payment Service (Node.js) - via
+<code>npm test</code> - Email Service (Python) - via <code>pytest</code>
+- Ad Service (Java) - via <code>mvn test</code> - All other
+microservices following language-specific patterns</p>
+<p><strong>2. Security Scans</strong> - Trivy vulnerability scanning
+(CRITICAL/HIGH/MEDIUM/LOW counts) - CodeQL static analysis (per
+language) - Semgrep security rule violations - Gitleaks secret
+detection</p>
+<p><strong>3. Code Quality</strong> - SonarCloud quality gate results -
+Code coverage percentages - Technical debt metrics - Maintainability
+ratings</p>
+<p><strong>4. Integration Tests</strong> - Smoke tests (endpoint
+accessibility) - End-to-end test scenarios - Performance test
+results</p>
+<hr />
+<h2 id="component-4-security-scan-integration">Component 4: Security
+Scan Integration</h2>
+<h3 id="purpose-3">Purpose</h3>
+<p>Capture security scanning results including Software Bill of
+Materials (SBOM), vulnerability assessments, and static analysis,
+providing complete security posture visibility in ServiceNow.</p>
+<h3 id="architecture-1">Architecture</h3>
+<p>Security scan integration utilizes specialized DevOps tables designed
+for security artifact management:</p>
+<p><strong>Primary Tables:</strong> 1. <code>sn_devops_artifact</code> -
+SBOM and security artifacts 2. <code>sn_devops_test_result</code> -
+Security scan execution results 3.
+<code>sn_devops_security_result</code> - Detailed vulnerability findings
+(if available)</p>
+<h3 id="security-scan-flow-diagram">Security Scan Flow Diagram</h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Scan as Security Scan Job
+    participant Trivy as Trivy Scanner
+    participant SQ as SonarCloud
+    participant Script as Upload Script
+    participant SNAPI as ServiceNow API
+    participant Artifact as sn_devops_artifact
+    participant TestRes as sn_devops_test_result
+
+    Scan-&gt;&gt;Trivy: trivy fs --format cyclonedx --output sbom.json
+    Trivy--&gt;&gt;Scan: Return SBOM (CycloneDX JSON)
+
+    Scan-&gt;&gt;Trivy: trivy sbom --format sarif --output vuln.sarif sbom.json
+    Trivy--&gt;&gt;Scan: Return vulnerability report (SARIF)
+
+    Scan-&gt;&gt;SQ: sonar-scanner (SonarCloud analysis)
+    SQ--&gt;&gt;Scan: Return quality gate status and metrics
+
+    Scan-&gt;&gt;Script: Execute upload-security-results-servicenow.sh
+    Script-&gt;&gt;Script: Parse SBOM (extract component count, categories)
+    Script-&gt;&gt;Script: Parse SARIF (count vulnerabilities by severity)
+    Script-&gt;&gt;Script: Query SonarCloud API for quality metrics
+
+    Script-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_artifact
+    Note over Script,SNAPI: Payload: SBOM artifact metadata + base64 content
+    SNAPI-&gt;&gt;Artifact: INSERT artifact record
+    Artifact--&gt;&gt;SNAPI: Return artifact sys_id (ART0002345)
+
+    Script-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_test_result
+    Note over Script,SNAPI: Payload: Trivy vulnerability scan results
+    SNAPI-&gt;&gt;TestRes: INSERT test_result (TR0005679)
+
+    Script-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_test_result
+    Note over Script,SNAPI: Payload: SonarCloud quality gate results
+    SNAPI-&gt;&gt;TestRes: INSERT test_result (TR0005678)
+
+    SNAPI--&gt;&gt;Script: Return all created record identifiers
+    Script--&gt;&gt;Scan: Output security evidence registration confirmation</code></pre>
+<h3 id="sbom-artifact-structure">SBOM Artifact Structure</h3>
+<p><strong>CycloneDX Format</strong> (Industry standard for Software
+Bill of Materials):</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;bomFormat&quot;</span><span class="fu">:</span> <span class="st">&quot;CycloneDX&quot;</span><span class="fu">,</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;specVersion&quot;</span><span class="fu">:</span> <span class="st">&quot;1.4&quot;</span><span class="fu">,</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;metadata&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;timestamp&quot;</span><span class="fu">:</span> <span class="st">&quot;2025-11-07T15:05:00Z&quot;</span><span class="fu">,</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;component&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;application&quot;</span><span class="fu">,</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;microservices-demo&quot;</span><span class="fu">,</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;99c7767b&quot;</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;components&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;library&quot;</span><span class="fu">,</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;express&quot;</span><span class="fu">,</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;4.18.2&quot;</span><span class="fu">,</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;purl&quot;</span><span class="fu">:</span> <span class="st">&quot;pkg:npm/express@4.18.2&quot;</span><span class="fu">,</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;licenses&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span><span class="dt">&quot;license&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;MIT&quot;</span><span class="fu">}}</span><span class="ot">]</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;library&quot;</span><span class="fu">,</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;requests&quot;</span><span class="fu">,</span></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;2.31.0&quot;</span><span class="fu">,</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;purl&quot;</span><span class="fu">:</span> <span class="st">&quot;pkg:pypi/requests@2.31.0&quot;</span><span class="fu">,</span></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;licenses&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span><span class="dt">&quot;license&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;Apache-2.0&quot;</span><span class="fu">}}</span><span class="ot">]</span></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;dependencies&quot;</span><span class="fu">:</span> <span class="ot">[]</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h3 id="artifact-table-schema">Artifact Table Schema</h3>
+<p><strong>Table:</strong> <code>sn_devops_artifact</code></p>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 12%" />
+<col style="width: 16%" />
+<col style="width: 30%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Source</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sys_id</code></td>
+<td>UUID</td>
+<td>Generated</td>
+<td>mno123pqr456…</td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>number</code></td>
+<td>String</td>
+<td>Auto-generated</td>
+<td>ART0002345</td>
+<td>Human-readable identifier</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>String</td>
+<td>Composite</td>
+<td>SBOM-microservices-demo-99c7767b</td>
+<td>Artifact identifier</td>
+</tr>
+<tr>
+<td><code>artifact_type</code></td>
+<td>String</td>
+<td>Hardcoded</td>
+<td>sbom</td>
+<td>Artifact classification</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>String</td>
+<td>Git SHA</td>
+<td>99c7767b</td>
+<td>Git commit associated with artifact</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>f62c4e49c3fcf614e1bbf0cb050131ef</td>
+<td>Links to sn_devops_tool</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>Reference</td>
+<td>Secret</td>
+<td>c6c9eb71c34d7a50b71ef44c05013194</td>
+<td>Links to sn_devops_project</td>
+</tr>
+<tr>
+<td><code>sbom_data</code></td>
+<td>Text</td>
+<td>SBOM file</td>
+<td><base64-encoded-json></td>
+<td>Complete SBOM content</td>
+</tr>
+<tr>
+<td><code>component_count</code></td>
+<td>Integer</td>
+<td>Computed</td>
+<td>342</td>
+<td>Number of components in SBOM</td>
+</tr>
+<tr>
+<td><code>artifact_url</code></td>
+<td>URL</td>
+<td>GitHub</td>
+<td>https://github.com/…/runs/…</td>
+<td>Link to artifact source</td>
+</tr>
+</tbody>
+</table>
+<h3 id="security-test-results-structure">Security Test Results
+Structure</h3>
+<p><strong>Trivy Vulnerability Scan Result:</strong></p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;Trivy Vulnerability Scan - Run #19172412878&quot;</span><span class="fu">,</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;test_suite_name&quot;</span><span class="fu">:</span> <span class="st">&quot;Trivy Dependency Scan&quot;</span><span class="fu">,</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;test_result&quot;</span><span class="fu">:</span> <span class="st">&quot;failed&quot;</span><span class="fu">,</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;execution_url&quot;</span><span class="fu">:</span> <span class="st">&quot;https://github.com/.../security/code-scanning&quot;</span><span class="fu">,</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;vulnerabilities&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;total&quot;</span><span class="fu">:</span> <span class="dv">23</span><span class="fu">,</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;critical&quot;</span><span class="fu">:</span> <span class="dv">2</span><span class="fu">,</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;high&quot;</span><span class="fu">:</span> <span class="dv">5</span><span class="fu">,</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;medium&quot;</span><span class="fu">:</span> <span class="dv">12</span><span class="fu">,</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;low&quot;</span><span class="fu">:</span> <span class="dv">4</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;failed_criteria&quot;</span><span class="fu">:</span> <span class="st">&quot;2 CRITICAL vulnerabilities exceed threshold (max: 0)&quot;</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><strong>SonarCloud Quality Gate Result:</strong></p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;SonarCloud Quality Analysis - Run #19172412878&quot;</span><span class="fu">,</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;test_suite_name&quot;</span><span class="fu">:</span> <span class="st">&quot;SonarCloud Code Quality&quot;</span><span class="fu">,</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;test_result&quot;</span><span class="fu">:</span> <span class="st">&quot;passed&quot;</span><span class="fu">,</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;execution_url&quot;</span><span class="fu">:</span> <span class="st">&quot;https://sonarcloud.io/project/overview?id=...&quot;</span><span class="fu">,</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;metrics&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;bugs&quot;</span><span class="fu">:</span> <span class="dv">12</span><span class="fu">,</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;vulnerabilities&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;code_smells&quot;</span><span class="fu">:</span> <span class="dv">45</span><span class="fu">,</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;coverage&quot;</span><span class="fu">:</span> <span class="fl">68.5</span><span class="fu">,</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;duplications&quot;</span><span class="fu">:</span> <span class="fl">2.3</span><span class="fu">,</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;quality_gate&quot;</span><span class="fu">:</span> <span class="st">&quot;passed&quot;</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<hr />
+<h2 id="component-5-change-request-automation">Component 5: Change
+Request Automation</h2>
+<h3 id="purpose-4">Purpose</h3>
+<p>Automatically create and manage ServiceNow change requests for
+deployments, implementing compliance-driven approval gates while
+capturing complete deployment context and evidence.</p>
+<h3 id="hybrid-approach-architecture">Hybrid Approach Architecture</h3>
+<p>The implementation uses a hybrid strategy combining:</p>
+<ol type="1">
+<li><strong>Table API</strong> - Traditional change request creation
+(change_request table)</li>
+<li><strong>DevOps Tables</strong> - Supplementary tracking
+(sn_devops_change_reference, etc.)</li>
+</ol>
+<p>This approach provides: - Traditional change request numbers
+(CHG0030XXX) for compliance - 40+ custom fields for complete audit trail
+- DevOps workspace visibility - No ServiceNow plugin configuration
+required</p>
+<h3 id="change-request-creation-flow">Change Request Creation Flow</h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Pipeline as Master CI/CD Pipeline
+    participant Checks as Quality Gates
+    participant Workflow as servicenow-change-rest.yaml
+    participant SNAPI as ServiceNow Table API
+    participant CR as change_request table
+    participant DevOps as DevOps Tables
+
+    Pipeline-&gt;&gt;Checks: Execute security scans, tests, builds
+    Checks--&gt;&gt;Pipeline: Return aggregated results
+
+    Pipeline-&gt;&gt;Workflow: Invoke with deployment context
+    Note over Pipeline,Workflow: Inputs: environment, test results, security status, etc.
+
+    Workflow-&gt;&gt;Workflow: Validate all quality gates passed
+    Workflow-&gt;&gt;Workflow: Construct change request payload (40+ fields)
+
+    Workflow-&gt;&gt;SNAPI: POST /api/now/table/change_request
+    Note over Workflow,SNAPI: Basic Auth + JSON payload
+    SNAPI-&gt;&gt;CR: INSERT change_request
+    CR--&gt;&gt;SNAPI: Return sys_id and CHG number
+
+    Workflow-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_change_reference
+    Note over Workflow,SNAPI: Link CR to pipeline execution
+    SNAPI-&gt;&gt;DevOps: INSERT change reference
+
+    Workflow-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_test_result (multiple)
+    Note over Workflow,SNAPI: Associate test results with CR
+    SNAPI-&gt;&gt;DevOps: INSERT test results
+
+    Workflow-&gt;&gt;SNAPI: POST /api/now/table/sn_devops_artifact (multiple)
+    Note over Workflow,SNAPI: Register deployed artifacts
+    SNAPI-&gt;&gt;DevOps: INSERT artifacts
+
+    SNAPI--&gt;&gt;Workflow: Return all created record sys_ids
+    Workflow--&gt;&gt;Pipeline: Output change_number and change_sys_id</code></pre>
+<h3 id="change-request-data-model">Change Request Data Model</h3>
+<p><strong>Table:</strong> <code>change_request</code> (ServiceNow
+standard + custom fields)</p>
+<p><strong>Standard Fields:</strong></p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 14%" />
+<col style="width: 35%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>number</code></td>
+<td>String</td>
+<td>CHG0030463</td>
+<td>Change request identifier</td>
+</tr>
+<tr>
+<td><code>sys_id</code></td>
+<td>UUID</td>
+<td>stu901vwx234…</td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>short_description</code></td>
+<td>String</td>
+<td>Deploy microservices to prod</td>
+<td>Brief description</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Text</td>
+<td>Automated deployment from GitHub Actions…</td>
+<td>Detailed description</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>String</td>
+<td>standard</td>
+<td>Change type classification</td>
+</tr>
+<tr>
+<td><code>risk</code></td>
+<td>String</td>
+<td>low / medium / high</td>
+<td>Risk assessment</td>
+</tr>
+<tr>
+<td><code>impact</code></td>
+<td>String</td>
+<td>low / medium / high</td>
+<td>Business impact</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>String</td>
+<td>moderate</td>
+<td>Change priority</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>String</td>
+<td>assess / authorize / scheduled / implement / review / closed</td>
+<td>Change state</td>
+</tr>
+<tr>
+<td><code>requested_by</code></td>
+<td>Reference</td>
+<td>github_integration</td>
+<td>User who requested change</td>
+</tr>
+<tr>
+<td><code>assignment_group</code></td>
+<td>Reference</td>
+<td>DevOps Team</td>
+<td>Responsible team</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td>Datetime</td>
+<td>2025-11-07 16:00:00</td>
+<td>Planned start time</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td>Datetime</td>
+<td>2025-11-07 16:30:00</td>
+<td>Planned end time</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Custom Fields (40+ fields for ARC integration):</strong></p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 14%" />
+<col style="width: 35%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>u_github_repo</code></td>
+<td>String</td>
+<td>Freundcloud/microservices-demo</td>
+<td>Repository name</td>
+</tr>
+<tr>
+<td><code>u_github_commit</code></td>
+<td>String</td>
+<td>99c7767b</td>
+<td>Git commit SHA</td>
+</tr>
+<tr>
+<td><code>u_github_branch</code></td>
+<td>String</td>
+<td>main</td>
+<td>Source branch</td>
+</tr>
+<tr>
+<td><code>u_github_actor</code></td>
+<td>String</td>
+<td>olafkfreund</td>
+<td>GitHub user</td>
+</tr>
+<tr>
+<td><code>u_github_run_id</code></td>
+<td>String</td>
+<td>19172412878</td>
+<td>Pipeline run ID</td>
+</tr>
+<tr>
+<td><code>u_github_workflow</code></td>
+<td>String</td>
+<td>Master CI/CD Pipeline</td>
+<td>Workflow name</td>
+</tr>
+<tr>
+<td><code>u_environment</code></td>
+<td>String</td>
+<td>prod</td>
+<td>Target environment</td>
+</tr>
+<tr>
+<td><code>u_services_deployed</code></td>
+<td>JSON</td>
+<td>[“frontend”, “cartservice”, …]</td>
+<td>Services in deployment</td>
+</tr>
+<tr>
+<td><code>u_infrastructure_changes</code></td>
+<td>Boolean</td>
+<td>false</td>
+<td>Infrastructure modified</td>
+</tr>
+<tr>
+<td><code>u_security_scan_status</code></td>
+<td>String</td>
+<td>passed</td>
+<td>Overall security status</td>
+</tr>
+<tr>
+<td><code>u_critical_vulnerabilities</code></td>
+<td>Integer</td>
+<td>0</td>
+<td>CRITICAL vuln count</td>
+</tr>
+<tr>
+<td><code>u_high_vulnerabilities</code></td>
+<td>Integer</td>
+<td>2</td>
+<td>HIGH vuln count</td>
+</tr>
+<tr>
+<td><code>u_medium_vulnerabilities</code></td>
+<td>Integer</td>
+<td>8</td>
+<td>MEDIUM vuln count</td>
+</tr>
+<tr>
+<td><code>u_unit_test_status</code></td>
+<td>String</td>
+<td>passed</td>
+<td>Unit test outcome</td>
+</tr>
+<tr>
+<td><code>u_unit_test_total</code></td>
+<td>Integer</td>
+<td>500</td>
+<td>Total tests executed</td>
+</tr>
+<tr>
+<td><code>u_unit_test_passed</code></td>
+<td>Integer</td>
+<td>485</td>
+<td>Passed tests</td>
+</tr>
+<tr>
+<td><code>u_unit_test_failed</code></td>
+<td>Integer</td>
+<td>15</td>
+<td>Failed tests</td>
+</tr>
+<tr>
+<td><code>u_unit_test_coverage</code></td>
+<td>String</td>
+<td>85.0%</td>
+<td>Code coverage</td>
+</tr>
+<tr>
+<td><code>u_sonarcloud_status</code></td>
+<td>String</td>
+<td>passed</td>
+<td>Quality gate status</td>
+</tr>
+<tr>
+<td><code>u_sonarcloud_bugs</code></td>
+<td>Integer</td>
+<td>12</td>
+<td>Bug count</td>
+</tr>
+<tr>
+<td><code>u_sonarcloud_vulnerabilities</code></td>
+<td>Integer</td>
+<td>3</td>
+<td>Vulnerability count</td>
+</tr>
+<tr>
+<td><code>u_sonarcloud_code_smells</code></td>
+<td>Integer</td>
+<td>45</td>
+<td>Code smell count</td>
+</tr>
+<tr>
+<td><code>u_sonarcloud_coverage</code></td>
+<td>String</td>
+<td>68.5%</td>
+<td>SonarCloud coverage</td>
+</tr>
+<tr>
+<td><code>u_previous_version</code></td>
+<td>String</td>
+<td>prod-v1.2.2</td>
+<td>Previous deployed version</td>
+</tr>
+<tr>
+<td><code>u_new_version</code></td>
+<td>String</td>
+<td>prod-v1.2.3</td>
+<td>New version being deployed</td>
+</tr>
+<tr>
+<td><code>u_deployment_status</code></td>
+<td>String</td>
+<td>success / failure</td>
+<td>Deployment outcome</td>
+</tr>
+<tr>
+<td><code>u_running_pods</code></td>
+<td>Integer</td>
+<td>36</td>
+<td>Healthy pods after deployment</td>
+</tr>
+<tr>
+<td><code>u_total_pods</code></td>
+<td>Integer</td>
+<td>36</td>
+<td>Total expected pods</td>
+</tr>
+<tr>
+<td><code>u_frontend_url</code></td>
+<td>URL</td>
+<td>http://alb-xyz.amazonaws.com</td>
+<td>Application URL</td>
+</tr>
+<tr>
+<td><code>u_smoke_test_status</code></td>
+<td>String</td>
+<td>passed</td>
+<td>Smoke test outcome</td>
+</tr>
+<tr>
+<td><code>u_smoke_test_duration</code></td>
+<td>Integer</td>
+<td>45</td>
+<td>Smoke test duration (seconds)</td>
+</tr>
+<tr>
+<td><code>u_correlation_id</code></td>
+<td>String</td>
+<td>19172412878-prod</td>
+<td>Unique correlation ID</td>
+</tr>
+</tbody>
+</table>
+<h3 id="change-reference-linking">Change Reference Linking</h3>
+<p><strong>Table:</strong> <code>sn_devops_change_reference</code></p>
+<p>Links change requests to DevOps pipeline executions, enabling
+bi-directional traceability.</p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 14%" />
+<col style="width: 35%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>change_request</code></td>
+<td>Reference</td>
+<td>stu901vwx234…</td>
+<td>Links to change_request.sys_id</td>
+</tr>
+<tr>
+<td><code>pipeline_name</code></td>
+<td>String</td>
+<td>Deploy to prod</td>
+<td>Human-readable pipeline name</td>
+</tr>
+<tr>
+<td><code>pipeline_id</code></td>
+<td>String</td>
+<td>19172412878</td>
+<td>GitHub run_id (correlation)</td>
+</tr>
+<tr>
+<td><code>pipeline_url</code></td>
+<td>URL</td>
+<td>https://github.com/…/runs/…</td>
+<td>Direct link to execution</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Reference</td>
+<td>f62c4e49…</td>
+<td>Links to sn_devops_tool</td>
+</tr>
+</tbody>
+</table>
+<h3 id="approval-workflow-logic">Approval Workflow Logic</h3>
+<p><strong>Environment-Based Approval Strategy:</strong></p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">if environment == &quot;dev&quot;</span><span class="kw">:</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="at">  approval_required = false</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="at">  state = &quot;implement&quot;</span><span class="co">  # Auto-approve</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="fu">elif environment == &quot;qa&quot;</span><span class="kw">:</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="at">  approval_required = true</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="at">  state = &quot;assess&quot;</span><span class="co">  # CAB review required</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="fu">elif environment == &quot;prod&quot;</span><span class="kw">:</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="at">  approval_required = true</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="at">  state = &quot;assess&quot;</span><span class="co">  # CAB + stakeholder approval required</span></span></code></pre></div>
+<p><strong>Approval Gate Implementation:</strong></p>
+<ol type="1">
+<li><strong>Dev Environment:</strong> No approval required, change
+auto-transitions to “implement” state</li>
+<li><strong>QA Environment:</strong> Single approver from DevOps team
+required</li>
+<li><strong>Production:</strong> Multiple approvers required (DevOps
+lead + stakeholder)</li>
+</ol>
+<p><strong>Approval Verification:</strong></p>
+<p>GitHub Actions workflow polls ServiceNow for change request
+state:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> <span class="bu">[</span> <span class="st">&quot;</span><span class="va">$STATE</span><span class="st">&quot;</span> <span class="ot">!=</span> <span class="st">&quot;implement&quot;</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">STATE</span><span class="op">=</span><span class="va">$(</span><span class="ex">curl</span> <span class="at">-s</span> <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/change_request/</span><span class="va">$CHANGE_SYS_ID</span><span class="st">?sysparm_fields=state&quot;</span> <span class="dt">\</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-r</span> <span class="st">&#39;.result.state&#39;</span><span class="va">)</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="bu">[</span> <span class="st">&quot;</span><span class="va">$STATE</span><span class="st">&quot;</span> <span class="ot">==</span> <span class="st">&quot;cancelled&quot;</span> <span class="bu">]</span> <span class="kw">||</span> <span class="bu">[</span> <span class="st">&quot;</span><span class="va">$STATE</span><span class="st">&quot;</span> <span class="ot">==</span> <span class="st">&quot;closed&quot;</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">echo</span> <span class="st">&quot;Change request rejected&quot;</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">exit</span> 1</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">fi</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sleep</span> 30  <span class="co"># Poll every 30 seconds</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span></code></pre></div>
+<hr />
+<h2 id="component-6-package-registration">Component 6: Package
+Registration</h2>
+<h3 id="purpose-5">Purpose</h3>
+<p>Register deployed artifacts (Docker container images) in ServiceNow’s
+package management system, enabling version tracking, rollback
+capabilities, and configuration management database (CMDB)
+integration.</p>
+<h3 id="technical-implementation-2">Technical Implementation</h3>
+<p><strong>Workflow:</strong>
+<code>.github/workflows/MASTER-PIPELINE.yaml</code> (register-packages
+job) <strong>ServiceNow Action:</strong>
+<code>ServiceNow/servicenow-devops-register-package@v3.1.0</code></p>
+<h3 id="package-registration-flow">Package Registration Flow</h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Build as build-and-push Job
+    participant Reg as register-packages Job
+    participant Action as ServiceNow DevOps Action
+    participant SNAPI as ServiceNow DevOps API
+    participant Package as sn_devops_package
+    participant Artifact as sn_devops_artifact
+
+    Build-&gt;&gt;Build: Build 12 microservice images
+    Build-&gt;&gt;Build: Push to AWS ECR
+    Build--&gt;&gt;Reg: Output services_built (JSON array)
+
+    Reg-&gt;&gt;Reg: Parse services_built JSON
+    Reg-&gt;&gt;Reg: Construct artifacts metadata (per service)
+
+    loop For each service
+        Reg-&gt;&gt;Reg: Create artifact entry:
+        Note over Reg: name: ECR repository URL
+        Note over Reg: version: environment-commit_sha
+        Note over Reg: semanticVersion: environment-run_number
+    end
+
+    Reg-&gt;&gt;Action: ServiceNow/servicenow-devops-register-package
+    Note over Reg,Action: Inputs: artifacts, package-name, credentials
+
+    Action-&gt;&gt;SNAPI: POST /api/sn_devops/devops/package/registration
+    Note over Action,SNAPI: Payload: package metadata + artifacts array
+    SNAPI-&gt;&gt;Package: INSERT or UPDATE package record
+    SNAPI-&gt;&gt;Artifact: INSERT artifact records (one per service)
+
+    Package--&gt;&gt;SNAPI: Return package sys_id
+    Artifact--&gt;&gt;SNAPI: Return artifact sys_ids
+    SNAPI--&gt;&gt;Action: Return 201 Created + package details
+    Action--&gt;&gt;Reg: Output package registration confirmation</code></pre>
+<h3 id="package-data-structure">Package Data Structure</h3>
+<p><strong>Package Metadata:</strong></p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;microservices-dev-19172412878.package&quot;</span><span class="fu">,</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;artifacts&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;533267307120.dkr.ecr.eu-west-2.amazonaws.com/frontend&quot;</span><span class="fu">,</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;dev-99c7767b&quot;</span><span class="fu">,</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;semanticVersion&quot;</span><span class="fu">:</span> <span class="st">&quot;dev-12878&quot;</span><span class="fu">,</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;repositoryName&quot;</span><span class="fu">:</span> <span class="st">&quot;Freundcloud/microservices-demo&quot;</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;533267307120.dkr.ecr.eu-west-2.amazonaws.com/cartservice&quot;</span><span class="fu">,</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="st">&quot;dev-99c7767b&quot;</span><span class="fu">,</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;semanticVersion&quot;</span><span class="fu">:</span> <span class="st">&quot;dev-12878&quot;</span><span class="fu">,</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;repositoryName&quot;</span><span class="fu">:</span> <span class="st">&quot;Freundcloud/microservices-demo&quot;</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><strong>Package Table Schema:</strong></p>
+<p><strong>Table:</strong> <code>sn_devops_package</code></p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 14%" />
+<col style="width: 35%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field Name</th>
+<th>Type</th>
+<th>Example Value</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sys_id</code></td>
+<td>UUID</td>
+<td>yza012bcd345…</td>
+<td>Primary key</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>String</td>
+<td>microservices-dev-19172412878.package</td>
+<td>Package identifier</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>String</td>
+<td>dev-99c7767b</td>
+<td>Version tag</td>
+</tr>
+<tr>
+<td><code>created_date</code></td>
+<td>Datetime</td>
+<td>2025-11-07 15:15:00</td>
+<td>Package creation time</td>
+</tr>
+<tr>
+<td><code>artifact_count</code></td>
+<td>Integer</td>
+<td>12</td>
+<td>Number of artifacts in package</td>
+</tr>
+<tr>
+<td><code>tool</code></td>
+<td>Reference</td>
+<td>f62c4e49…</td>
+<td>Links to sn_devops_tool</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>Reference</td>
+<td>c6c9eb71…</td>
+<td>Links to sn_devops_project</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="database-schema-reference">Database Schema Reference</h2>
+<h3 id="entity-relationship-diagram">Entity Relationship Diagram</h3>
+<pre class="mermaid"><code>erDiagram
+    sn_devops_tool ||--o{ sn_devops_project : &quot;has&quot;
+    sn_devops_project ||--o{ sn_devops_orchestration_task : &quot;contains&quot;
+    sn_devops_project ||--o{ sn_devops_work_item : &quot;contains&quot;
+    sn_devops_project ||--o{ sn_devops_test_result : &quot;contains&quot;
+    sn_devops_project ||--o{ sn_devops_test_summary : &quot;contains&quot;
+    sn_devops_project ||--o{ sn_devops_artifact : &quot;contains&quot;
+    sn_devops_project ||--o{ sn_devops_package : &quot;contains&quot;
+    change_request ||--o{ sn_devops_change_reference : &quot;linked_via&quot;
+    change_request ||--o{ sn_devops_test_result : &quot;validates&quot;
+    change_request ||--o{ sn_devops_work_item : &quot;implements&quot;
+    change_request ||--o{ sn_devops_artifact : &quot;deploys&quot;
+    sn_devops_package ||--o{ sn_devops_artifact : &quot;bundles&quot;
+
+    sn_devops_tool {
+        string sys_id PK
+        string name &quot;GithHubARC&quot;
+        string type &quot;github&quot;
+    }
+
+    sn_devops_project {
+        string sys_id PK
+        string number &quot;PRJ0001001&quot;
+        string name &quot;Freundcloud/microservices-demo&quot;
+        string tool_id FK
+    }
+
+    sn_devops_orchestration_task {
+        string sys_id PK
+        string number &quot;TASK0001234&quot;
+        string name
+        string native_id
+        string task_url
+        string project_id FK
+        string tool_id FK
+        boolean track
+        datetime sys_created_on
+    }
+
+    sn_devops_work_item {
+        string sys_id PK
+        string number &quot;WI0001197&quot;
+        string name
+        string external_id
+        string url
+        string status
+        string type
+        string project_id FK
+        string tool_id FK
+        datetime sys_created_on
+    }
+
+    sn_devops_test_result {
+        string sys_id PK
+        string number &quot;TR0005678&quot;
+        string name
+        string test_suite_name
+        string test_result
+        integer test_cases_total
+        integer test_cases_passed
+        integer test_cases_failed
+        integer test_cases_skipped
+        datetime start_time
+        datetime end_time
+        integer duration
+        string execution_url
+        string project_id FK
+        string tool_id FK
+    }
+
+    sn_devops_test_summary {
+        string sys_id PK
+        string pipeline_id
+        integer total_test_suites
+        integer passed_test_suites
+        integer failed_test_suites
+        integer total_tests
+        integer passed_tests
+        integer failed_tests
+        integer test_execution_time
+        string overall_result
+    }
+
+    sn_devops_artifact {
+        string sys_id PK
+        string number &quot;ART0002345&quot;
+        string name
+        string artifact_type
+        string version
+        text sbom_data
+        integer component_count
+        string artifact_url
+        string project_id FK
+        string tool_id FK
+    }
+
+    sn_devops_package {
+        string sys_id PK
+        string name
+        string version
+        datetime created_date
+        integer artifact_count
+        string tool_id FK
+        string project_id FK
+    }
+
+    change_request {
+        string sys_id PK
+        string number &quot;CHG0030463&quot;
+        string short_description
+        text description
+        string type
+        string risk
+        string impact
+        string priority
+        string state
+        string u_github_repo
+        string u_github_commit
+        string u_environment
+        json u_services_deployed
+        string u_security_scan_status
+        integer u_critical_vulnerabilities
+        string u_deployment_status
+    }
+
+    sn_devops_change_reference {
+        string sys_id PK
+        string change_request_id FK
+        string pipeline_name
+        string pipeline_id
+        string pipeline_url
+        string tool_id FK
+    }</code></pre>
+<h3 id="table-index-summary">Table Index Summary</h3>
+<p><strong>Core Tables:</strong> - <code>sn_devops_tool</code> - CI/CD
+tool registration (GitHub, Jenkins, GitLab, etc.) -
+<code>sn_devops_project</code> - Project/repository tracking -
+<code>sn_devops_orchestration_task</code> - Pipeline job execution
+tracking - <code>sn_devops_work_item</code> - Requirements and issue
+tracking</p>
+<p><strong>Testing Tables:</strong> - <code>sn_devops_test_result</code>
+- Individual test suite executions - <code>sn_devops_test_summary</code>
+- Aggregated test metrics per pipeline -
+<code>sn_devops_performance_test_summary</code> - Performance and smoke
+test results</p>
+<p><strong>Security Tables:</strong> - <code>sn_devops_artifact</code> -
+SBOM and security artifacts -
+<code>sn_devops_software_quality_scan_summary</code> - Code quality scan
+results - <code>sn_devops_software_quality_scan_detail</code> -
+Individual security findings</p>
+<p><strong>Package Management Tables:</strong> -
+<code>sn_devops_package</code> - Deployment package tracking -
+<code>sn_devops_artifact</code> - Individual artifacts within
+packages</p>
+<p><strong>Change Management Tables:</strong> -
+<code>change_request</code> - Traditional ServiceNow change requests -
+<code>sn_devops_change_reference</code> - Links change requests to
+pipelines</p>
+<hr />
+<h2 id="rest-api-specifications">REST API Specifications</h2>
+<h3 id="authentication">Authentication</h3>
+<p>All ServiceNow REST API requests use HTTP Basic Authentication:</p>
+<pre class="http"><code>Authorization: Basic &lt;base64-encoded-credentials&gt;</code></pre>
+<p>Where credentials are encoded as:
+<code>base64(username:password)</code></p>
+<p><strong>Security Considerations:</strong> - Credentials stored as
+GitHub encrypted secrets - Never logged or exposed in workflow outputs -
+Each request creates new authenticated session - No session tokens or
+cookies maintained</p>
+<h3 id="common-request-headers">Common Request Headers</h3>
+<pre class="http"><code>Content-Type: application/json
+Accept: application/json
+Authorization: Basic &lt;credentials&gt;</code></pre>
+<h3 id="api-endpoint-patterns">API Endpoint Patterns</h3>
+<p>ServiceNow provides two API patterns:</p>
+<p><strong>1. Table API (Standard REST)</strong></p>
+<pre><code>POST   /api/now/table/{table_name}
+GET    /api/now/table/{table_name}/{sys_id}
+GET    /api/now/table/{table_name}?sysparm_query={query}
+PATCH  /api/now/table/{table_name}/{sys_id}
+DELETE /api/now/table/{table_name}/{sys_id}</code></pre>
+<p><strong>2. DevOps API (Specialized)</strong></p>
+<pre><code>POST /api/sn_devops/devops/tool/test
+POST /api/sn_devops/devops/package/registration
+POST /api/sn_devops/devops/artifact/registration</code></pre>
+<h3 id="query-parameter-reference">Query Parameter Reference</h3>
+<p><strong>Common Query Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Purpose</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sysparm_query</code></td>
+<td>Filter results</td>
+<td><code>url=https://github.com/...</code></td>
+</tr>
+<tr>
+<td><code>sysparm_fields</code></td>
+<td>Limit returned fields</td>
+<td><code>sys_id,number,state</code></td>
+</tr>
+<tr>
+<td><code>sysparm_limit</code></td>
+<td>Limit result count</td>
+<td><code>10</code></td>
+</tr>
+<tr>
+<td><code>sysparm_offset</code></td>
+<td>Pagination offset</td>
+<td><code>20</code></td>
+</tr>
+<tr>
+<td><code>sysparm_display_value</code></td>
+<td>Return display values</td>
+<td><code>true</code> or <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Query Operators:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Syntax</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Equals</td>
+<td><code>field=value</code></td>
+<td><code>type=issue</code></td>
+</tr>
+<tr>
+<td>Not Equals</td>
+<td><code>field!=value</code></td>
+<td><code>state!=closed</code></td>
+</tr>
+<tr>
+<td>Contains</td>
+<td><code>fieldLIKEvalue</code></td>
+<td><code>nameLIKEmicroservices</code></td>
+</tr>
+<tr>
+<td>Greater Than</td>
+<td><code>field&gt;value</code></td>
+<td><code>created_on&gt;2025-01-01</code></td>
+</tr>
+<tr>
+<td>AND</td>
+<td><code>^</code></td>
+<td><code>type=issue^state=open</code></td>
+</tr>
+<tr>
+<td>OR</td>
+<td><code>^OR</code></td>
+<td><code>priority=high^ORpriority=critical</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response-format-standards">Response Format Standards</h3>
+<p><strong>Successful Response (201 Created):</strong></p>
+<div class="sourceCode" id="cb21"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;result&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;sys_id&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123def456...&quot;</span><span class="fu">,</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;number&quot;</span><span class="fu">:</span> <span class="st">&quot;TASK0001234&quot;</span><span class="fu">,</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;Orchestration task name&quot;</span><span class="fu">,</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;sys_created_on&quot;</span><span class="fu">:</span> <span class="st">&quot;2025-11-07 15:01:23&quot;</span><span class="fu">,</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;sys_updated_on&quot;</span><span class="fu">:</span> <span class="st">&quot;2025-11-07 15:01:23&quot;</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><strong>Error Response (400 Bad Request):</strong></p>
+<div class="sourceCode" id="cb22"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;error&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;message&quot;</span><span class="fu">:</span> <span class="st">&quot;Invalid field name: &#39;invalid_field&#39;&quot;</span><span class="fu">,</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;detail&quot;</span><span class="fu">:</span> <span class="st">&quot;Field &#39;invalid_field&#39; does not exist on table &#39;sn_devops_orchestration_task&#39;&quot;</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;failure&quot;</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><strong>Query Result (200 OK):</strong></p>
+<div class="sourceCode" id="cb23"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;result&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;sys_id&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123...&quot;</span><span class="fu">,</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;number&quot;</span><span class="fu">:</span> <span class="st">&quot;WI0001197&quot;</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;sys_id&quot;</span><span class="fu">:</span> <span class="st">&quot;def456...&quot;</span><span class="fu">,</span></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;number&quot;</span><span class="fu">:</span> <span class="st">&quot;WI0001198&quot;</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<hr />
+<h2 id="implementation-challenges-and-solutions">Implementation
+Challenges and Solutions</h2>
+<h3 id="challenge-1-tool-id-mismatch">Challenge 1: Tool ID Mismatch</h3>
+<p><strong>Problem:</strong> Initial implementation used incorrect tool
+sys_id, causing records to not link to correct project.</p>
+<p><strong>Root Cause:</strong> ServiceNow instance had multiple tools
+registered for GitHub integration: - GithHubARC (correct, sys_id:
+f62c4e49c3fcf614e1bbf0cb050131ef) - GitHub (incorrect, different
+sys_id)</p>
+<p><strong>Solution:</strong> 1. Query ServiceNow to identify correct
+tool:</p>
+<div class="sourceCode" id="cb24"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/sn_devops_tool?sysparm_query=nameLIKEGith&quot;</span> <span class="dt">\</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="st">&#39;.result[] | {name, sys_id}&#39;</span></span></code></pre></div>
+<ol start="2" type="1">
+<li>Update all workflows and composite actions to use correct tool
+sys_id</li>
+<li>Store as GitHub secret: <code>SN_ORCHESTRATION_TOOL_ID</code></li>
+</ol>
+<p><strong>Reference:</strong> <a
+href="docs/implemented/SERVICENOW-TOOL-ID-FIX.md">SERVICENOW-TOOL-ID-FIX.md</a></p>
+<h3 id="challenge-2-commit-message-parsing-for-work-items">Challenge 2:
+Commit Message Parsing for Work Items</h3>
+<p><strong>Problem:</strong> Work item extraction only parsed commit
+subject lines, missing issue references in commit bodies.</p>
+<p><strong>Root Cause:</strong> Git log command used
+<code>--pretty=format:"%s"</code> (subject only) instead of
+<code>--pretty=format:"%s%n%b"</code> (subject + body).</p>
+<p><strong>Solution:</strong> Modified work item extraction in
+<code>.github/actions/register-work-items/action.yaml</code>:</p>
+<div class="sourceCode" id="cb25"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Before (incorrect)</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="at">COMMITS=$(git log --pretty=format:&quot;%s&quot; -10)</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="co"># After (correct)</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="at">COMMITS=$(git log --pretty=format:&quot;%s%n%b&quot; -10)</span></span></code></pre></div>
+<p><strong>Impact:</strong> Improved work item extraction accuracy from
+~60% to ~95%.</p>
+<p><strong>Reference:</strong> <a
+href="docs/implemented/SERVICENOW-WORK-ITEMS-INTEGRATION.md">SERVICENOW-WORK-ITEMS-INTEGRATION.md</a></p>
+<h3 id="challenge-3-devops-api-vs-table-api-selection">Challenge 3:
+DevOps API vs Table API Selection</h3>
+<p><strong>Problem:</strong> Uncertainty about which API to use for
+change request creation.</p>
+<p><strong>Analysis:</strong> - DevOps Change Control API requires
+plugin configuration - Table API works immediately with any ServiceNow
+instance - Custom fields not available in DevOps Change Control API</p>
+<p><strong>Solution:</strong> Implement hybrid approach: 1. Use Table
+API for change request creation (with 40+ custom fields) 2. Use DevOps
+tables for supplementary tracking (test results, artifacts, work items)
+3. Link via <code>sn_devops_change_reference</code> table</p>
+<p><strong>Benefits:</strong> - No ServiceNow configuration required -
+Full compliance data capture - DevOps workspace visibility - Works on
+all ServiceNow instances including PDIs</p>
+<p><strong>Reference:</strong> <a
+href="docs/implemented/SERVICENOW-HYBRID-APPROACH.md">SERVICENOW-HYBRID-APPROACH.md</a></p>
+<h3 id="challenge-4-test-result-upload-timing">Challenge 4: Test Result
+Upload Timing</h3>
+<p><strong>Problem:</strong> Test results uploaded to ServiceNow before
+change request created, causing orphaned test records.</p>
+<p><strong>Root Cause:</strong> Parallel job execution - test jobs
+complete before change request creation job.</p>
+<p><strong>Solution:</strong> 1. Create change request first 2. Pass
+change_sys_id to downstream jobs via outputs 3. Associate test results
+with change request in subsequent jobs</p>
+<p><strong>Implementation:</strong></p>
+<div class="sourceCode" id="cb26"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">servicenow-change</span><span class="kw">:</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">outputs</span><span class="kw">:</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">change_sys_id</span><span class="kw">:</span><span class="at"> ${{ steps.create-cr.outputs.sys_id }}</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">upload-test-results</span><span class="kw">:</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">needs</span><span class="kw">:</span><span class="at"> servicenow-change</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">env</span><span class="kw">:</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">CHANGE_SYS_ID</span><span class="kw">:</span><span class="at"> ${{ needs.servicenow-change.outputs.change_sys_id }}</span></span></code></pre></div>
+<hr />
+<h2 id="future-enhancement-opportunities">Future Enhancement
+Opportunities</h2>
+<h3 id="real-time-deployment-status-updates">1. Real-Time Deployment
+Status Updates</h3>
+<p><strong>Current State:</strong> Change requests updated
+post-deployment with final status.</p>
+<p><strong>Enhancement:</strong> Stream deployment progress to
+ServiceNow in real-time: - Pod readiness updates every 30 seconds -
+Service health check results - Rolling update progress percentage -
+Error and warning log streaming</p>
+<p><strong>Implementation Approach:</strong></p>
+<div class="sourceCode" id="cb27"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Stream Deployment Status</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    while kubectl rollout status deployment/frontend -n microservices-dev; do</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>      READY=$(kubectl get deployment frontend -o jsonpath=&#39;{.status.readyReplicas}&#39;)</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>      TOTAL=$(kubectl get deployment frontend -o jsonpath=&#39;{.spec.replicas}&#39;)</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>      curl -X PATCH -u &quot;$USER:$PASS&quot; \</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>        &quot;$SN_URL/api/now/table/change_request/$CHANGE_SYS_ID&quot; \</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>        -d &quot;{\&quot;u_deployment_progress\&quot;: \&quot;$READY/$TOTAL pods ready\&quot;}&quot;</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>      sleep 30</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    done</span></code></pre></div>
+<h3 id="automated-rollback-integration">2. Automated Rollback
+Integration</h3>
+<p><strong>Enhancement:</strong> Link ServiceNow change request state to
+automatic rollback: - Monitor change request state during deployment -
+If changed to “cancelled”, trigger rollback - Update change request with
+rollback evidence - Restore previous version from package registry</p>
+<p><strong>Implementation Approach:</strong></p>
+<div class="sourceCode" id="cb28"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Monitor for Cancellation</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    while [ &quot;$DEPLOYMENT_IN_PROGRESS&quot; == &quot;true&quot; ]; do</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>      STATE=$(curl -s -u &quot;$USER:$PASS&quot; \</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>        &quot;$SN_URL/api/now/table/change_request/$CHANGE_SYS_ID?sysparm_fields=state&quot; \</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>        | jq -r &#39;.result.state&#39;)</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>      if [ &quot;$STATE&quot; == &quot;cancelled&quot; ]; then</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>        echo &quot;Change cancelled - initiating rollback&quot;</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>        kubectl rollout undo deployment/frontend -n microservices-prod</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>        exit 0</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>      fi</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>      sleep 30</span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>    done</span></code></pre></div>
+<h3 id="advanced-analytics-integration">3. Advanced Analytics
+Integration</h3>
+<p><strong>Enhancement:</strong> Populate ServiceNow analytics tables
+for trend analysis: - Deployment frequency metrics - Lead time for
+changes - Mean time to recovery (MTTR) - Change failure rate - DORA
+metrics calculation</p>
+<p><strong>Tables to Populate:</strong> -
+<code>sn_devops_deployment_metrics</code> -
+<code>sn_devops_change_velocity</code> -
+<code>sn_devops_reliability_metrics</code></p>
+<h3 id="bi-directional-synchronization">4. Bi-Directional
+Synchronization</h3>
+<p><strong>Enhancement:</strong> Sync change request updates back to
+GitHub: - Create GitHub issue when change request created - Update issue
+status based on change request state - Link ServiceNow change number in
+GitHub issue - Cross-reference comments between systems</p>
+<h3 id="configuration-item-ci-integration">5. Configuration Item (CI)
+Integration</h3>
+<p><strong>Enhancement:</strong> Register deployed services as
+Configuration Items in ServiceNow CMDB: - Create CI records for each
+microservice - Link CIs to change requests - Track service dependencies
+via CI relationships - Maintain CI version history</p>
+<p><strong>Implementation:</strong></p>
+<div class="sourceCode" id="cb29"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create CI for each service</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/cmdb_ci_service&quot;</span> <span class="dt">\</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&#39;{</span></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;name&quot;: &quot;frontend-service&quot;,</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;environment&quot;: &quot;prod&quot;,</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;operational_status&quot;: &quot;operational&quot;,</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;version&quot;: &quot;v1.2.3&quot;,</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;u_github_repo&quot;: &quot;Freundcloud/microservices-demo&quot;</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a><span class="st">  }&#39;</span></span></code></pre></div>
+<h3 id="performance-test-integration">6. Performance Test
+Integration</h3>
+<p><strong>Enhancement:</strong> Capture performance test results from
+load testing tools: - Locust load test metrics - K6 performance test
+results - JMeter test execution data - Response time percentiles (p50,
+p95, p99) - Throughput and error rate metrics</p>
+<p><strong>Table:</strong>
+<code>sn_devops_performance_test_summary</code></p>
+<h3 id="security-vulnerability-tracking">7. Security Vulnerability
+Tracking</h3>
+<p><strong>Enhancement:</strong> Detailed vulnerability management in
+ServiceNow: - Individual vulnerability records (CVE tracking) -
+Severity-based assignment rules - Remediation tracking and verification
+- Vulnerability aging metrics - Integration with security information
+and event management (SIEM)</p>
+<p><strong>Tables:</strong> - <code>sn_devops_security_result</code> -
+<code>sn_devops_vulnerability</code></p>
+<hr />
+<h2 id="operational-considerations">Operational Considerations</h2>
+<h3 id="monitoring-and-alerting">Monitoring and Alerting</h3>
+<p><strong>Key Metrics to Monitor:</strong></p>
+<ol type="1">
+<li><strong>Integration Success Rate</strong>
+<ul>
+<li>Percentage of successful API calls to ServiceNow</li>
+<li>Target: &gt;99% success rate</li>
+<li>Alert threshold: &lt;95% over 1-hour period</li>
+</ul></li>
+<li><strong>Data Synchronization Lag</strong>
+<ul>
+<li>Time between GitHub event and ServiceNow record creation</li>
+<li>Target: &lt;2 minutes average</li>
+<li>Alert threshold: &gt;5 minutes average</li>
+</ul></li>
+<li><strong>Missing Record Detection</strong>
+<ul>
+<li>Orphaned test results (no associated change request)</li>
+<li>Work items without project linkage</li>
+<li>Orchestration tasks with invalid tool references</li>
+<li>Alert: Daily summary of missing linkages</li>
+</ul></li>
+<li><strong>API Performance</strong>
+<ul>
+<li>ServiceNow API response time (p95)</li>
+<li>Target: &lt;2 seconds</li>
+<li>Alert threshold: &gt;5 seconds</li>
+</ul></li>
+</ol>
+<p><strong>Monitoring Implementation:</strong></p>
+<div class="sourceCode" id="cb30"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Monitor Integration Health</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">if</span><span class="kw">:</span><span class="at"> always()</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    # Count successful vs failed ServiceNow API calls</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    SUCCESS_COUNT=$(grep &quot;ServiceNow API: 201 Created&quot; workflow.log | wc -l)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    FAILURE_COUNT=$(grep &quot;ServiceNow API: ERROR&quot; workflow.log | wc -l)</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    SUCCESS_RATE=$(echo &quot;scale=2; $SUCCESS_COUNT / ($SUCCESS_COUNT + $FAILURE_COUNT) * 100&quot; | bc)</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    if (( $(echo &quot;$SUCCESS_RATE &lt; 95&quot; | bc -l) )); then</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>      echo &quot;::warning::ServiceNow integration success rate: ${SUCCESS_RATE}%&quot;</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    fi</span></code></pre></div>
+<h3 id="troubleshooting-guide">Troubleshooting Guide</h3>
+<p><strong>Issue: Orchestration tasks not appearing in
+ServiceNow</strong></p>
+<p><strong>Diagnosis:</strong> 1. Check workflow logs for API response
+codes 2. Verify tool sys_id matches project configuration 3. Confirm
+GitHub token has correct permissions 4. Validate ServiceNow
+credentials</p>
+<p><strong>Resolution:</strong></p>
+<div class="sourceCode" id="cb31"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify tool sys_id</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/sn_devops_tool?sysparm_query=name=GithHubARC&quot;</span> <span class="dt">\</span></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="st">&#39;.result[0].sys_id&#39;</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Check recent orchestration tasks</span></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/sn_devops_orchestration_task?sysparm_limit=10&amp;sysparm_query=sys_created_onONToday@javascript:gs.beginningOfToday()@javascript:gs.endOfToday()&quot;</span> <span class="dt">\</span></span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="st">&#39;.result[] | {number, name, sys_created_on}&#39;</span></span></code></pre></div>
+<p><strong>Issue: Work items not extracted from commits</strong></p>
+<p><strong>Diagnosis:</strong> 1. Check commit message format for issue
+references 2. Verify GitHub token has <code>issues: read</code>
+permission 3. Confirm issue numbers are valid and accessible</p>
+<p><strong>Resolution:</strong></p>
+<div class="sourceCode" id="cb32"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Test issue extraction locally</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> log <span class="at">--pretty</span><span class="op">=</span>format:<span class="st">&quot;%s%n%b&quot;</span> <span class="at">-10</span> <span class="dt">\</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-oP</span> <span class="st">&#39;(?:Fixes|Closes|Resolves|Issue)?\s*#\K\d+&#39;</span> <span class="dt">\</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify GitHub API access</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api /repos/Freundcloud/microservices-demo/issues/80</span></code></pre></div>
+<p><strong>Issue: Test results not linked to change request</strong></p>
+<p><strong>Diagnosis:</strong> 1. Verify change request created before
+test result upload 2. Check change_sys_id output from change request job
+3. Confirm test result API payload includes change_request field</p>
+<p><strong>Resolution:</strong></p>
+<div class="sourceCode" id="cb33"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Add debug output in workflow</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Debug Change Request</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    echo &quot;Change Sys ID: ${{ needs.servicenow-change.outputs.change_sys_id }}&quot;</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    echo &quot;Change Number: ${{ needs.servicenow-change.outputs.change_number }}&quot;</span></code></pre></div>
+<h3 id="performance-optimization">Performance Optimization</h3>
+<p><strong>Parallel API Calls:</strong></p>
+<p>When multiple independent ServiceNow records need creation, execute
+API calls in parallel:</p>
+<div class="sourceCode" id="cb34"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Sequential (slow) - 12 seconds for 12 services</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> service <span class="kw">in</span> frontend cartservice productcatalogservice<span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="ex">curl</span> <span class="at">-X</span> POST ... /api/now/table/sn_devops_artifact</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Parallel (fast) - 1-2 seconds for 12 services</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> service <span class="kw">in</span> frontend cartservice productcatalogservice<span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>  <span class="ex">curl</span> <span class="at">-X</span> POST ... /api/now/table/sn_devops_artifact <span class="kw">&amp;</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a><span class="bu">wait</span></span></code></pre></div>
+<p><strong>Batch Operations:</strong></p>
+<p>For bulk data insertion, use ServiceNow batch API:</p>
+<div class="sourceCode" id="cb35"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/batch&quot;</span> <span class="dt">\</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&#39;{</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;batch_request_id&quot;: &quot;batch-001&quot;,</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="st">    &quot;rest_requests&quot;: [</span></span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a><span class="st">      {&quot;method&quot;: &quot;POST&quot;, &quot;url&quot;: &quot;/api/now/table/sn_devops_artifact&quot;, &quot;body&quot;: {...}},</span></span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a><span class="st">      {&quot;method&quot;: &quot;POST&quot;, &quot;url&quot;: &quot;/api/now/table/sn_devops_artifact&quot;, &quot;body&quot;: {...}}</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a><span class="st">    ]</span></span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a><span class="st">  }&#39;</span></span></code></pre></div>
+<p><strong>Response Caching:</strong></p>
+<p>Cache frequently-accessed reference data (project sys_id, tool
+sys_id) to reduce API calls:</p>
+<div class="sourceCode" id="cb36"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Cache tool sys_id for 24 hours</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">[</span> <span class="ot">!</span> <span class="ot">-f</span> .cache/tool_sys_id <span class="bu">]</span> <span class="kw">||</span> <span class="bu">[</span> <span class="va">$(</span><span class="fu">find</span> .cache/tool_sys_id <span class="at">-mmin</span> +1440<span class="va">)</span> <span class="bu">]</span><span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="ex">curl</span> <span class="at">-s</span> <span class="at">-u</span> <span class="st">&quot;</span><span class="va">$USER</span><span class="st">:</span><span class="va">$PASS</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;</span><span class="va">$SN_URL</span><span class="st">/api/now/table/sn_devops_tool?sysparm_query=name=GithHubARC&quot;</span> <span class="dt">\</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-r</span> <span class="st">&#39;.result[0].sys_id&#39;</span> <span class="op">&gt;</span> .cache/tool_sys_id</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a><span class="va">TOOL_SYS_ID</span><span class="op">=</span><span class="va">$(</span><span class="fu">cat</span> .cache/tool_sys_id<span class="va">)</span></span></code></pre></div>
+<hr />
+<h2 id="security-best-practices">Security Best Practices</h2>
+<h3 id="credential-management">Credential Management</h3>
+<p><strong>GitHub Secrets Configuration:</strong></p>
+<p>All ServiceNow credentials stored as GitHub repository or
+organization secrets:</p>
+<table>
+<colgroup>
+<col style="width: 35%" />
+<col style="width: 24%" />
+<col style="width: 40%" />
+</colgroup>
+<thead>
+<tr>
+<th>Secret Name</th>
+<th>Purpose</th>
+<th>Example Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SERVICENOW_USERNAME</code></td>
+<td>API authentication username</td>
+<td>github_integration</td>
+</tr>
+<tr>
+<td><code>SERVICENOW_PASSWORD</code></td>
+<td>API authentication password</td>
+<td>(encrypted)</td>
+</tr>
+<tr>
+<td><code>SERVICENOW_INSTANCE_URL</code></td>
+<td>ServiceNow instance base URL</td>
+<td>https://calitiiltddemo3.service-now.com</td>
+</tr>
+<tr>
+<td><code>SN_ORCHESTRATION_TOOL_ID</code></td>
+<td>Tool sys_id for record linking</td>
+<td>f62c4e49c3fcf614e1bbf0cb050131ef</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Secret Rotation Policy:</strong></p>
+<ul>
+<li>Rotate ServiceNow password every 90 days</li>
+<li>Update GitHub secret immediately after rotation</li>
+<li>Test integration after credential update</li>
+<li>Maintain 24-hour overlap during rotation (if supported by
+ServiceNow)</li>
+</ul>
+<h3 id="api-request-security">API Request Security</h3>
+<p><strong>TLS/SSL Enforcement:</strong> - All API requests use HTTPS
+(TLS 1.2 minimum) - Certificate validation enabled (no self-signed certs
+in production) - Hostname verification enforced</p>
+<p><strong>Request Validation:</strong></p>
+<div class="sourceCode" id="cb37"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Validate instance URL before API call</span></span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="kw">[[</span> <span class="ot">!</span> <span class="st">&quot;</span><span class="va">$SERVICENOW_INSTANCE_URL</span><span class="st">&quot;</span> <span class="ot">=~</span> <span class="pp">^</span><span class="ss">https://</span><span class="op">[</span><span class="ss">a</span><span class="op">-</span><span class="ss">z0</span><span class="op">-</span><span class="ss">9-</span><span class="op">]</span><span class="pp">+</span><span class="dt">\.</span><span class="ss">service-now</span><span class="dt">\.</span><span class="ss">com</span><span class="op">$</span> <span class="kw">]];</span> <span class="cf">then</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>  <span class="bu">echo</span> <span class="st">&quot;Invalid ServiceNow URL format&quot;</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>  <span class="bu">exit</span> 1</span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code></pre></div>
+<p><strong>Input Sanitization:</strong></p>
+<div class="sourceCode" id="cb38"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Sanitize user-controlled input before API call</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="va">COMMIT_MESSAGE</span><span class="op">=</span><span class="va">$(</span><span class="bu">echo</span> <span class="st">&quot;</span><span class="va">$RAW_COMMIT_MSG</span><span class="st">&quot;</span> <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-Rs</span> .<span class="va">)</span>  <span class="co"># JSON-safe escaping</span></span></code></pre></div>
+<h3 id="audit-trail">Audit Trail</h3>
+<p><strong>Logging Requirements:</strong></p>
+<ol type="1">
+<li><strong>Log all API calls</strong> (without credentials):</li>
+</ol>
+<div class="sourceCode" id="cb39"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Create Orchestration Task</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>    echo &quot;API: POST /api/now/table/sn_devops_orchestration_task&quot;</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>    echo &quot;Payload: $(echo &quot;$PAYLOAD&quot; | jq -c &#39;del(.password)&#39;)&quot;</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>    RESPONSE=$(curl ...)</span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>    echo &quot;Response: $RESPONSE&quot;</span></code></pre></div>
+<ol start="2" type="1">
+<li><strong>Log ServiceNow record identifiers:</strong></li>
+</ol>
+<div class="sourceCode" id="cb40"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">echo &quot;Created</span><span class="kw">:</span><span class="at"> $TASK_NUMBER (sys_id: $TASK_SYS_ID)&quot;</span></span></code></pre></div>
+<ol start="3" type="1">
+<li><strong>Retain logs for compliance:</strong></li>
+</ol>
+<ul>
+<li>GitHub Actions logs retained for 90 days minimum</li>
+<li>ServiceNow audit tables (<code>sys_audit</code>) track all record
+changes</li>
+<li>Export critical logs to long-term storage (S3, CloudWatch)</li>
+</ul>
+<hr />
+<h2 id="conclusion">Conclusion</h2>
+<p>The GitHub-ServiceNow integration implemented in ARC establishes a
+comprehensive DevOps platform that bridges development workflows with
+enterprise change management and compliance requirements. By utilizing
+ServiceNow’s REST API and DevOps-specific tables, the solution
+achieves:</p>
+<p><strong>Technical Excellence:</strong> - Complete automation of
+manual data entry processes - Real-time synchronization between GitHub
+Actions and ServiceNow - Robust error handling and non-blocking failure
+modes - Scalable architecture supporting 12+ microservices</p>
+<p><strong>Business Value:</strong> - Compliance-ready audit trails for
+SOC 2, ISO 27001, PCI DSS - Reduced deployment friction through
+automated approvals - Complete traceability from commit to production -
+Risk-based decision making with comprehensive test evidence</p>
+<p><strong>Operational Benefits:</strong> - Zero-configuration
+deployment (no ServiceNow plugins required) - Environment-agnostic
+implementation (works on all ServiceNow instances) - Extensible
+architecture supporting future enhancements - Battle-tested in
+production deployments</p>
+<p>This integration serves as a reference implementation for
+organizations seeking to modernize their SDLC while maintaining
+enterprise governance standards.</p>
+<hr />
+<h2 id="appendix-a-api-endpoint-reference">Appendix A: API Endpoint
+Reference</h2>
+<h3 id="servicenow-table-api-endpoints">ServiceNow Table API
+Endpoints</h3>
+<p><strong>Base URL:</strong>
+<code>https://{instance}.service-now.com/api/now/table</code></p>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 18%" />
+<col style="width: 20%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Purpose</th>
+<th>Authentication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/change_request</code></td>
+<td>POST</td>
+<td>Create change request</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/change_request/{sys_id}</code></td>
+<td>GET</td>
+<td>Retrieve change request</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/change_request/{sys_id}</code></td>
+<td>PATCH</td>
+<td>Update change request</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_orchestration_task</code></td>
+<td>POST</td>
+<td>Register orchestration task</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_orchestration_task</code></td>
+<td>GET</td>
+<td>Query orchestration tasks</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_work_item</code></td>
+<td>POST</td>
+<td>Register work item</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_work_item</code></td>
+<td>GET</td>
+<td>Query work items</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_test_result</code></td>
+<td>POST</td>
+<td>Register test result</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_test_result</code></td>
+<td>GET</td>
+<td>Query test results</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_test_summary</code></td>
+<td>POST</td>
+<td>Register test summary</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_artifact</code></td>
+<td>POST</td>
+<td>Register artifact</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_package</code></td>
+<td>POST</td>
+<td>Register package</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_change_reference</code></td>
+<td>POST</td>
+<td>Link change to pipeline</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_tool</code></td>
+<td>GET</td>
+<td>Query registered tools</td>
+<td>Basic Auth</td>
+</tr>
+<tr>
+<td><code>/sn_devops_project</code></td>
+<td>GET</td>
+<td>Query projects</td>
+<td>Basic Auth</td>
+</tr>
+</tbody>
+</table>
+<h3 id="servicenow-devops-api-endpoints">ServiceNow DevOps API
+Endpoints</h3>
+<p><strong>Base URL:</strong>
+<code>https://{instance}.service-now.com/api/sn_devops/devops</code></p>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 18%" />
+<col style="width: 20%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Purpose</th>
+<th>Authentication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/tool/test</code></td>
+<td>POST</td>
+<td>Upload test results (via action)</td>
+<td>Token-based</td>
+</tr>
+<tr>
+<td><code>/package/registration</code></td>
+<td>POST</td>
+<td>Register deployment package</td>
+<td>Token-based</td>
+</tr>
+<tr>
+<td><code>/artifact/registration</code></td>
+<td>POST</td>
+<td>Register artifacts</td>
+<td>Token-based</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="appendix-b-workflow-reference">Appendix B: Workflow
+Reference</h2>
+<h3 id="key-workflows">Key Workflows</h3>
+<p><strong>Master CI/CD Pipeline:</strong> - Path:
+<code>.github/workflows/MASTER-PIPELINE.yaml</code> - Trigger: Push to
+main, pull requests, manual dispatch - Jobs: 15+ jobs orchestrating
+build, test, scan, deploy - ServiceNow Integration: Orchestration tasks,
+work items, test results, change requests</p>
+<p><strong>Change Request Creation:</strong> - Path:
+<code>.github/workflows/servicenow-change-rest.yaml</code> - Type:
+Reusable workflow - Purpose: Create change request with 40+ custom
+fields - Outputs: change_number, change_sys_id</p>
+<p><strong>Test Result Upload:</strong> - Path:
+<code>.github/workflows/upload-test-results-servicenow.yaml</code> -
+Type: Reusable workflow - Purpose: Upload test execution results to
+ServiceNow - Integration: sn_devops_test_result table</p>
+<h3 id="composite-actions">Composite Actions</h3>
+<p><strong>Register Orchestration Task:</strong> - Path:
+<code>.github/actions/register-orchestration-task/action.yaml</code> -
+Usage: Track GitHub Actions jobs in ServiceNow - Integration:
+sn_devops_orchestration_task table</p>
+<p><strong>Register Work Items:</strong> - Path:
+<code>.github/actions/register-work-items/action.yaml</code> - Usage:
+Extract issues from commits and register in ServiceNow - Integration:
+sn_devops_work_item table</p>
+<hr />
+<h2 id="document-metadata">Document Metadata</h2>
+<p><strong>Document Version:</strong> 1.0 <strong>Created:</strong>
+2025-11-10 <strong>Last Updated:</strong> 2025-11-10
+<strong>Status:</strong> Production <strong>Classification:</strong>
+Technical Reference <strong>Audience:</strong> Engineers, Architects,
+Technical Partners</p>
+<p><strong>Related Documentation:</strong> - <a
+href="GITHUB-SERVICENOW-DATA-FLOW.md">GITHUB-SERVICENOW-DATA-FLOW.md</a>
+- Visual demo guide - <a
+href="implemented/SERVICENOW-HYBRID-APPROACH.md">SERVICENOW-HYBRID-APPROACH.md</a>
+- Implementation strategy - <a
+href="implemented/SERVICENOW-DEVOPS-TABLES-REFERENCE.md">SERVICENOW-DEVOPS-TABLES-REFERENCE.md</a>
+- Table schemas</p>
+<p><strong>Revision History:</strong></p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 18%" />
+<col style="width: 25%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Author</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>2025-11-10</td>
+<td>Claude Code</td>
+<td>Initial technical deep dive document</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
