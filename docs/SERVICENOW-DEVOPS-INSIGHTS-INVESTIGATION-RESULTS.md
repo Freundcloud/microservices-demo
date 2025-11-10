@@ -366,11 +366,36 @@ The investigation has definitively proven that:
 
 ---
 
+## Playbook Investigation Completed (2025-11-10)
+
+**Investigation method**: ServiceNow REST API analysis of flows, business rules, audit logs, and system logs
+
+**Key Finding**: **NO playbook was triggered** when repository was linked to project (2025-11-10 14:52:36 UTC)
+
+**Details**:
+- Analyzed 2,606 flow executions during timeframe - all were GitHub webhook-related flows (orchestration, notifications, scans)
+- No flows executed that create DevOps Insights records or update Application fields
+- No business rules found that update `creation_source` field
+- No audit log of `creation_source` field change
+- No system logs showing insights record creation attempts
+
+**Conclusion**:
+- Application's `creation_source: "playbook"` likely set manually or via earlier unknown event
+- GitHub integration does **NOT** include playbook that creates DevOps Insights records
+- GitLab integration includes playbook, GitHub integration does not
+- Manual creation or ServiceNow support intervention required
+
+**See**: **[Playbook Investigation Findings](SERVICENOW-PLAYBOOK-INVESTIGATION-FINDINGS.md)** for complete analysis and UI investigation steps
+
+---
+
 ## Related Documentation
 
+- **[Playbook Investigation Findings](SERVICENOW-PLAYBOOK-INVESTIGATION-FINDINGS.md)** - Complete API investigation results and UI next steps
 - **[Current State Summary](SERVICENOW-CURRENT-STATE-SUMMARY.md)** - Complete current configuration and next steps
+- **[Repository Statistics Limitation](SERVICENOW-REPOSITORY-STATISTICS-LIMITATION.md)** - Why statistics are empty (expected behavior)
 - **[Quick Start Guide](SERVICENOW-QUICK-START.md)** - 3-minute manual creation attempt
-- **[Playbook Investigation](SERVICENOW-PLAYBOOK-INVESTIGATION-GUIDE.md)** - How to identify and trigger playbooks
+- **[Playbook Investigation Guide](SERVICENOW-PLAYBOOK-INVESTIGATION-GUIDE.md)** - How to identify and trigger playbooks via UI
 - **[Support Ticket Template](SERVICENOW-SUPPORT-TICKET-TEMPLATE.md)** - Request ServiceNow support assistance
 
 ---
