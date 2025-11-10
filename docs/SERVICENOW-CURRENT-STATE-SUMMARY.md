@@ -50,7 +50,8 @@ The repository misconfiguration has been successfully resolved. All components (
 }
 ```
 **Status**: ✅ Properly linked to both Project and Application
-**Data**: ✅ Branches and commits imported
+**Data**: ⚠️ Only 2 commits and 1 branch imported (historical data NOT imported - expected behavior)
+**Statistics**: Empty (will populate as new commits are pushed - see Repository Statistics Limitation below)
 
 #### 4. SBOM Summaries (sn_devops_software_quality_scan_summary)
 - **Count**: 21 records
@@ -276,6 +277,34 @@ https://calitiiltddemo3.service-now.com/sn_devops_insights_st_summary.do?sys_id=
 2. Why playbook didn't create DevOps Insights record
 3. How to manually trigger playbook to complete creation
 4. Whether this is a bug or expected behavior requiring manual insights creation
+
+---
+
+## Repository Statistics Limitation
+
+**Note**: The repository Details tab shows empty statistics (dashes for all fields):
+- Total commits: —
+- Total merges: —
+- Average files per commit: —
+- etc.
+
+**This is expected behavior** - ServiceNow only imports commits from GitHub Actions webhook events, NOT historical commits. Currently only 2 commits have been imported (from this investigation):
+- `fb6dc042` - "docs: Update ServiceNow DevOps Insights investigation..."
+- `56a22cdc` - "Trigger ServiceNow repository data reimport"
+
+Statistics will populate naturally as new commits are pushed and workflows run. Historical commits (~150+) will **NOT** be imported. This does NOT prevent the application from appearing in DevOps Insights dashboard.
+
+**See**: [SERVICENOW-REPOSITORY-STATISTICS-LIMITATION.md](SERVICENOW-REPOSITORY-STATISTICS-LIMITATION.md) for complete explanation.
+
+---
+
+## Related Documentation
+
+- **[Repository Statistics Limitation](SERVICENOW-REPOSITORY-STATISTICS-LIMITATION.md)** - Why statistics are empty (expected behavior)
+- **[Investigation Results](SERVICENOW-DEVOPS-INSIGHTS-INVESTIGATION-RESULTS.md)** - Full investigation timeline
+- **[Quick Start Guide](SERVICENOW-QUICK-START.md)** - 3-minute manual creation attempt
+- **[Playbook Investigation](SERVICENOW-PLAYBOOK-INVESTIGATION-GUIDE.md)** - How to identify and trigger playbooks
+- **[Support Ticket Template](SERVICENOW-SUPPORT-TICKET-TEMPLATE.md)** - Request ServiceNow support assistance
 
 ---
 
