@@ -309,24 +309,73 @@ Then update workflows to populate `u_application` instead of `application`.
 - `/tmp/check-reverse-relationship.sh` - Reverse linkage check
 - `/tmp/final-summary.md` - Investigation summary
 
+## Repository Configuration Fix (2025-11-10)
+
+### Issue: Duplicate Repository Entries
+
+During investigation, discovered duplicate repository entries in GithHubARC tool:
+- Repository sys_id `02217f7dc38d7a50b71ef44c05013178` - Had Project linked but NO imported data (branches, commits)
+- Repository sys_id `a27eca01c3303a14e1bbf0cb05013125` - NO Project, NO Application
+- Repository sys_id `2cb353f6c3c13a10b71ef44c0501313f` - **Original with imported data**, had Application but NO Project
+
+### Resolution
+
+1. **Deleted empty repositories** (02217f7dc38d7a50b71ef44c05013178 and a27eca01c3303a14e1bbf0cb05013125)
+2. **Linked correct repository to Project**:
+   ```bash
+   PATCH /api/now/table/sn_devops_repository/2cb353f6c3c13a10b71ef44c0501313f
+   {"project": "c6c9eb71c34d7a50b71ef44c05013194"}
+   ```
+
+### Final Configuration ✅
+
+**Repository sys_id**: `2cb353f6c3c13a10b71ef44c0501313f`
+- **Name**: Freundcloud/microservices-demo
+- **URL**: https://github.com/Freundcloud/microservices-demo
+- **Project**: Freundcloud/microservices-demo (c6c9eb71c34d7a50b71ef44c05013194) ✅
+- **Application**: Online Boutique (e489efd1c3383e14e1bbf0cb050131d5) ✅
+- **Native ID**: 1076023411 (GitHub repository ID)
+- **Status**: Configured ✅
+- **Imported Data**: Branches and commits present ✅
+
 ## Conclusion
 
-**Issue Status**: **BLOCKED on ServiceNow configuration/support**
+**Issue Status**: **BLOCKED on ServiceNow playbook workflow**
 
 The investigation has definitively proven that:
-1. ✅ The schema fields needed for linking do not exist
-2. ✅ No native mechanism exists to connect projects and applications
-3. ✅ This is not a workflow bug or data issue
-4. ❌ This requires ServiceNow expertise to resolve
+1. ✅ Repository properly configured and linked to both Project and Application
+2. ✅ Repository has imported data (branches, commits)
+3. ✅ SBOM summaries linked to Project (21 records)
+4. ✅ Critical discovery: HelloWorld4 (GitLab) uses playbook workflow (`creation_source: "playbook"`) and HAS insights record
+5. ❌ Online Boutique (GitHub) created manually (`creation_source: ""`) and NO insights record
+6. ❌ DevOps Insights record creation is BLOCKED by ACLs - only playbooks with elevated permissions can create records
+
+**Root Cause**: GitHub integration does NOT trigger the same playbook workflow that GitLab integration uses. GitLab automatically creates both Application and Insights records via playbook. GitHub only creates Projects and Repositories, leaving Application and Insights records to be created manually.
 
 **Next Required Action**: ServiceNow administrator/support intervention to:
-- Verify correct modules installed
-- Check instance configuration
-- Provide guidance on project-application linking
-- Potentially create custom fields or enable missing features
+- Identify which playbook GitLab integration uses (Flow Designer UI access required)
+- Configure GitHub integration to trigger same playbook workflow
+- OR manually trigger playbook to create DevOps Insights record for Online Boutique
+- OR provide privileged script to create insights record (bypassing ACLs)
+- Verify correct modules and features are enabled for GitHub integration
+
+**Alternative Approaches**:
+1. **Manual UI Form Creation**: Try direct form URL with sys_id pre-populated (see SERVICENOW-QUICK-START.md)
+2. **ServiceNow Support Ticket**: Request assistance creating insights record (see SERVICENOW-SUPPORT-TICKET-TEMPLATE.md)
+3. **Contact HelloWorld4 Creator**: Ask alex.wells@calitii.com how GitLab integration was configured
+
+---
+
+## Related Documentation
+
+- **[Current State Summary](SERVICENOW-CURRENT-STATE-SUMMARY.md)** - Complete current configuration and next steps
+- **[Quick Start Guide](SERVICENOW-QUICK-START.md)** - 3-minute manual creation attempt
+- **[Playbook Investigation](SERVICENOW-PLAYBOOK-INVESTIGATION-GUIDE.md)** - How to identify and trigger playbooks
+- **[Support Ticket Template](SERVICENOW-SUPPORT-TICKET-TEMPLATE.md)** - Request ServiceNow support assistance
 
 ---
 
 *Investigation completed: 2025-11-10*
+*Repository configuration fixed: 2025-11-10*
 *Documented by: Claude Code*
 *Related Issue: [#78](https://github.com/Freundcloud/microservices-demo/issues/78)*
