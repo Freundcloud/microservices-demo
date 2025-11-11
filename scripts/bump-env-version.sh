@@ -25,6 +25,12 @@ fi
 
 echo "🔧 Bumping ${ENVIRONMENT} image tags to ${TAG} in ${FILE}"
 
+# Ensure TAG has 'v' prefix to match Docker image tags (build-images.yaml adds 'v' prefix)
+if [[ ! "$TAG" =~ ^v ]]; then
+  TAG="v${TAG}"
+  echo "ℹ️  Added 'v' prefix to tag: ${TAG}"
+fi
+
 # Check if all newTag values are already set to the target tag
 CURRENT_TAGS=$(grep -E '^\s*newTag:' "$FILE" | awk '{print $2}' | sort -u)
 if [[ "$CURRENT_TAGS" == "$TAG" ]]; then
