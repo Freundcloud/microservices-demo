@@ -633,8 +633,14 @@ demo-run ENV TAG="":
             fi
 
         echo "🚀 Trigger MASTER-PIPELINE for {{ENV}} with version {{TAG}}"
+        # Use main branch for dev (merged to main), release branch for qa/prod
+        if [ "{{ENV}}" = "dev" ]; then
+            REF_BRANCH="main"
+        else
+            REF_BRANCH="release/{{TAG}}"
+        fi
         gh workflow run MASTER-PIPELINE.yaml \
-            --ref release/{{TAG}} \
+            --ref "$REF_BRANCH" \
             -f environment={{ENV}} \
             -f version={{TAG}} \
             -f force_build_all=true
