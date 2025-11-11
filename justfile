@@ -611,8 +611,8 @@ demo-run ENV TAG="":
                 if [[ "$BRANCH" =~ ^release\/ ]]; then
                     echo "ℹ️ Skipping auto-merge for release branch; PR remains open until production completes."
                 else
-                if ! gh pr merge --squash --delete-branch --merge; then
-                    if ! gh pr merge --squash --delete-branch --admin --merge; then
+                if ! gh pr merge --squash --delete-branch; then
+                    if ! gh pr merge --squash --delete-branch --admin; then
                         echo "❌ Unable to auto-merge PR. Please merge it in the GitHub UI, then rerun: just demo-deploy ENV={{ENV}}"; exit 1; fi
                 fi
             fi
