@@ -97,8 +97,20 @@ jobs:
           # Determine environment based on trigger
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            ENV="dev"  # Auto-deploy to dev on main
+          elif [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            # For push events to main, detect environment from changed Kustomize overlays
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || echo "")
+
+            if echo "$CHANGED_FILES" | grep -q 'kustomize/overlays/prod/'; then
+              ENV="prod"
+              echo "🎯 Detected PROD deployment from Kustomize overlay changes"
+            elif echo "$CHANGED_FILES" | grep -q 'kustomize/overlays/qa/'; then
+              ENV="qa"
+              echo "🎯 Detected QA deployment from Kustomize overlay changes"
+            else
+              ENV="dev"
+              echo "🎯 Detected DEV deployment (default for main branch)"
+            fi
           elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
             ENV="dev"
           else
