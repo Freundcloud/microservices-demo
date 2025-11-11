@@ -634,6 +634,7 @@ demo-run ENV TAG="":
 
         echo "🚀 Trigger MASTER-PIPELINE for {{ENV}} with version {{TAG}}"
         gh workflow run MASTER-PIPELINE.yaml \
+            --ref release/{{TAG}} \
             -f environment={{ENV}} \
             -f version={{TAG}} \
             -f force_build_all=true
