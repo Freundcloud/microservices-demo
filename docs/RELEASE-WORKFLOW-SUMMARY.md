@@ -42,7 +42,13 @@ New:     1.4.0
 - Updates `kustomize/overlays/dev/kustomization.yaml`
 - Creates PR linked to issue
 - Auto-merges PR
-- Triggers MASTER-PIPELINE
+- Triggers MASTER-PIPELINE with:
+  - `environment=dev`
+  - `version=1.4.0`
+  - `force_build_all=true`
+- **Builds all 12 Docker images** (frontend, cart, catalog, etc.)
+- **Tags images**: `v1.4.0`, `dev-sha123`, `latest`
+- **Pushes images to ECR**
 - Deploys to `microservices-dev` namespace
 - ServiceNow: Auto-approved ✅
 
@@ -53,7 +59,13 @@ New:     1.4.0
 - Creates branch: `release/1.4.0`
 - Updates `kustomize/overlays/qa/kustomization.yaml`
 - Creates PR
-- Triggers MASTER-PIPELINE
+- Triggers MASTER-PIPELINE with:
+  - `environment=qa`
+  - `version=1.4.0`
+  - `force_build_all=true`
+- **Builds all 12 Docker images** (if not already built)
+- **Tags images**: `v1.4.0`, `qa-sha123`
+- **Pushes images to ECR**
 - **PAUSES** for ServiceNow approval ⏸️
 - Waits for QA Lead approval in ServiceNow
 - After approval: Deploys to `microservices-qa` namespace
@@ -65,7 +77,13 @@ New:     1.4.0
 - Uses same `release/1.4.0` branch
 - Updates `kustomize/overlays/prod/kustomization.yaml`
 - Creates PR
-- Triggers MASTER-PIPELINE
+- Triggers MASTER-PIPELINE with:
+  - `environment=prod`
+  - `version=1.4.0`
+  - `force_build_all=true`
+- **Builds all 12 Docker images** (if not already built)
+- **Tags images**: `v1.4.0`, `prod-sha123`, `latest`
+- **Pushes images to ECR**
 - **PAUSES** for ServiceNow CAB approval ⏸️
 - Waits for Change Advisory Board approval
 - After approval: Deploys to `microservices-prod` namespace
@@ -242,6 +260,25 @@ Complete audit trail is maintained in:
 - 🚀 GitHub Actions (CI/CD workflows)
 - 📊 ServiceNow Change Requests (approvals)
 - 🐳 Kubernetes (deployment history)
+
+## Key Features
+
+### Automated Docker Image Building
+The workflow **automatically builds all Docker images** as part of the deployment:
+- No manual image building required
+- Images are built with the correct version tag
+- All 12 services built in parallel for efficiency
+- Images pushed to ECR before Kubernetes deployment
+- Eliminates ImagePullBackOff errors from missing images
+
+This means you **never need to manually run**:
+```bash
+# ❌ NOT NEEDED - Automated workflow does this
+just docker-build-all
+just ecr-push service dev
+```
+
+The `demo-run` command and automated workflows handle everything!
 
 ## Troubleshooting
 

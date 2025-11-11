@@ -113,7 +113,13 @@ just demo-run ENV=prod TAG=1.4.0
 
 8. **Triggers MASTER-PIPELINE**
    - Workflow: `.github/workflows/MASTER-PIPELINE.yaml`
-   - Parameter: `environment={ENV}`
+   - Parameters:
+     - `environment={ENV}` (dev/qa/prod)
+     - `version={TAG}` (semantic version for image tagging)
+     - `force_build_all=true` (builds all service images)
+   - Builds Docker images for all 12 services
+   - Tags images with version (e.g., `v1.4.0`, `dev-sha`, `latest`)
+   - Pushes images to ECR
    - Waits for ServiceNow approval (qa/prod only)
 
 9. **Monitors Deployment**

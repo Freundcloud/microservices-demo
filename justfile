@@ -632,8 +632,11 @@ demo-run ENV TAG="":
                 fi
             fi
 
-        echo "🚀 Trigger MASTER-PIPELINE for {{ENV}}"
-        gh workflow run MASTER-PIPELINE.yaml -f environment={{ENV}}
+        echo "🚀 Trigger MASTER-PIPELINE for {{ENV}} with version {{TAG}}"
+        gh workflow run MASTER-PIPELINE.yaml \
+            -f environment={{ENV}} \
+            -f version={{TAG}} \
+            -f force_build_all=true
         # Allow a moment for the run to register
         sleep 5
         RUN_ID=$(gh run list --workflow MASTER-PIPELINE.yaml --limit 1 --json databaseId,createdAt | jq -r '.[0].databaseId')

@@ -36,10 +36,15 @@ just promotion-status 1.4.0       # Check version across all environments
 3. Creates feature/release branch
 4. Updates kustomize overlays
 5. Creates and auto-merges PR
-6. Triggers MASTER-PIPELINE
-7. Deploys to Kubernetes
-8. Waits for ServiceNow approval (qa/prod)
-9. Closes issue after success
+6. Triggers MASTER-PIPELINE with version and force_build_all
+7. **Builds all 12 Docker images** (frontend, cart, catalog, etc.)
+8. **Tags images** with version (v1.4.0, dev-sha, latest)
+9. **Pushes images to ECR**
+10. Deploys to Kubernetes
+11. Waits for ServiceNow approval (qa/prod)
+12. Closes issue after success
+
+**No manual image building required!** The workflow handles everything.
 
 **Complete Guide**: [docs/AUTOMATED-RELEASE-GUIDE.md](docs/AUTOMATED-RELEASE-GUIDE.md)
 
