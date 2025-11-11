@@ -589,11 +589,26 @@ demo-run ENV TAG="":
         ./scripts/bump-env-version.sh "{{ENV}}" "{{TAG}}"
 
         echo "📝 Commit changes"
+        git add -A
+
+        # Check if there are any changes to commit
+        if git diff --cached --quiet; then
+            echo "ℹ️  No changes detected - version already at {{TAG}} for {{ENV}}"
+            echo "✅ Skipping commit, PR creation, and deployment (already up to date)"
+
+            # Clean up branch and return early
+            git checkout main 2>/dev/null || true
+            git branch -D "$BRANCH" 2>/dev/null || true
+
+            echo ""
+            echo "🎉 Environment {{ENV}} is already at version {{TAG}}"
+            exit 0
+        fi
+
+        # Commit the changes
         if [ -n "$ISSUE_NUM" ]; then
-            git add -A
             git commit -m "chore({{ENV}}): bump version to {{TAG}} (refs #$ISSUE_NUM)"
         else
-            git add -A
             git commit -m "chore({{ENV}}): bump version to {{TAG}}"
         fi
 
@@ -628,7 +643,7 @@ demo-run ENV TAG="":
         echo "⏳ Waiting for ServiceNow approval and deployment to complete (run id: $RUN_ID)"
         echo "👉 If gated (qa/prod), approve the change in ServiceNow to resume deployment."
         # Exit nonzero on failure so we don't close the issue
-        gh run watch --run-id "$RUN_ID" --exit-status || { echo "❌ Deployment failed. See run $RUN_ID in GitHub Actions."; exit 1; }
+        gh run watch "$RUN_ID" --exit-status || { echo "❌ Deployment failed. See run $RUN_ID in GitHub Actions."; exit 1; }
 
         echo "🎉 Deployment completed successfully"
         if [ -n "$ISSUE_NUM" ]; then

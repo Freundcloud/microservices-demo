@@ -25,6 +25,14 @@ fi
 
 echo "🔧 Bumping ${ENVIRONMENT} image tags to ${TAG} in ${FILE}"
 
+# Check if all newTag values are already set to the target tag
+CURRENT_TAGS=$(grep -E '^\s*newTag:' "$FILE" | awk '{print $2}' | sort -u)
+if [[ "$CURRENT_TAGS" == "$TAG" ]]; then
+  echo "ℹ️  All image tags are already set to ${TAG} for ${ENVIRONMENT}"
+  echo "✅ No changes needed"
+  exit 0
+fi
+
 # Replace all newTag values to the desired tag (safe in-place with backup)
 sed -i.bak -E "s/^(\s*newTag:)\s*.*/\1 ${TAG}/" "$FILE"
 rm -f "${FILE}.bak"
