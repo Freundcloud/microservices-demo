@@ -1114,6 +1114,135 @@ bump-patch:
     echo "✅ Version bumped to $NEW_VERSION"
 
 # ==============================================================================
+# Automated Version Release Workflows
+# ==============================================================================
+
+# Complete automated workflow: bump minor version and deploy through all environments
+release-minor-auto:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🚀 Starting Automated Minor Version Release Workflow"
+    echo "====================================================="
+    echo ""
+
+    # 1. Bump minor version
+    CURRENT_VERSION=$(cat VERSION)
+    IFS='.' read -ra VER <<< "$CURRENT_VERSION"
+    MAJOR="${VER[0]}"
+    MINOR="${VER[1]}"
+    NEW_MINOR=$((MINOR + 1))
+    NEW_VERSION="$MAJOR.$NEW_MINOR.0"
+
+    echo "📦 Bumping MINOR version: $CURRENT_VERSION → $NEW_VERSION"
+    echo "$NEW_VERSION" > VERSION
+    git add VERSION
+    git commit -m "chore: Bump version to $NEW_VERSION"
+    git push origin main
+    echo "✅ Version file updated and pushed"
+    echo ""
+
+    # 2. Deploy to dev (auto-approved)
+    echo "🟢 Deploying to DEV environment..."
+    just demo-run dev $NEW_VERSION
+    echo ""
+
+    # 3. Prompt for QA deployment
+    read -p "🟡 Deploy to QA? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🟡 Deploying to QA environment (requires ServiceNow approval)..."
+        just demo-run qa $NEW_VERSION
+    fi
+    echo ""
+
+    # 4. Prompt for production deployment
+    read -p "🔴 Deploy to PROD? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🔴 Deploying to PROD environment (requires ServiceNow approval)..."
+        just demo-run prod $NEW_VERSION
+    fi
+    echo ""
+
+    echo "🎉 Release workflow complete!"
+    echo "Version $NEW_VERSION deployed successfully"
+
+# Complete automated workflow: bump patch version and deploy through all environments
+release-patch-auto:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🚀 Starting Automated Patch Version Release Workflow"
+    echo "====================================================="
+    echo ""
+
+    # 1. Bump patch version
+    CURRENT_VERSION=$(cat VERSION)
+    IFS='.' read -ra VER <<< "$CURRENT_VERSION"
+    MAJOR="${VER[0]}"
+    MINOR="${VER[1]}"
+    PATCH="${VER[2]}"
+    NEW_PATCH=$((PATCH + 1))
+    NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+
+    echo "📦 Bumping PATCH version: $CURRENT_VERSION → $NEW_VERSION"
+    echo "$NEW_VERSION" > VERSION
+    git add VERSION
+    git commit -m "chore: Bump version to $NEW_VERSION"
+    git push origin main
+    echo "✅ Version file updated and pushed"
+    echo ""
+
+    # 2. Deploy to dev (auto-approved)
+    echo "🟢 Deploying to DEV environment..."
+    just demo-run dev $NEW_VERSION
+    echo ""
+
+    # 3. Prompt for QA deployment
+    read -p "🟡 Deploy to QA? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🟡 Deploying to QA environment (requires ServiceNow approval)..."
+        just demo-run qa $NEW_VERSION
+    fi
+    echo ""
+
+    # 4. Prompt for production deployment
+    read -p "🔴 Deploy to PROD? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🔴 Deploying to PROD environment (requires ServiceNow approval)..."
+        just demo-run prod $NEW_VERSION
+    fi
+    echo ""
+
+    echo "🎉 Release workflow complete!"
+    echo "Version $NEW_VERSION deployed successfully"
+
+# Deploy existing version to specific environment using complete workflow
+release-deploy-version VERSION ENV:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "🚀 Deploying Version {{VERSION}} to {{ENV}}"
+    echo "=========================================="
+    echo ""
+
+    # Validate environment
+    if [[ "{{ENV}}" != "dev" && "{{ENV}}" != "qa" && "{{ENV}}" != "prod" ]]; then
+        echo "❌ Invalid environment: {{ENV}}"
+        echo "   Must be one of: dev, qa, prod"
+        exit 1
+    fi
+
+    # Run the demo workflow
+    just demo-run {{ENV}} {{VERSION}}
+
+    echo ""
+    echo "✅ Deployment to {{ENV}} complete!"
+
+# ==============================================================================
 # Automated Promotion Pipeline Commands
 # ==============================================================================
 
@@ -1226,44 +1355,68 @@ promotion-status VERSION:
 release-help:
     @echo "🚀 Release Management Commands"
     @echo ""
-    @echo "Quick Commands:"
-    @echo "  just release-dev          - Auto-increment patch and deploy to dev"
-    @echo "  just release-qa 1.1.0     - Release v1.1.0 to QA (creates branch/tag)"
-    @echo "  just release-prod 1.1.0   - Release v1.1.0 to Production (creates branch/tag)"
+    @echo "🎯 Fully Automated Workflows (Recommended):"
+    @echo "  just release-minor-auto           - Bump minor version + deploy to all envs"
+    @echo "  just release-patch-auto           - Bump patch version + deploy to all envs"
+    @echo "  just release-deploy-version 1.2.0 dev   - Deploy existing version to env"
     @echo ""
-    @echo "Version Bumping:"
+    @echo "What these do:"
+    @echo "  1. Create GitHub issue (ticket)"
+    @echo "  2. Bump version in VERSION file"
+    @echo "  3. Create feature/release branch"
+    @echo "  4. Update kustomize overlays"
+    @echo "  5. Create and auto-merge PR"
+    @echo "  6. Trigger MASTER-PIPELINE"
+    @echo "  7. Wait for ServiceNow approval (qa/prod)"
+    @echo "  8. Deploy to Kubernetes"
+    @echo "  9. Close GitHub issue"
+    @echo ""
+    @echo "📝 Version Bumping Only:"
     @echo "  just bump-major           - Bump major version (1.0.0 → 2.0.0)"
     @echo "  just bump-minor           - Bump minor version (1.0.0 → 1.1.0)"
     @echo "  just bump-patch           - Bump patch version (1.0.0 → 1.0.1)"
     @echo ""
-    @echo "Manual Release:"
-    @echo "  just release 1.2.3 dev    - Release specific version to dev"
-    @echo "  just release 1.2.3 qa     - Release specific version to QA"
-    @echo "  just release 1.2.3 prod   - Release specific version to prod"
+    @echo "🔧 Manual Workflows:"
+    @echo "  just demo-run dev 1.2.0           - Full workflow for specific env/version"
+    @echo "  just promote 1.2.3 all            - Promote version to all envs (interactive)"
+    @echo "  just release-dev                  - Auto-increment patch and deploy to dev"
+    @echo "  just release-qa 1.1.0             - Release v1.1.0 to QA"
+    @echo "  just release-prod 1.1.0           - Release v1.1.0 to Production"
     @echo ""
-    @echo "Deployment:"
-    @echo "  just deploy dev           - Deploy to dev"
-    @echo "  just deploy qa            - Deploy to QA (via ServiceNow)"
-    @echo "  just deploy prod          - Deploy to prod (via ServiceNow)"
+    @echo "🚀 Environment Deployments:"
+    @echo "  just deploy-dev           - Deploy to dev (auto-approved)"
+    @echo "  just deploy-qa            - Deploy to QA (requires ServiceNow approval)"
+    @echo "  just deploy-prod          - Deploy to prod (requires ServiceNow approval)"
     @echo ""
-    @echo "Monitoring:"
+    @echo "📊 Monitoring:"
     @echo "  just watch-deploy         - Watch current deployment"
     @echo "  just deployments          - List recent deployments"
     @echo "  just version              - Show current version"
+    @echo "  just promotion-status 1.2.0  - Check version across all envs"
     @echo ""
-    @echo "Rollback:"
+    @echo "⏮️  Rollback:"
     @echo "  just rollback dev         - Rollback dev environment"
     @echo "  just rollback qa          - Rollback QA environment"
     @echo "  just rollback prod        - Rollback prod environment"
     @echo ""
-    @echo "Workflows:"
-    @echo "  • Dev: Push to main → Auto builds/tests/deploys to dev"
-    @echo "  • QA/Prod: Use 'just release-qa' or 'just release-prod'"
-    @echo "    - Creates release/X.Y branch"
-    @echo "    - Creates vX.Y.Z tag"
-    @echo "    - Builds and pushes images"
-    @echo "    - Triggers ServiceNow change management"
-    @echo "    - Deploys after approval"
+    @echo "📚 Example Usage:"
+    @echo "  # Complete automated release"
+    @echo "  just release-minor-auto"
+    @echo "  # → Bumps 1.3.0 → 1.4.0"
+    @echo "  # → Creates ticket"
+    @echo "  # → Deploys to dev automatically"
+    @echo "  # → Prompts for qa deployment"
+    @echo "  # → Prompts for prod deployment"
+    @echo ""
+    @echo "📖 Workflows:"
+    @echo "  • Automated: Use release-minor-auto or release-patch-auto"
+    @echo "  • Manual Control: Use demo-run for specific env/version"
+    @echo "  • Promotion: Use promote for multi-env with wait between"
+    @echo ""
+    @echo "🔐 ServiceNow Integration:"
+    @echo "  • Dev: Auto-approved, immediate deployment"
+    @echo "  • QA: Requires manual approval in ServiceNow"
+    @echo "  • Prod: Requires CAB approval in ServiceNow"
 
 # ==============================================================================
 # Enterprise Demonstrations

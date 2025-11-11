@@ -12,6 +12,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Essential Commands
 
+### Automated Release Management (NEW!)
+```bash
+# Complete automated version bump and deployment workflow
+just release-minor-auto           # Bump 1.3.0 → 1.4.0 and deploy to all envs
+just release-patch-auto           # Bump 1.3.0 → 1.3.1 and deploy to all envs
+
+# Manual control over specific environment
+just demo-run dev 1.4.0           # Full workflow: ticket → branch → PR → deploy → close
+
+# Version bumping only
+just bump-minor                   # Bump 1.3.0 → 1.4.0 (no deployment)
+just bump-patch                   # Bump 1.3.0 → 1.3.1 (no deployment)
+
+# Help and status
+just release-help                 # Show all release commands
+just promotion-status 1.4.0       # Check version across all environments
+```
+
+**What happens automatically:**
+1. Creates GitHub issue (ticket)
+2. Bumps version in VERSION file
+3. Creates feature/release branch
+4. Updates kustomize overlays
+5. Creates and auto-merges PR
+6. Triggers MASTER-PIPELINE
+7. Deploys to Kubernetes
+8. Waits for ServiceNow approval (qa/prod)
+9. Closes issue after success
+
+**Complete Guide**: [docs/AUTOMATED-RELEASE-GUIDE.md](docs/AUTOMATED-RELEASE-GUIDE.md)
+
 ### Developer Onboarding
 ```bash
 # First time setup (automated)
