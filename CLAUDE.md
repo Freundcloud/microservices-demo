@@ -19,7 +19,7 @@ just release-minor-auto           # Bump 1.3.0 → 1.4.0 and deploy to all envs
 just release-patch-auto           # Bump 1.3.0 → 1.3.1 and deploy to all envs
 
 # Manual control over specific environment
-just demo-run ENV=dev TAG=1.4.0   # Full workflow: ticket → branch → PR → deploy → close
+just demo-run dev 1.4.0           # Full workflow: ticket → branch → PR → deploy → close
 
 # Version bumping only
 just bump-minor                   # Bump 1.3.0 → 1.4.0 (no deployment)

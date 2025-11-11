@@ -1144,7 +1144,7 @@ release-minor-auto:
 
     # 2. Deploy to dev (auto-approved)
     echo "🟢 Deploying to DEV environment..."
-    just demo-run ENV=dev TAG=$NEW_VERSION
+    just demo-run dev $NEW_VERSION
     echo ""
 
     # 3. Prompt for QA deployment
@@ -1152,7 +1152,7 @@ release-minor-auto:
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "🟡 Deploying to QA environment (requires ServiceNow approval)..."
-        just demo-run ENV=qa TAG=$NEW_VERSION
+        just demo-run qa $NEW_VERSION
     fi
     echo ""
 
@@ -1161,7 +1161,7 @@ release-minor-auto:
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "🔴 Deploying to PROD environment (requires ServiceNow approval)..."
-        just demo-run ENV=prod TAG=$NEW_VERSION
+        just demo-run prod $NEW_VERSION
     fi
     echo ""
 
@@ -1196,7 +1196,7 @@ release-patch-auto:
 
     # 2. Deploy to dev (auto-approved)
     echo "🟢 Deploying to DEV environment..."
-    just demo-run ENV=dev TAG=$NEW_VERSION
+    just demo-run dev $NEW_VERSION
     echo ""
 
     # 3. Prompt for QA deployment
@@ -1204,7 +1204,7 @@ release-patch-auto:
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "🟡 Deploying to QA environment (requires ServiceNow approval)..."
-        just demo-run ENV=qa TAG=$NEW_VERSION
+        just demo-run qa $NEW_VERSION
     fi
     echo ""
 
@@ -1213,7 +1213,7 @@ release-patch-auto:
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "🔴 Deploying to PROD environment (requires ServiceNow approval)..."
-        just demo-run ENV=prod TAG=$NEW_VERSION
+        just demo-run prod $NEW_VERSION
     fi
     echo ""
 
@@ -1237,7 +1237,7 @@ release-deploy-version VERSION ENV:
     fi
 
     # Run the demo workflow
-    just demo-run ENV={{ENV}} TAG={{VERSION}}
+    just demo-run {{ENV}} {{VERSION}}
 
     echo ""
     echo "✅ Deployment to {{ENV}} complete!"
@@ -1377,7 +1377,7 @@ release-help:
     @echo "  just bump-patch           - Bump patch version (1.0.0 → 1.0.1)"
     @echo ""
     @echo "🔧 Manual Workflows:"
-    @echo "  just demo-run ENV=dev TAG=1.2.0   - Full workflow for specific env/version"
+    @echo "  just demo-run dev 1.2.0           - Full workflow for specific env/version"
     @echo "  just promote 1.2.3 all            - Promote version to all envs (interactive)"
     @echo "  just release-dev                  - Auto-increment patch and deploy to dev"
     @echo "  just release-qa 1.1.0             - Release v1.1.0 to QA"
