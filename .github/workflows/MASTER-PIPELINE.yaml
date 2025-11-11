@@ -727,10 +727,11 @@ jobs:
 
   deploy-to-environment:
     name: "🚀 Deploy Application"
-    needs: [pipeline-init, servicenow-change]
+    needs: [pipeline-init, servicenow-change, build-and-push]
     if: |
-      needs.servicenow-change.result == 'success' ||
-      (needs.servicenow-change.result == 'skipped' && needs.pipeline-init.outputs.is_production != 'true')
+      (needs.servicenow-change.result == 'success' ||
+       (needs.servicenow-change.result == 'skipped' && needs.pipeline-init.outputs.is_production != 'true')) &&
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
     uses: ./.github/workflows/deploy-environment.yaml
     secrets: inherit
     with:
