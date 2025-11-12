@@ -655,8 +655,42 @@ demo-run ENV TAG="":
         if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
             echo "❌ Could not determine run id. You can watch runs with: gh run list --workflow MASTER-PIPELINE.yaml"; exit 1; fi
 
-        echo "⏳ Waiting for ServiceNow approval and deployment to complete (run id: $RUN_ID)"
-        echo "👉 If gated (qa/prod), approve the change in ServiceNow to resume deployment."
+        echo "⏳ Waiting for ServiceNow Change Request creation..."
+        # For qa/prod, wait for CR to be created, then auto-approve it
+        if [ "{{ENV}}" != "dev" ]; then
+            echo "👉 QA/PROD deployment requires ServiceNow approval"
+            echo "⏳ Waiting for Change Request to be created (checking every 30s)..."
+
+            # Wait up to 5 minutes for CR to be created
+            MAX_ATTEMPTS=10
+            ATTEMPT=0
+            CR_NUMBER=""
+
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+                sleep 30
+                # Try to find CR from workflow run logs (CR number appears in workflow output)
+                CR_SEARCH=$(gh run view "$RUN_ID" --log 2>/dev/null | grep -oP "Change Request Created: CHG\d+" | head -1 || echo "")
+                if [ -n "$CR_SEARCH" ]; then
+                    CR_NUMBER=$(echo "$CR_SEARCH" | grep -oP "CHG\d+")
+                    echo "✅ Found Change Request: $CR_NUMBER"
+                    break
+                fi
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "   Still waiting... (attempt $ATTEMPT/$MAX_ATTEMPTS)"
+            done
+
+            if [ -z "$CR_NUMBER" ]; then
+                echo "⚠️  Could not find CR number automatically"
+                echo "👉 Approve manually in ServiceNow or check workflow logs"
+            else
+                echo "🤖 Auto-approving Change Request: $CR_NUMBER"
+                ./scripts/approve-servicenow-cr.sh "$CR_NUMBER" || {
+                    echo "⚠️  Auto-approval failed. Approve manually: just sn-approve-cr $CR_NUMBER"
+                }
+            fi
+        fi
+
+        echo "⏳ Watching deployment progress (run id: $RUN_ID)"
         # Exit nonzero on failure so we don't close the issue
         gh run watch "$RUN_ID" --exit-status || { echo "❌ Deployment failed. See run $RUN_ID in GitHub Actions."; exit 1; }
 
