@@ -4,7 +4,27 @@
 
 ## Quick Start
 
-To approve a Change Request for QA or PROD deployment:
+### Automated Approval (Recommended)
+
+QA/PROD deployments now **auto-approve** Change Requests automatically:
+
+```bash
+# Deploys to QA with automatic CR approval
+just demo-run qa 1.5.5
+
+# Deploys to PROD with automatic CR approval
+just demo-run prod 1.5.5
+```
+
+The workflow will:
+1. Create the Change Request in ServiceNow
+2. Wait for CR creation (up to 5 minutes)
+3. **Automatically approve** the CR using the script
+4. Continue with deployment
+
+### Manual Approval (When Needed)
+
+If auto-approval fails or you need to approve manually:
 
 ```bash
 # 1. Load ServiceNow credentials
@@ -164,18 +184,24 @@ just demo-run dev 1.5.4
 - CR state set directly to `scheduled` (-2)
 - Deployment proceeds immediately
 
-### QA/PROD Environments
+### QA/PROD Environments (Auto-Approval)
 
 ```bash
 just demo-run qa 1.5.4
 just demo-run prod 1.5.4
 ```
 
+**Automated Flow:**
 1. **CR Created**: State set to `assess` (-4), approval set to `requested`
 2. **Approvers Added**: Olaf and GitHubARC DevOps Admin added automatically
-3. **Workflow Waits**: GitHub Actions polls for approval
-4. **Manual Approval Required**: Run `just sn-approve-cr CHG0030XXX`
-5. **Deployment Proceeds**: Once approved and scheduled
+3. **Workflow Detects CR**: Searches logs for CR number (waits up to 5 minutes)
+4. **Auto-Approval**: Script automatically approves and transitions to `scheduled`
+5. **Deployment Proceeds**: Deployment continues without manual intervention
+
+**Fallback:**
+- If auto-approval fails, workflow displays manual approval command
+- Use `just sn-approve-cr CHG0030XXX` to approve manually
+- Workflow continues to poll for approval
 
 ## ServiceNow UI Access
 
