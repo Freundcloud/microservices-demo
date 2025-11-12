@@ -721,6 +721,112 @@ jobs:
           fi
 
       # ========================================
+      # ADD APPROVERS (QA/PROD only)
+      # ========================================
+
+      - name: Add Approvers to Change Request
+        id: add-approvers
+        if: steps.create-cr.outputs.change_sys_id != '' && inputs.environment != 'dev'
+        env:
+          CHANGE_SYSID: ${{ steps.create-cr.outputs.change_sys_id }}
+          CHANGE_NUMBER: ${{ steps.create-cr.outputs.change_number }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          SERVICENOW_USERNAME: ${{ secrets.SERVICENOW_USERNAME }}
+          SERVICENOW_PASSWORD: ${{ secrets.SERVICENOW_PASSWORD }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+        run: |
+          echo "👥 Adding approvers to Change Request $CHANGE_NUMBER..."
+          echo ""
+
+          # Approver sys_ids (hardcoded for reliability)
+          OLAF_USER_SYS_ID="220ab6a6c34a2e10e1bbf0cb0501314c"  # Olaf Krasicki-Freund
+          DEVOPS_GROUP_SYS_ID="9825d52ec3e8ba90e1bbf0cb0501315b"  # GitHubARC DevOps Admin
+
+          # Function to add an approver
+          add_approver() {
+            local APPROVER_TYPE=$1
+            local APPROVER_SYS_ID=$2
+            local APPROVER_NAME=$3
+
+            echo "Adding $APPROVER_TYPE: $APPROVER_NAME..."
+
+            # Check if approver already exists
+            EXISTING=$(curl -s -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sysapproval_approver?sysparm_query=sysapproval=$CHANGE_SYSID^approver=$APPROVER_SYS_ID&sysparm_fields=sys_id" | \
+              jq -r '.result[0].sys_id // "none"')
+
+            if [ "$EXISTING" != "none" ]; then
+              echo "  ✓ Already exists (sys_id: $EXISTING)"
+              return 0
+            fi
+
+            # Create approver payload
+            if [ "$APPROVER_TYPE" = "user" ]; then
+              PAYLOAD=$(jq -n \
+                --arg source_table "change_request" \
+                --arg sysapproval "$CHANGE_SYSID" \
+                --arg approver "$APPROVER_SYS_ID" \
+                --arg state "requested" \
+                '{
+                  source_table: $source_table,
+                  sysapproval: $sysapproval,
+                  approver: $approver,
+                  state: $state
+                }')
+            else
+              # Group approver
+              PAYLOAD=$(jq -n \
+                --arg source_table "change_request" \
+                --arg sysapproval "$CHANGE_SYSID" \
+                --arg group "$APPROVER_SYS_ID" \
+                --arg state "requested" \
+                '{
+                  source_table: $source_table,
+                  sysapproval: $sysapproval,
+                  group: $group,
+                  state: $state
+                }')
+            fi
+
+            # Add approver
+            RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+              -u "$SERVICENOW_USERNAME:$SERVICENOW_PASSWORD" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -X POST \
+              -d "$PAYLOAD" \
+              "$SERVICENOW_INSTANCE_URL/api/now/table/sysapproval_approver")
+
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | cut -d':' -f2)
+            BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
+
+            if [ "$HTTP_CODE" = "201" ]; then
+              APPROVER_RECORD=$(echo "$BODY" | jq -r '.result.sys_id')
+              echo "  ✅ Added successfully (sys_id: $APPROVER_RECORD)"
+            else
+              echo "  ⚠️  Failed to add (HTTP $HTTP_CODE)"
+              echo "$BODY" | jq '.' || echo "$BODY"
+            fi
+          }
+
+          # Add Olaf as individual approver
+          add_approver "user" "$OLAF_USER_SYS_ID" "Olaf Krasicki-Freund"
+          echo ""
+
+          # Add GitHubARC DevOps Admin group as approver
+          add_approver "group" "$DEVOPS_GROUP_SYS_ID" "GitHubARC DevOps Admin"
+          echo ""
+
+          echo "✅ Approvers added to Change Request $CHANGE_NUMBER"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "  1. Navigate to ServiceNow Change Request: $CHANGE_NUMBER"
+          echo "  2. You should now see approval requests in the 'Approvals' related list"
+          echo "  3. Approve the change to proceed with deployment"
+          echo ""
+          echo "🔗 Direct link: $SERVICENOW_INSTANCE_URL/change_request.do?sys_id=$CHANGE_SYSID"
+
+      # ========================================
       # PHASE 1: DevOps Workspace Integration
       # ========================================
 
