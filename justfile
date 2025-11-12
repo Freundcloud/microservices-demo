@@ -405,6 +405,11 @@ backend-destroy:
 # ServiceNow Integration
 # ==============================================================================
 
+# Approve a ServiceNow Change Request
+sn-approve-cr CR_NUMBER:
+    @echo "✅ Approving ServiceNow Change Request: {{CR_NUMBER}}..."
+    @./scripts/approve-servicenow-cr.sh {{CR_NUMBER}}
+
 # Run security scan and send results to ServiceNow
 sn-security-scan:
     @echo "🔐 Running security scan with ServiceNow integration..."
