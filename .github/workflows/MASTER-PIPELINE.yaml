@@ -742,7 +742,7 @@ jobs:
     needs: [pipeline-init, servicenow-change, build-and-push]
     if: |
       needs.pipeline-init.outputs.should_deploy == 'true' &&
-      !inputs.skip_deploy &&
+      (inputs.skip_deploy == false || inputs.skip_deploy == '') &&
       (needs.servicenow-change.result == 'success' ||
        (needs.servicenow-change.result == 'skipped' && needs.pipeline-init.outputs.is_production != 'true')) &&
       (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped')
