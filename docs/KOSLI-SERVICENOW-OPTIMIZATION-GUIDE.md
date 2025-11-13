@@ -38,10 +38,10 @@ GitHub Actions → Kosli (attest evidence) → ServiceNow (minimal CR with Kosli
 
 ---
 
-## Optimization Strategy 1: Enhanced Evidence Presentation
+## Optimization Strategy 1: CAB Evidence Dashboard
 
 ### Goal
-Present Kosli evidence directly within ServiceNow UI for faster CAB decision-making.
+Present Kosli compliance evidence directly within ServiceNow UI for faster CAB decision-making.
 
 ### Implementation Options
 
@@ -412,14 +412,14 @@ function buildComplianceDashboard(data) {
 
 ---
 
-## Optimization Strategy 2: Automated Approval Rules
+## Optimization Strategy 2: Automated Governance with Risk Scoring
 
 ### Goal
-Automatically approve low-risk deployments based on Kosli compliance metrics, reducing CAB overhead.
+Automatically approve low-risk deployments based on Kosli compliance risk scores, reducing CAB overhead.
 
 ### Implementation: ServiceNow Approval Business Rule
 
-**Create tiered approval automation based on risk:**
+**Create tiered automated governance based on calculated risk scores:**
 
 ```javascript
 // ServiceNow Business Rule: "Kosli-Based Auto-Approval"
@@ -591,11 +591,12 @@ function determineApprovalAction(riskScore, environment, kosliData) {
 | **< 70** | QA/PROD | High/critical risk | ❌ Mandatory CAB review |
 
 **Benefits:**
-- ✅ **80% reduction** in manual approvals (for compliant deployments)
-- ✅ CAB focuses on high-risk changes only
-- ✅ Faster time-to-production for low-risk changes
-- ✅ Consistent, objective approval criteria
-- ✅ Audit trail shows automated approval reasoning
+
+- **80% reduction** in manual approvals (for compliant deployments)
+- CAB focuses on high-risk changes only
+- Faster time-to-production for low-risk changes
+- Consistent, objective risk-based approval criteria
+- Audit trail shows automated governance reasoning
 
 ---
 
@@ -785,59 +786,6 @@ function sendCriticalAlertEmail(changeRequest, kosliData) {
 
 ---
 
-## Implementation Roadmap
-
-### Phase 1: Enhanced Evidence Presentation (2-3 weeks)
-
-**Week 1-2:**
-- [ ] Create custom ServiceNow tables (u_kosli_artifact, u_kosli_test_result, u_kosli_vulnerability)
-- [ ] Implement scheduled job to sync Kosli data to ServiceNow
-- [ ] Add related lists to Change Request form
-- [ ] Test data sync with sample deployments
-
-**Week 3:**
-- [ ] Create UI Action button "View Kosli Compliance Dashboard"
-- [ ] Implement modal dialog with visual evidence summary
-- [ ] Add CSS styling for compliance dashboard
-- [ ] User acceptance testing with CAB members
-
-### Phase 2: Automated Approval Rules (2 weeks)
-
-**Week 1:**
-- [ ] Implement risk scoring algorithm
-- [ ] Create business rule for auto-approval logic
-- [ ] Add custom fields (u_risk_score, u_risk_level, u_approval_method)
-- [ ] Test approval rules with various risk scenarios
-
-**Week 2:**
-- [ ] Configure approval thresholds (adjust for organization)
-- [ ] Document approval criteria and exceptions
-- [ ] Train CAB on new automated approval process
-- [ ] Monitor and tune risk scoring algorithm
-
-### Phase 3: CAB Dashboard & Analytics (2 weeks)
-
-**Week 1:**
-- [ ] Create Performance Analytics dashboard widgets
-- [ ] Build CAB homepage portal
-- [ ] Configure summary cards and trend charts
-- [ ] Implement high-risk changes queue
-
-**Week 2:**
-- [ ] Add filtering and drill-down capabilities
-- [ ] Create scheduled email reports for CAB
-- [ ] Setup compliance trend tracking
-- [ ] Enable export functionality
-
-### Phase 4: Alerting & Continuous Improvement (1 week)
-
-- [ ] Implement event management for compliance alerts
-- [ ] Configure email notifications for critical issues
-- [ ] Create escalation rules for stale approvals
-- [ ] Establish feedback loop for rule tuning
-
----
-
 ## Expected Benefits
 
 ### Quantitative Improvements
@@ -853,23 +801,26 @@ function sendCriticalAlertEmail(changeRequest, kosliData) {
 ### Qualitative Improvements
 
 **For CAB Members:**
-- ✅ Evidence presented in familiar ServiceNow UI
-- ✅ Visual risk indicators (color-coded, charts)
-- ✅ Focus only on high-risk changes (70-80% auto-approved)
-- ✅ Historical trends for context
-- ✅ Faster decision-making with pre-calculated risk scores
+
+- Evidence presented in familiar ServiceNow UI
+- Visual risk indicators (color-coded, charts)
+- Focus only on high-risk changes (70-80% auto-approved)
+- Historical trends for context
+- Faster decision-making with pre-calculated risk scores
 
 **For DevOps Teams:**
-- ✅ Faster approvals for compliant deployments
-- ✅ Clear visibility into approval criteria
-- ✅ Reduced deployment delays
-- ✅ Objective, consistent approval process
+
+- Faster approvals for compliant deployments
+- Clear visibility into risk-based approval criteria
+- Reduced deployment delays
+- Objective, consistent governance process
 
 **For Compliance/Audit:**
-- ✅ Documented approval criteria and reasoning
-- ✅ Audit trail of automated decisions
-- ✅ Evidence persists in ServiceNow (compliance requirement)
-- ✅ Trend analysis for continuous improvement
+
+- Documented risk-based approval criteria and reasoning
+- Audit trail of automated governance decisions
+- Evidence persists in ServiceNow (compliance requirement)
+- Trend analysis for continuous improvement
 
 ---
 
@@ -911,17 +862,17 @@ function sendCriticalAlertEmail(changeRequest, kosliData) {
 By implementing these optimizations, the Kosli-ServiceNow integration delivers:
 
 1. **Enhanced CAB Experience** - Evidence presented natively in ServiceNow with visual dashboards
-2. **Automated Approvals** - 70-80% reduction in manual approvals via risk-based automation
+2. **Automated Governance** - 70-80% reduction in manual approvals via risk-based automation
 3. **Faster Deployments** - 95% reduction in time-to-approval for low-risk changes
-4. **Better Governance** - Consistent, objective, auditable approval criteria
+4. **Better Governance** - Consistent, objective, auditable risk-based approval criteria
 
 **Recommended Starting Point:**
 
-Begin with **Phase 1 (Enhanced Evidence Presentation)** to improve CAB experience without changing approval workflows. Once CAB is comfortable with the new interface, introduce **Phase 2 (Automated Approvals)** gradually:
+Begin with **CAB Evidence Dashboard** to improve CAB experience without changing approval workflows. Once CAB is comfortable with the new interface, introduce **Automated Governance** gradually:
 
 1. Start with QA environment only
 2. Require perfect score (100) for auto-approval
-3. Monitor for 2 weeks
+3. Monitor and validate results
 4. Gradually lower threshold and enable PROD auto-approval
 5. Continuous tuning based on feedback
 
